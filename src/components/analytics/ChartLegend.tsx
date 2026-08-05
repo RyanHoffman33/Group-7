@@ -25,7 +25,7 @@ export function ChartLegend({
             label: "Projected revenue",
             dashed: true,
           },
-          { color: ANALYTICS_COLORS.band, label: "Confidence band", swatch: "band" },
+          { color: ANALYTICS_COLORS.band, label: "80% prediction band", swatch: "band" },
         ]
       : variant === "history"
         ? [
@@ -42,7 +42,7 @@ export function ChartLegend({
               label: "Projected revenue (dashed)",
               dashed: true,
             },
-            { color: ANALYTICS_COLORS.band, label: "Forecast band", swatch: "band" },
+            { color: ANALYTICS_COLORS.band, label: "80% prediction band", swatch: "band" },
           ];
 
   return (

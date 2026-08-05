@@ -41,6 +41,20 @@ function assert(cond: boolean, msg: string) {
   const avg = f.points.reduce((s, p) => s + p.revenue, 0) / 6;
   assert(avg > 150000, `seed forecast should stay near run-rate, got ${avg}`);
   assert(f.method.includes("ensemble"), `method label: ${f.method}`);
+  assert(f.confidence.score >= 0 && f.confidence.score <= 100, "confidence score");
+  assert(
+    f.confidence.label === "High" ||
+      f.confidence.label === "Medium" ||
+      f.confidence.label === "Low",
+    "confidence label",
+  );
+  assert(f.confidence.intervalLevel === 0.8, "80% intervals");
+  // Bands should widen with horizon when residual scale is positive.
+  const w0 = f.points[0].revenueHigh - f.points[0].revenueLow;
+  const wLast =
+    f.points[f.points.length - 1].revenueHigh -
+    f.points[f.points.length - 1].revenueLow;
+  assert(wLast >= w0 * 0.95, `bands should not shrink with horizon: ${w0} → ${wLast}`);
 }
 
 // Trailing near-zero months must not force forever-zero forecasts.

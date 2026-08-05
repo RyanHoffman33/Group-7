@@ -25,6 +25,14 @@ function scaleForecast(base: ForecastResult, factor: number): ForecastResult {
   };
 }
 
+function confidenceTone(
+  label: ForecastResult["confidence"]["label"],
+): "accent" | "default" | "warn" {
+  if (label === "High") return "accent";
+  if (label === "Low") return "warn";
+  return "default";
+}
+
 export function ProjectionsClient({
   history,
   initialForecast,
@@ -89,7 +97,7 @@ export function ProjectionsClient({
         ))}
       </div>
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-3">
+      <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Next 3 months revenue"
           value={formatCurrency(next3Rev)}
@@ -118,11 +126,21 @@ export function ProjectionsClient({
                 : "Flat trend"
           }
         />
+        <StatCard
+          label="Forecast confidence"
+          value={`${forecast.confidence.label} (${forecast.confidence.score}%)`}
+          hint={`${Math.round(forecast.confidence.intervalLevel * 100)}% band · holdout RMSE ${formatCurrency(forecast.confidence.residualRmse)}`}
+          tone={confidenceTone(forecast.confidence.label)}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Projected revenue trend">
-          <ProjectionChart history={history} forecast={forecast.points} />
+          <ProjectionChart
+            history={history}
+            forecast={forecast.points}
+            confidence={forecast.confidence}
+          />
         </Panel>
         <Panel title="Projected months">
           <ul className="divide-y divide-[var(--line)] text-sm">
@@ -143,6 +161,9 @@ export function ProjectionsClient({
                 <div className="text-right">
                   <p className="font-semibold tabular-nums text-[#2f9a57]">
                     <Money amount={p.revenue} />
+                  </p>
+                  <p className="text-[11px] tabular-nums text-[var(--muted)]">
+                    <Money amount={p.revenueLow} />–<Money amount={p.revenueHigh} />
                   </p>
                   <p
                     className={`text-[11px] tabular-nums ${

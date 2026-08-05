@@ -151,6 +151,7 @@ export function AnalyticsCenterClient({
             history={bundle.history.slice(-12)}
             forecast={forecast.points}
             showLegend={false}
+            confidence={forecast.confidence}
           />
           <p className="mt-3 text-xs text-[var(--muted)]">
             Model: {forecast.method} (full history; filters apply to charts/KPIs)

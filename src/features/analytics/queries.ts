@@ -191,8 +191,9 @@ export function buildFallbackInsights(bundle: AnalyticsBundle): string[] {
     const first = forecast.points[0];
     const lastF = forecast.points[forecast.points.length - 1];
     const bandWidth = lastF.revenueHigh - lastF.revenueLow;
+    const conf = forecast.confidence;
     tips.push(
-      `Forecast uncertainty widens to ±$${Math.round(bandWidth / 2).toLocaleString()} by ${lastF.month.slice(0, 7)}; near-term ${first.month.slice(0, 7)} is the more actionable planning month.`,
+      `Forecast confidence is ${conf.label} (${conf.score}%); the ${Math.round(conf.intervalLevel * 100)}% band widens to ±$${Math.round(bandWidth / 2).toLocaleString()} by ${lastF.month.slice(0, 7)} — near-term ${first.month.slice(0, 7)} is the more actionable planning month.`,
     );
   }
 

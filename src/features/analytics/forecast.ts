@@ -10,6 +10,18 @@ export type ForecastPoint = {
   revenueHigh: number;
 };
 
+export type ForecastConfidence = {
+  /** 0–100 score from residual CV, member agreement, and sample size. */
+  score: number;
+  label: "High" | "Medium" | "Low";
+  /** Nominal prediction-interval coverage (e.g. 0.8). */
+  intervalLevel: number;
+  /** Holdout 1-step RMSE used to size bands. */
+  residualRmse: number;
+  /** Mean relative ensemble disagreement across the horizon (0–1+). */
+  disagreement: number;
+};
+
 export type ForecastResult = {
   method: string;
   horizonMonths: number;
@@ -17,7 +29,12 @@ export type ForecastResult = {
   /** Implied month-over-month revenue change from the ensemble path. */
   revenueSlope: number;
   rmse: number;
+  confidence: ForecastConfidence;
 };
+
+/** ~80% two-sided normal quantile for prediction intervals. */
+const PI_Z = 1.2816;
+const PI_LEVEL = 0.8;
 
 function monthKey(d: Date): string {
   const y = d.getUTCFullYear();
@@ -256,10 +273,42 @@ function seasonalFactors(
 
 type SeriesFit = {
   path: number[];
+  /** Per-horizon std-dev of weighted ensemble member paths (disagreement). */
+  memberSpread: number[];
+  /** Walk-forward 1-step RMSE of the inverse-error ensemble. */
   residualRmse: number;
+  /** Coefficient of variation of holdout residuals vs baseline level. */
+  residualCv: number;
   slope: number;
   components: string[];
+  n: number;
 };
+
+function confidenceFromFit(
+  residualCv: number,
+  disagreement: number,
+  n: number,
+  residualRmse: number,
+): ForecastConfidence {
+  // Low relative error → high score (CV of 0 → 1; CV ≥ 45% → 0).
+  const accuracy = clamp(1 - residualCv / 0.45, 0, 1);
+  // Models agreeing → high score.
+  const agreement = clamp(1 - disagreement / 0.35, 0, 1);
+  // More history → modest bump (saturates ~24 months).
+  const sample = clamp((n - 4) / 20, 0, 1);
+  const score = Math.round(
+    100 * (0.5 * accuracy + 0.35 * agreement + 0.15 * sample),
+  );
+  const label: ForecastConfidence["label"] =
+    score >= 72 ? "High" : score >= 48 ? "Medium" : "Low";
+  return {
+    score,
+    label,
+    intervalLevel: PI_LEVEL,
+    residualRmse,
+    disagreement,
+  };
+}
 
 /**
  * Ensemble one numeric series (revenue / cogs / events).
@@ -275,13 +324,22 @@ function ensembleSeries(
 ): SeriesFit {
   const n = values.length;
   if (n === 0) {
-    return { path: Array(horizon).fill(0), residualRmse: 0, slope: 0, components: [] };
+    return {
+      path: Array(horizon).fill(0),
+      memberSpread: Array(horizon).fill(0),
+      residualRmse: 0,
+      residualCv: 0,
+      slope: 0,
+      components: [],
+      n: 0,
+    };
   }
 
   const posMean = positiveTrailingMean(values, 6);
   const posMedian = positiveTrailingMedian(values, 6);
   const zeroShare = values.filter((v) => v <= 0).length / n;
   const intermittent = zeroShare >= 0.2 && values.some((v) => v > 0);
+  const baseline = Math.max(posMean, posMedian, 1);
 
   // Fit primarily on positive observations for trend models.
   const posIdx: number[] = [];
@@ -378,6 +436,8 @@ function ensembleSeries(
   const minTrain = Math.min(4, Math.max(2, n - 3));
   const errors = cands.map(() => 0);
   const errW = cands.map(() => 0);
+  // Collect ensemble (equal-then-reweighted) holdout residuals for PI sizing.
+  const holdoutResid: number[] = [];
   for (let t = minTrain; t < n; t++) {
     const histY = values.slice(0, t);
     const histM = months.slice(0, t);
@@ -436,6 +496,23 @@ function ensembleSeries(
       errors[c] += e * recency;
       errW[c] += recency;
     }
+
+    // Preliminary inverse-error ensemble residual at this origin
+    // (weights from errors accumulated so far — expanding).
+    let ensPred = 0;
+    let wSumT = 0;
+    for (let c = 0; c < preds.length; c++) {
+      const avgErr = errW[c] > 0 ? errors[c] / errW[c] : 1;
+      const w = 1 / Math.max(avgErr, 0.05);
+      ensPred += w * preds[c];
+      wSumT += w;
+    }
+    ensPred /= wSumT || 1;
+    // Skip pure recognition-lag zeros when we have a positive baseline —
+    // they inflate residual scale without reflecting forecast skill.
+    if (!(actual <= 0 && pm > 0)) {
+      holdoutResid.push(actual - ensPred);
+    }
   }
 
   for (let c = 0; c < cands.length; c++) {
@@ -459,9 +536,19 @@ function ensembleSeries(
   for (const c of cands) c.weight /= wSum;
 
   const path: number[] = [];
+  const memberSpread: number[] = [];
   for (let h = 0; h < horizon; h++) {
-    let v = 0;
-    for (const c of cands) v += c.weight * c.path[h];
+    let meanV = 0;
+    for (const c of cands) meanV += c.weight * c.path[h];
+    // Weighted std vs unfloored mean (honest disagreement signal).
+    let varSum = 0;
+    for (const c of cands) {
+      const d = c.path[h] - meanV;
+      varSum += c.weight * d * d;
+    }
+    memberSpread.push(Math.sqrt(Math.max(0, varSum)));
+
+    let v = meanV;
     // Soft floor toward positive run-rate (recognition-lag protection).
     if (posMean > 0) {
       const floor = posMedian * 0.55;
@@ -472,44 +559,71 @@ function ensembleSeries(
     path.push(v);
   }
 
-  // In-sample residual approx from last fit points vs ensemble 0-step level.
-  const fittedLast = path[0]; // crude
-  const recentActual = values.slice(-Math.min(6, n));
-  const recentPred = recentActual.map(() =>
-    cands.reduce(
-      (s, c) => s + c.weight * (c.path[0] ?? fittedLast),
-      0,
-    ),
-  );
-  // Better: one-step backcasts already scored — use weighted residual scale.
-  let residSum = 0;
-  let residN = 0;
-  for (let i = 0; i < n; i++) {
-    if (values[i] <= 0 && posMean > 0) continue;
-    const xi = monthIndex(months[i]) - x0;
-    const s = season[monthOfYear(months[i])] || 1;
-    const trendV = (huber.a + huber.b * xi) * s;
-    const blend =
-      0.35 * trendV +
-      0.35 * (posMedian || posMean) +
-      0.3 * ses.level;
-    residSum += (values[i] - blend) ** 2;
-    residN++;
+  // Holdout residual RMSE — primary scale for prediction intervals.
+  let residualRmse = 0;
+  if (holdoutResid.length > 0) {
+    residualRmse = Math.sqrt(
+      holdoutResid.reduce((s, r) => s + r * r, 0) / holdoutResid.length,
+    );
+  } else {
+    // Fallback: robust in-sample blend residual when series is too short.
+    let residSum = 0;
+    let residN = 0;
+    for (let i = 0; i < n; i++) {
+      if (values[i] <= 0 && posMean > 0) continue;
+      const xi = monthIndex(months[i]) - x0;
+      const s = season[monthOfYear(months[i])] || 1;
+      const trendV = (huber.a + huber.b * xi) * s;
+      const blend =
+        0.35 * trendV +
+        0.35 * (posMedian || posMean) +
+        0.3 * ses.level;
+      residSum += (values[i] - blend) ** 2;
+      residN++;
+    }
+    residualRmse = residN > 0 ? Math.sqrt(residSum / residN) : baseline * 0.12;
   }
-  const residualRmse =
-    residN > 0 ? Math.sqrt(residSum / residN) : rmseVec(recentActual, recentPred);
 
+  const residualCv = residualRmse / baseline;
   const slope =
     horizon >= 2 ? (path[horizon - 1] - path[0]) / (horizon - 1) : 0;
 
   return {
     path,
+    memberSpread,
     residualRmse,
+    residualCv,
     slope,
     components: cands.map(
       (c) => `${c.name} ${(c.weight * 100).toFixed(0)}%`,
     ),
+    n,
   };
+}
+
+/**
+ * Horizon half-width for an ~80% prediction interval.
+ * Combines holdout residual variance (grows with √h) and ensemble
+ * member disagreement. Soft floors/caps keep bands honest but readable.
+ */
+function predictionHalfWidth(
+  point: number,
+  h: number,
+  residualRmse: number,
+  memberStd: number,
+  baseline: number,
+): number {
+  // Residual component: widens with horizon (√h for random-walk-like growth).
+  const residHalf = PI_Z * residualRmse * Math.sqrt(h);
+  // Disagreement: models diverge further out — use as additive variance.
+  const disagreeHalf = PI_Z * memberStd * 0.85;
+  const combined = Math.sqrt(residHalf * residHalf + disagreeHalf * disagreeHalf);
+
+  // Soft floor: never thinner than ~3% of level when we have signal.
+  const floor = Math.max(point * 0.03, baseline * 0.025);
+  // Cap: avoid absurdly wide bands that look like "no confidence".
+  const cap = Math.max(point * 0.42, baseline * 0.35);
+  return clamp(Math.max(combined, floor), floor, cap);
 }
 
 /**
@@ -520,11 +634,23 @@ function ensembleSeries(
  * positive run-rate, and Croston/TSB when zeros are intermittent.
  * Always non-negative for revenue/COGS/events; floors against
  * recognition-lag collapse.
+ *
+ * Prediction intervals (~80%) are sized from walk-forward residual RMSE
+ * plus ensemble member spread, growing with horizon. A confidence score
+ * reflects residual CV, member agreement, and sample size.
  */
 export function forecastSeries(
   history: AnalyticsMonth[],
   horizon = 6,
 ): ForecastResult {
+  const emptyConfidence: ForecastConfidence = {
+    score: 0,
+    label: "Low",
+    intervalLevel: PI_LEVEL,
+    residualRmse: 0,
+    disagreement: 0,
+  };
+
   const series = [...history].sort((a, b) => a.month.localeCompare(b.month));
   const n = series.length;
   if (n === 0) {
@@ -534,6 +660,7 @@ export function forecastSeries(
       points: [],
       revenueSlope: 0,
       rmse: 0,
+      confidence: emptyConfidence,
     };
   }
 
@@ -563,11 +690,12 @@ export function forecastSeries(
     const revenue = revFit.path[h - 1];
     const cogsVal = cogsFit.path[h - 1];
     const eventsVal = evtFit.path[h - 1];
-    // Prediction interval widens with horizon (≈80% heuristic band).
-    const band = Math.max(
-      revFit.residualRmse * 1.28 * Math.sqrt(h),
-      revenue * (0.06 + 0.02 * h),
-      baselineRev * 0.05,
+    const band = predictionHalfWidth(
+      revenue,
+      h,
+      revFit.residualRmse,
+      revFit.memberSpread[h - 1] ?? 0,
+      baselineRev,
     );
     points.push({
       month: addMonths(last, h),
@@ -580,6 +708,19 @@ export function forecastSeries(
     });
   }
 
+  const meanPath =
+    points.reduce((s, p) => s + p.revenue, 0) / Math.max(points.length, 1);
+  const meanDisagree =
+    revFit.memberSpread.reduce((s, v) => s + v, 0) /
+    Math.max(revFit.memberSpread.length, 1);
+  const relDisagree = meanDisagree / Math.max(meanPath, baselineRev, 1);
+  const confidence = confidenceFromFit(
+    revFit.residualCv,
+    relDisagree,
+    revFit.n,
+    revFit.residualRmse,
+  );
+
   const method = `ensemble forecast (${revFit.components.join(", ")})`;
 
   return {
@@ -588,6 +729,7 @@ export function forecastSeries(
     points,
     revenueSlope: revFit.slope,
     rmse: revFit.residualRmse,
+    confidence,
   };
 }
 
@@ -602,4 +744,6 @@ export const __forecastInternals = {
   rmseVec,
   positiveTrailingMean,
   ensembleSeries,
+  predictionHalfWidth,
+  confidenceFromFit,
 };

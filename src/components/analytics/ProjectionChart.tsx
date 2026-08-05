@@ -1,5 +1,8 @@
 import type { AnalyticsMonth } from "@/features/analytics/seed";
-import type { ForecastPoint } from "@/features/analytics/forecast";
+import type {
+  ForecastConfidence,
+  ForecastPoint,
+} from "@/features/analytics/forecast";
 import { Money } from "@/components/billing/ui";
 import { ANALYTICS_COLORS, ChartLegend } from "@/components/analytics/ChartLegend";
 
@@ -25,10 +28,12 @@ export function ProjectionChart({
   history,
   forecast,
   showLegend = true,
+  confidence,
 }: {
   history: AnalyticsMonth[];
   forecast: ForecastPoint[];
   showLegend?: boolean;
+  confidence?: ForecastConfidence;
 }) {
   const hist = history.slice(-8);
   const points: PlotPoint[] = [
@@ -113,13 +118,39 @@ export function ProjectionChart({
 
   const lastForecast = forecast[forecast.length - 1];
   const firstHist = hist[0];
+  const intervalPct = confidence
+    ? Math.round(confidence.intervalLevel * 100)
+    : 80;
 
   return (
     <div>
       {showLegend ? (
-        <div className="mb-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <ChartLegend variant="projection" />
+          {confidence ? (
+            <p className="text-xs text-[var(--muted)]">
+              Confidence:{" "}
+              <span className="font-medium text-[var(--ink)]">
+                {confidence.label} ({confidence.score}%)
+              </span>
+              <span className="text-[var(--muted)]">
+                {" "}
+                · {intervalPct}% band
+              </span>
+            </p>
+          ) : null}
         </div>
+      ) : confidence ? (
+        <p className="mb-2 text-xs text-[var(--muted)]">
+          Confidence:{" "}
+          <span className="font-medium text-[var(--ink)]">
+            {confidence.label} ({confidence.score}%)
+          </span>
+          <span>
+            {" "}
+            · {intervalPct}% prediction interval
+          </span>
+        </p>
       ) : null}
       <svg
         viewBox={`0 0 ${width} ${height}`}
