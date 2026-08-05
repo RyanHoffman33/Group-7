@@ -1,8 +1,9 @@
-# Contract-to-Cash — Billing & A/R + GAAP Compliance
+# Contract-to-Cash — Billing & Accounts Receivable
 
-GAAP-oriented Billing & A/R and ASC 606 Compliance modules for the ACCY 628 Event Production Company project (MainEvent).
+GAAP-oriented Billing & A/R module for the ACCY 628 Event Production Company project (MainEvent).
 
-**Branch:** `GAAP-Compliance` (built on Billing & A/R)  
+**Branch:** `Billing-and-Accounts-Receivable`  
+**Related:** ASC 606 Compliance lives on branch `GAAP-Compliance`  
 **Stack:** Next.js (App Router) + TypeScript + Tailwind + Supabase  
 **Supabase project:** `ACCY628-FINAL-PROJECT` (`eslwjydxevrdgeiqkwtq`)
 
@@ -35,13 +36,11 @@ npm install
 npm run dev
 ```
 
-3. Open [http://localhost:3000/billing](http://localhost:3000/billing) or [http://localhost:3000/compliance](http://localhost:3000/compliance)
+3. Open [http://localhost:3000/billing](http://localhost:3000/billing)
 
 Schema + seed are already applied on the shared Supabase project. SQL copies live under `supabase/` for teammates / disaster recovery.
 
 ## Module map
-
-### Billing & A/R
 
 | Route | Purpose |
 |-------|---------|
@@ -55,29 +54,15 @@ Schema + seed are already applied on the shared Supabase project. SQL copies liv
 | `/billing/aging` | Aging buckets + P(collect) + expected $ |
 | `/billing/alerts` | Bucket-transition inbox + manual aging check |
 
-### GAAP Compliance
-
-| Route | Purpose |
-|-------|---------|
-| `/compliance` | Contract position: assets, liabilities, deferred, open AR, earned-not-billed |
-| `/compliance/recognition` | Evidence register + deferred invoices (billed before vs earned then billed) |
-| `/compliance/deposits-retainers` | Deposit/retainer liability treatment |
-| `/compliance/modifications` | Change-order register + apply treatment |
-| `/compliance/costs` | Cost classification + `v_profitability_inputs` |
-| `/compliance/audit` | Ledger browser + evidence pack export (JSON/CSV) |
-| `/compliance/policies` | ASC-aligned MainEvent policy cards |
-
-## GAAP behavior
+## GAAP behavior (within Billing)
 
 - **Deposits** start as `unearned` (liability) until applied/earned.
 - **Invoices** post AR; `recognition_status` is `deferred` until performance is complete, then `recognized`.
-- **Recognition evidence required** — `recognizeRevenue` fails unless a `recognition_evidence` row exists for the invoice or contract.
-- **Contract asset** = earned (progress / completed milestones / performance complete) − billed (see `v_contract_asset`).
-- **Contract liability** = unearned deposits + deferred billed outstanding (`v_contract_liability`).
-- **Mods** preserve `prior_contract_value`; historical invoices are never silently rewritten.
 - **Payments** apply via `payment_applications` (partials supported).
 - **Ledger** (`ar_ledger_entries`) is append-only for audit.
 - Controls: unique invoice numbers; no duplicate open milestone invoices; no pay/void conflicts without unapplying.
+
+For full ASC 606 compliance UI (evidence, contract assets/liabilities, mods, cost classification, audit pack), see branch **`GAAP-Compliance`**.
 
 ## Aging alerts
 
@@ -98,26 +83,9 @@ When an open invoice moves buckets (`current` → `1-30` → `31-60` → `61-90`
 
 - `invoices`, `invoice_lines`, `payments`, `payment_applications`, `deposits`
 - `ar_ledger_entries`, `ar_bucket_state`, `billing_alerts`, `customer_payment_stats`
-- GAAP tables: `gaap_policies`, `recognition_evidence`, `contract_modifications`, `cost_classifications`
-- Views: `v_ar_outstanding`, `v_unearned_deposits`, `v_contract_asset`, `v_contract_liability`, `v_gaap_contract_position`, `v_profitability_inputs`
+- Views: `v_ar_outstanding`, `v_unearned_deposits` (for Profitability / Dashboards)
 
 **Auth:** Demo RLS is open to `anon`/`authenticated`. Replace with role-based policies when Users & Roles ships.
-
-## GAAP integration (locked contracts)
-
-Do **not** rename the views below — they are the teammate API.
-
-| Teammate | Ownership | How Compliance integrates |
-|----------|-----------|---------------------------|
-| **Gabriel** | Real `contracts` + approve mods | Keep `contract_modifications.contract_id`. Adapter: [`src/features/gaap/adapters/contracts.ts`](src/features/gaap/adapters/contracts.ts) |
-| **Walker** | Real expenses replace `billable_costs` | Classifications stay on `cost_ref_id` + `cost_source`. Adapter: [`src/features/gaap/adapters/costs.ts`](src/features/gaap/adapters/costs.ts) |
-| **Jacob** | Work completion | May insert `recognition_evidence` (`event_completion` / `time_sheet`) |
-| **Joseph** | Profitability | Consume **only** `v_profitability_inputs` and `v_gaap_contract_position` — no duplicate revenue math |
-| **Grayson** | Executive KPIs | Same views for dashboards |
-| **Carson** | Controls | Gate `recognizeRevenue` / mod apply behind approval; stubs `assertCanRecognizeRevenue` / `assertCanApplyModification` in [`src/features/gaap/actions.ts`](src/features/gaap/actions.ts) leave `approved_by` / policy hooks ready |
-| **Brandon** | Users & Roles | Replace demo open RLS with role policies; **do not change view names** |
-
-Billing upstream stubs remain in [`src/features/billing/adapters/upstream.ts`](src/features/billing/adapters/upstream.ts).
 
 ## Deploy (later, after merge to main)
 

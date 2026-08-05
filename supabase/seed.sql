@@ -3,10 +3,7 @@
 
 TRUNCATE public.billing_alerts, public.ar_bucket_state, public.ar_ledger_entries,
   public.payment_applications, public.payments, public.invoice_lines, public.deposits,
-  public.invoices, public.customer_payment_stats,
-  public.gaap_policies, public.recognition_evidence, public.contract_modifications,
-  public.cost_classifications,
-  public.contracts, public.customers
+  public.invoices, public.customer_payment_stats, public.contracts, public.customers
   RESTART IDENTITY CASCADE;
 
 INSERT INTO public.customers (id, name, billing_email, payment_terms_days, status) VALUES
@@ -86,35 +83,3 @@ INSERT INTO public.ar_bucket_state (invoice_id, current_bucket, outstanding_amou
 INSERT INTO public.customer_payment_stats (customer_id, avg_days_to_pay, on_time_rate, sample_size, bucket_survival) VALUES
   ('11111111-1111-1111-1111-111111111101', 12, 1.0, 3, '{"current":1.0,"1-30":0.98,"31-60":0.95,"61-90":0.90,"90+":0.85}'::jsonb),
   ('11111111-1111-1111-1111-111111111102', 38, 0.33, 3, '{"current":1.0,"1-30":0.92,"31-60":0.85,"61-90":0.75,"90+":0.60}'::jsonb);
-
--- GAAP Compliance seed
-INSERT INTO public.gaap_policies (topic, asc_reference, mainevent_rule, evidence_required, sort_order) VALUES
-  ('When revenue is recognized','ASC 606-10-25','Revenue is recognized when (or as) performance obligations for an event are satisfied — typically at event completion or agreed milestone delivery, not merely when cash is collected.','Customer approval, event completion sign-off, or milestone acceptance on file',1),
-  ('Evidence supporting recognition','ASC 606-10-25-27','Recognition requires documented evidence that control transferred or the milestone was accepted. Cash receipt alone is not evidence of earning.','recognition_evidence row linked to contract/invoice before recognition posts',2),
-  ('Deposits and retainers','ASC 606-10-45 / liability','Customer deposits and unused retainer draws are contract liabilities (unearned) until performance is delivered or the deposit is applied to an earned invoice.','Deposit status unearned|applied; retainer invoices issue only per schedule terms',3),
-  ('Cost classification','ASC 340-40 / matching','Direct event production costs are matched to event revenue as COGS. Reimbursable pass-throughs are not margin. Overhead is period expense.','cost_classifications on each cost_ref before profitability reporting',4),
-  ('Contract modifications','ASC 606-10-25-10..13','Change orders adjust transaction price prospectively unless the remaining goods/services are not distinct — then cumulative catch-up. Historical invoices are never silently rewritten.','Approved contract_modifications with prior_contract_value preserved',5),
-  ('Unpaid customer balances','ASC 310 / presentation','Open A/R is presented by aging and recognition status (deferred vs recognized). Disputed balances remain in A/R until resolved or written off.','v_ar_outstanding + aging buckets + dispute status',6),
-  ('Billed before vs after performance','ASC 606 contract liability/asset','Amounts billed before performance create deferred revenue / contract liability. Performance before billing creates a contract asset (earned not billed).','Compare performance_complete / progress to billed_to_date on v_gaap_contract_position',7),
-  ('Earned but not yet billed','ASC 606 contract asset','Progress completed or milestones accepted but not yet invoiced are reported as contract assets, not as A/R.','v_contract_asset.contract_asset > 0',8),
-  ('Recurring arrangements','ASC 606 series of distinct periods','Monthly retainers/recurring fees are recognized as each service period is provided (generally upon scheduled invoice for that period), not when the annual engagement is signed.','billing_schedules + invoice recognition_status per period',9),
-  ('Profitability measurement','Matching principle','Event margin = recognized revenue − direct_event_cogs; reimbursable passthrough excluded from margin; overhead separate.','v_profitability_inputs',10),
-  ('Auditability and financial reporting support','ASC 606 disclosure / controls','Append-only ledger entries, recognition evidence, and modification history support audit and period reporting.','ar_ledger_entries + recognition_evidence + contract_modifications',11);
-
-INSERT INTO public.recognition_evidence (id, contract_id, invoice_id, evidence_type, evidence_date, description, supporting_ref) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01','22222222-2222-2222-2222-222222222201','33333333-3333-3333-3333-333333333301','event_completion','2025-09-01','Q3 Leadership Summit completed; client walkthrough signed','DOC-NS-CLOSE-001'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02','22222222-2222-2222-2222-222222222203','33333333-3333-3333-3333-333333333304','customer_approval','2025-08-20','Physician Conference final run-of-show approved','DOC-HV-APPROVAL-004'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa03','22222222-2222-2222-2222-222222222205','33333333-3333-3333-3333-333333333310','delivery_acceptance','2026-01-15','Anderson Wedding weekend delivered; acceptance email on file','DOC-CP-ACCEPT-010'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa04','22222222-2222-2222-2222-222222222202',NULL,'milestone_signoff','2026-03-01','Year-End Gala design package approved (milestone)','DOC-NS-MILE-DESIGN');
-
-INSERT INTO public.contract_modifications (id, contract_id, mod_number, effective_date, description, price_change, prior_contract_value, scope_change_notes, accounting_treatment, status, approved_by) VALUES
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01','22222222-2222-2222-2222-222222222204','CO-001','2026-03-15','Add LED wall day + overnight security',8500,64000,'Distinct additional services — prospective price increase','prospective','approved','gabriel-stub'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02','22222222-2222-2222-2222-222222222206','CO-001','2026-02-01','Reduce ballroom hours (scope cut)',-4000,55000,'Remaining services not substantially distinct from original — catch-up remaining TP','cumulative_catchup','draft',NULL);
-
-INSERT INTO public.cost_classifications (id, cost_ref_id, cost_source, contract_id, classification, period, amount, notes) VALUES
-  ('cccccccc-cccc-cccc-cccc-cccccccccc01','77777777-7777-7777-7777-777777777701','billable_costs','22222222-2222-2222-2222-222222222204','direct_event_cogs','2026-03-01',8200,'LED wall rental — direct production'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc02','77777777-7777-7777-7777-777777777702','billable_costs','22222222-2222-2222-2222-222222222204','reimbursable_passthrough','2026-03-01',340,'Courier — pass-through'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc03','77777777-7777-7777-7777-777777777703','billable_costs','22222222-2222-2222-2222-222222222205','direct_event_cogs','2026-01-01',4100,'Floral wholesale — direct'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc04','77777777-7777-7777-7777-777777777704','billable_costs','22222222-2222-2222-2222-222222222205','reimbursable_passthrough','2026-01-01',275,'Permit fees — passthrough'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc05','77777777-7777-7777-7777-777777777705','billable_costs','22222222-2222-2222-2222-222222222204','reimbursable_passthrough','2026-02-01',1860,'Airfare — reimbursable'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc06','77777777-7777-7777-7777-777777777706','billable_costs','22222222-2222-2222-2222-222222222204','reimbursable_passthrough','2026-02-01',2400,'Hotel — reimbursable');

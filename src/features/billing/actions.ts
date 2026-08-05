@@ -160,33 +160,6 @@ export async function recognizeRevenue(invoiceId: string): Promise<ActionResult>
       return { ok: false, error: "Revenue already recognized." };
     }
 
-    // ASC 606 evidence gate — at least one recognition_evidence row for invoice or contract
-    const { count: invEvidence, error: e1 } = await supabase
-      .from("recognition_evidence")
-      .select("id", { count: "exact", head: true })
-      .eq("invoice_id", invoiceId);
-    if (e1) throw e1;
-    const { count: contractEvidence, error: e2 } = await supabase
-      .from("recognition_evidence")
-      .select("id", { count: "exact", head: true })
-      .eq("contract_id", inv.contract_id);
-    if (e2) throw e2;
-    if ((invEvidence ?? 0) < 1 && (contractEvidence ?? 0) < 1) {
-      return {
-        ok: false,
-        error:
-          "Recognition requires evidence (customer approval, event completion, milestone sign-off, etc.). Add evidence under GAAP Compliance → Recognition.",
-      };
-    }
-
-    const { assertCanRecognizeRevenue } = await import(
-      "@/features/gaap/actions"
-    );
-    const gate = await assertCanRecognizeRevenue("billing-user");
-    if (!gate.allowed) {
-      return { ok: false, error: gate.reason ?? "Not authorized to recognize revenue." };
-    }
-
     const contract = inv.contracts as { performance_complete: boolean } | null;
     if (!contract?.performance_complete) {
       const { error: updC } = await supabase
@@ -207,13 +180,10 @@ export async function recognizeRevenue(invoiceId: string): Promise<ActionResult>
       entry_type: "revenue_recognize",
       debit: 0,
       credit: 0,
-      memo: "Deferred revenue → earned revenue (performance obligation satisfied; evidence on file)",
+      memo: "Deferred revenue → earned revenue (performance obligation satisfied)",
     });
 
     revalidateBilling();
-    revalidatePath("/compliance");
-    revalidatePath("/compliance/recognition");
-    revalidatePath("/compliance/audit");
     return { ok: true, id: invoiceId };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

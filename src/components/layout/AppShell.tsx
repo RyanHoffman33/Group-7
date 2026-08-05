@@ -15,16 +15,6 @@ const billingLinks = [
   { href: "/billing/alerts", label: "Billing Alerts" },
 ];
 
-const complianceLinks = [
-  { href: "/compliance", label: "Contract position" },
-  { href: "/compliance/recognition", label: "Recognition" },
-  { href: "/compliance/deposits-retainers", label: "Deposits & retainers" },
-  { href: "/compliance/modifications", label: "Modifications" },
-  { href: "/compliance/costs", label: "Cost classification" },
-  { href: "/compliance/audit", label: "Audit pack" },
-  { href: "/compliance/policies", label: "Policies" },
-];
-
 const teamModules = [
   { label: "Users & Roles", owner: "Brandon" },
   { label: "Contracts & Engagements", owner: "Gabriel" },
@@ -39,107 +29,9 @@ function isBillingRoute(pathname: string) {
   return pathname === "/billing" || pathname.startsWith("/billing/");
 }
 
-function isComplianceRoute(pathname: string) {
-  return pathname === "/compliance" || pathname.startsWith("/compliance/");
-}
-
 function isLinkActive(pathname: string, href: string) {
-  if (href === "/billing" || href === "/compliance") return pathname === href;
+  if (href === "/billing") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function NavAccordion({
-  title,
-  open,
-  onToggle,
-  active,
-  controlsId,
-  links,
-  pathname,
-  badge,
-}: {
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  active: boolean;
-  controlsId: string;
-  links: { href: string; label: string }[];
-  pathname: string;
-  badge?: number;
-}) {
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls={controlsId}
-        className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-medium transition ${
-          active
-            ? "bg-white/12 text-white"
-            : "text-white/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        <span className="flex items-center gap-2">
-          {title}
-          {badge && badge > 0 ? (
-            <span className="rounded-full bg-[#f0c14a] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--ink)]">
-              {badge}
-            </span>
-          ) : null}
-        </span>
-        <svg
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-          className={`h-4 w-4 shrink-0 text-white/55 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
-        >
-          <path
-            fillRule="evenodd"
-            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
-
-      <div
-        id={controlsId}
-        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
-      >
-        <ul
-          className="mt-1 min-h-0 space-y-0.5 overflow-hidden border-l border-white/10 pl-2 ml-3"
-          aria-hidden={!open}
-        >
-          {links.map((link) => {
-            const linkActive = isLinkActive(pathname, link.href);
-            return (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition ${
-                    linkActive
-                      ? "bg-white/15 text-white"
-                      : "text-white/65 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <span>{link.label}</span>
-                  {link.href === "/billing/alerts" && badge && badge > 0 ? (
-                    <span className="rounded-full bg-[#f0c14a] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)]">
-                      {badge}
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </li>
-  );
 }
 
 export function AppShell({
@@ -151,17 +43,11 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const billingActive = isBillingRoute(pathname);
-  const complianceActive = isComplianceRoute(pathname);
   const [billingOpen, setBillingOpen] = useState(billingActive);
-  const [complianceOpen, setComplianceOpen] = useState(complianceActive);
 
   useEffect(() => {
     if (billingActive) setBillingOpen(true);
   }, [billingActive]);
-
-  useEffect(() => {
-    if (complianceActive) setComplianceOpen(true);
-  }, [complianceActive]);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -191,25 +77,77 @@ export function AppShell({
 
         <nav className="px-3 pb-4" aria-label="Primary">
           <ul className="space-y-1">
-            <NavAccordion
-              title="Billing & A/R"
-              open={billingOpen}
-              onToggle={() => setBillingOpen((o) => !o)}
-              active={billingActive}
-              controlsId="billing-nav-submenu"
-              links={billingLinks}
-              pathname={pathname}
-              badge={alertCount}
-            />
-            <NavAccordion
-              title="GAAP Compliance"
-              open={complianceOpen}
-              onToggle={() => setComplianceOpen((o) => !o)}
-              active={complianceActive}
-              controlsId="compliance-nav-submenu"
-              links={complianceLinks}
-              pathname={pathname}
-            />
+            <li>
+              <button
+                type="button"
+                onClick={() => setBillingOpen((open) => !open)}
+                aria-expanded={billingOpen}
+                aria-controls="billing-nav-submenu"
+                className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-medium transition ${
+                  billingActive
+                    ? "bg-white/12 text-white"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  Billing & A/R
+                  {alertCount > 0 ? (
+                    <span className="rounded-full bg-[#f0c14a] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--ink)]">
+                      {alertCount}
+                    </span>
+                  ) : null}
+                </span>
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                  className={`h-4 w-4 shrink-0 text-white/55 transition-transform duration-200 ${
+                    billingOpen ? "rotate-180" : ""
+                  }`}
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+
+              <div
+                id="billing-nav-submenu"
+                className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                  billingOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
+              >
+                <ul
+                  className="mt-1 min-h-0 space-y-0.5 overflow-hidden border-l border-white/10 pl-2 ml-3"
+                  aria-hidden={!billingOpen}
+                >
+                  {billingLinks.map((link) => {
+                    const active = isLinkActive(pathname, link.href);
+                    return (
+                      <li key={link.href}>
+                        <Link
+                          href={link.href}
+                          className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition ${
+                            active
+                              ? "bg-white/15 text-white"
+                              : "text-white/65 hover:bg-white/10 hover:text-white"
+                          }`}
+                        >
+                          <span>{link.label}</span>
+                          {link.href === "/billing/alerts" && alertCount > 0 ? (
+                            <span className="rounded-full bg-[#f0c14a] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)]">
+                              {alertCount}
+                            </span>
+                          ) : null}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </li>
           </ul>
         </nav>
 
