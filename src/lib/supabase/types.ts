@@ -54,6 +54,22 @@ export type Contract = {
   placement_fee_percent: number;
   progress_percent: number;
   per_service_rate: number;
+  /** Contracts foundation (optional until all readers select *) */
+  contract_number?: string;
+  original_contract_value?: number;
+  change_order_value_total?: number;
+  project_manager_label?: string;
+  project_manager_party_id?: string | null;
+  event_type?: string | null;
+  event_start?: string | null;
+  event_end?: string | null;
+  venue_name?: string | null;
+  venue_city?: string | null;
+  guest_count?: number | null;
+  minimum_deposit_amount?: number | null;
+  requires_deposit_before_work?: boolean;
+  approved_by?: string | null;
+  currency?: string;
 };
 
 export type Deposit = {

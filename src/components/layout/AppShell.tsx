@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AssistantChat } from "@/components/assistant/AssistantChat";
 
 const billingLinks = [
@@ -26,9 +26,17 @@ const complianceLinks = [
   { href: "/compliance/policies", label: "Policies" },
 ];
 
+const contractsLinks = [
+  { href: "/contracts", label: "Contracts Dashboard" },
+  { href: "/contracts/list", label: "All Contracts" },
+  { href: "/contracts/new", label: "Create Contract" },
+  { href: "/contracts/approvals", label: "Approvals" },
+  { href: "/contracts/change-orders", label: "Change Orders" },
+  { href: "/contracts/closeout", label: "Contract Closeout" },
+];
+
 const teamModules = [
   { label: "Users & Roles", owner: "Brandon" },
-  { label: "Contracts & Engagements", owner: "Gabriel" },
   { label: "Work & Performance", owner: "Jacob" },
   { label: "Cost & Resources", owner: "Walker" },
   { label: "Profitability", owner: "Joseph" },
@@ -44,8 +52,18 @@ function isComplianceRoute(pathname: string) {
   return pathname === "/compliance" || pathname.startsWith("/compliance/");
 }
 
+function isContractsRoute(pathname: string) {
+  return pathname === "/contracts" || pathname.startsWith("/contracts/");
+}
+
 function isLinkActive(pathname: string, href: string) {
-  if (href === "/billing" || href === "/compliance") return pathname === href;
+  if (
+    href === "/billing" ||
+    href === "/compliance" ||
+    href === "/contracts"
+  ) {
+    return pathname === href;
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -153,16 +171,14 @@ export function AppShell({
   const pathname = usePathname();
   const billingActive = isBillingRoute(pathname);
   const complianceActive = isComplianceRoute(pathname);
-  const [billingOpen, setBillingOpen] = useState(billingActive);
-  const [complianceOpen, setComplianceOpen] = useState(complianceActive);
+  const contractsActive = isContractsRoute(pathname);
+  const [billingPinned, setBillingPinned] = useState(false);
+  const [compliancePinned, setCompliancePinned] = useState(false);
+  const [contractsPinned, setContractsPinned] = useState(false);
 
-  useEffect(() => {
-    if (billingActive) setBillingOpen(true);
-  }, [billingActive]);
-
-  useEffect(() => {
-    if (complianceActive) setComplianceOpen(true);
-  }, [complianceActive]);
+  const billingOpen = billingActive || billingPinned;
+  const complianceOpen = complianceActive || compliancePinned;
+  const contractsOpen = contractsActive || contractsPinned;
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -193,9 +209,24 @@ export function AppShell({
         <nav className="px-3 pb-4" aria-label="Primary">
           <ul className="space-y-1">
             <NavAccordion
+              title="Contracts & Engagements"
+              open={contractsOpen}
+              onToggle={() => {
+                if (contractsActive) return;
+                setContractsPinned((p) => !p);
+              }}
+              active={contractsActive}
+              controlsId="contracts-nav-submenu"
+              links={contractsLinks}
+              pathname={pathname}
+            />
+            <NavAccordion
               title="Billing & A/R"
               open={billingOpen}
-              onToggle={() => setBillingOpen((o) => !o)}
+              onToggle={() => {
+                if (billingActive) return;
+                setBillingPinned((p) => !p);
+              }}
               active={billingActive}
               controlsId="billing-nav-submenu"
               links={billingLinks}
@@ -205,7 +236,10 @@ export function AppShell({
             <NavAccordion
               title="GAAP Compliance"
               open={complianceOpen}
-              onToggle={() => setComplianceOpen((o) => !o)}
+              onToggle={() => {
+                if (complianceActive) return;
+                setCompliancePinned((p) => !p);
+              }}
               active={complianceActive}
               controlsId="compliance-nav-submenu"
               links={complianceLinks}
