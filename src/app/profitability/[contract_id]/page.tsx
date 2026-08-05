@@ -3,9 +3,15 @@ import { notFound } from "next/navigation";
 import {
   getEventProfit,
   getOverheadAllocation,
+  listBudgetVsActual,
   listExceptions,
 } from "@/features/profitability/queries";
-import { exceptionMeta, exceptionTitle, statusTone } from "@/features/profitability/labels";
+import {
+  categoryLabel,
+  exceptionMeta,
+  exceptionTitle,
+  statusTone,
+} from "@/features/profitability/labels";
 import { Money, PageHeader, Panel, StatusPill } from "@/components/billing/ui";
 import { Waterfall } from "@/components/profitability/Waterfall";
 
@@ -17,10 +23,11 @@ export default async function EventProfitPage({
   params: Promise<{ contract_id: string }>;
 }) {
   const { contract_id } = await params;
-  const [event, overhead, exceptions] = await Promise.all([
+  const [event, overhead, exceptions, budgetRows] = await Promise.all([
     getEventProfit(contract_id),
     getOverheadAllocation(contract_id),
     listExceptions(contract_id),
+    listBudgetVsActual(contract_id),
   ]);
   if (!event) notFound();
 
@@ -106,35 +113,75 @@ export default async function EventProfitPage({
             </dl>
           </Panel>
 
-          <Panel title="Budget vs actual">
-            <dl className="space-y-3 text-sm">
-              <div className="flex justify-between gap-4 border-b border-[var(--line)] pb-3">
-                <dt className="text-[var(--muted)]">Total budget</dt>
-                <dd className="font-semibold">
-                  {event.budget_total == null ? (
-                    "—"
-                  ) : (
-                    <Money amount={event.budget_total} />
-                  )}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4 border-b border-[var(--line)] pb-3">
-                <dt className="text-[var(--muted)]">Actual costs</dt>
-                <dd className="font-semibold">
-                  <Money amount={event.actual_cost_total} />
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-[var(--muted)]">Remaining</dt>
-                <dd
-                  className={`font-semibold ${
-                    event.budget_remaining < 0 ? "text-[var(--danger)]" : ""
-                  }`}
-                >
-                  <Money amount={event.budget_remaining} />
-                </dd>
-              </div>
-            </dl>
+          <Panel title="Budget vs actual by category">
+            {budgetRows.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">
+                No budget or cost lines recorded yet.
+              </p>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-wider text-[var(--muted)]">
+                  <tr className="border-b border-[var(--line)]">
+                    <th className="pb-2 font-medium">Category</th>
+                    <th className="pb-2 text-right font-medium">Budget</th>
+                    <th className="pb-2 text-right font-medium">Actual</th>
+                    <th className="pb-2 text-right font-medium">Variance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {budgetRows.map((r) => (
+                    <tr
+                      key={r.category}
+                      className="border-b border-[var(--line)] last:border-0"
+                    >
+                      <td className="py-2">
+                        {categoryLabel(r.category)}
+                        {r.committed_amount > 0 ? (
+                          <span className="block text-xs text-[var(--muted)]">
+                            + <Money amount={r.committed_amount} /> committed
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-2 text-right">
+                        <Money amount={r.budgeted_amount} />
+                      </td>
+                      <td className="py-2 text-right">
+                        <Money amount={r.actual_amount} />
+                      </td>
+                      <td
+                        className={`py-2 text-right ${
+                          r.over_budget ? "text-[var(--danger)]" : ""
+                        }`}
+                      >
+                        <Money amount={r.variance} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-[var(--line)] text-sm font-semibold">
+                    <td className="pt-2">Total</td>
+                    <td className="pt-2 text-right">
+                      {event.budget_total == null ? (
+                        "—"
+                      ) : (
+                        <Money amount={event.budget_total} />
+                      )}
+                    </td>
+                    <td className="pt-2 text-right">
+                      <Money amount={event.actual_cost_total} />
+                    </td>
+                    <td
+                      className={`pt-2 text-right ${
+                        event.budget_remaining < 0 ? "text-[var(--danger)]" : ""
+                      }`}
+                    >
+                      <Money amount={event.budget_remaining} />
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
           </Panel>
 
           <Panel title="Billing position">

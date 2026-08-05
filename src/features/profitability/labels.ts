@@ -75,6 +75,13 @@ export const statusTone: Record<
   canceled: "danger",
 };
 
+export function categoryLabel(category: string): string {
+  if (category === "billable_costs (classified)") {
+    return "Rebillable costs (GAAP-classified)";
+  }
+  return category.charAt(0).toUpperCase() + category.slice(1).replaceAll("_", " ");
+}
+
 export function formatMonth(isoDate: string): string {
   return new Date(`${isoDate}T00:00:00`).toLocaleDateString("en-US", {
     month: "short",

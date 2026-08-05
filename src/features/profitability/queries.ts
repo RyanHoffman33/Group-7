@@ -176,6 +176,39 @@ export async function getOverheadAllocation(
   };
 }
 
+export type BudgetVsActual = {
+  contract_id: string;
+  event_name: string;
+  category: string;
+  budgeted_amount: number;
+  actual_amount: number;
+  committed_amount: number;
+  variance: number;
+  over_budget: boolean;
+};
+
+export async function listBudgetVsActual(
+  contractId: string,
+): Promise<BudgetVsActual[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("v_profit_budget_vs_actual")
+    .select("*")
+    .eq("contract_id", contractId)
+    .order("category");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    contract_id: String(r.contract_id),
+    event_name: String(r.event_name),
+    category: String(r.category),
+    budgeted_amount: num(r.budgeted_amount),
+    actual_amount: num(r.actual_amount),
+    committed_amount: num(r.committed_amount),
+    variance: num(r.variance),
+    over_budget: Boolean(r.over_budget),
+  }));
+}
+
 /** Portfolio headline numbers — sums of view outputs only. */
 export async function getPortfolioTotals(
   events?: EventProfit[],
