@@ -26,12 +26,16 @@ const complianceLinks = [
   { href: "/compliance/policies", label: "Policies" },
 ];
 
+const profitabilityLinks = [
+  { href: "/profitability", label: "Portfolio overview" },
+  { href: "/profitability/exceptions", label: "Exceptions" },
+];
+
 const teamModules = [
   { label: "Users & Roles", owner: "Brandon" },
   { label: "Contracts & Engagements", owner: "Gabriel" },
   { label: "Work & Performance", owner: "Jacob" },
   { label: "Cost & Resources", owner: "Walker" },
-  { label: "Profitability", owner: "Joseph" },
   { label: "Dashboards", owner: "Grayson" },
   { label: "Controls", owner: "Carson" },
 ];
@@ -44,8 +48,13 @@ function isComplianceRoute(pathname: string) {
   return pathname === "/compliance" || pathname.startsWith("/compliance/");
 }
 
+function isProfitabilityRoute(pathname: string) {
+  return pathname === "/profitability" || pathname.startsWith("/profitability/");
+}
+
 function isLinkActive(pathname: string, href: string) {
-  if (href === "/billing" || href === "/compliance") return pathname === href;
+  if (href === "/billing" || href === "/compliance" || href === "/profitability")
+    return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -153,8 +162,10 @@ export function AppShell({
   const pathname = usePathname();
   const billingActive = isBillingRoute(pathname);
   const complianceActive = isComplianceRoute(pathname);
+  const profitabilityActive = isProfitabilityRoute(pathname);
   const [billingOpen, setBillingOpen] = useState(billingActive);
   const [complianceOpen, setComplianceOpen] = useState(complianceActive);
+  const [profitabilityOpen, setProfitabilityOpen] = useState(profitabilityActive);
 
   useEffect(() => {
     if (billingActive) setBillingOpen(true);
@@ -163,6 +174,10 @@ export function AppShell({
   useEffect(() => {
     if (complianceActive) setComplianceOpen(true);
   }, [complianceActive]);
+
+  useEffect(() => {
+    if (profitabilityActive) setProfitabilityOpen(true);
+  }, [profitabilityActive]);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -209,6 +224,15 @@ export function AppShell({
               active={complianceActive}
               controlsId="compliance-nav-submenu"
               links={complianceLinks}
+              pathname={pathname}
+            />
+            <NavAccordion
+              title="Profitability"
+              open={profitabilityOpen}
+              onToggle={() => setProfitabilityOpen((o) => !o)}
+              active={profitabilityActive}
+              controlsId="profitability-nav-submenu"
+              links={profitabilityLinks}
               pathname={pathname}
             />
           </ul>
