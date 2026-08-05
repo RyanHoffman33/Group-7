@@ -129,16 +129,34 @@ function answerFromSnapshot(snapshot: string, question: string): string {
   if (q.includes("alert")) {
     return `There are **${line("- Open billing alerts")}** unacknowledged aging alerts right now.`;
   }
+  if (
+    q.includes("commit") ||
+    q.includes("actual cost") ||
+    (q.includes("cost") && (q.includes("total") || q.includes("how much")))
+  ) {
+    return `From Cost & Resources: actual costs are **${line("- Total actual costs")}**, open commitments are **${line("- Open commitments")}**. Pending cost approvals: **${line("- Pending cost approvals")}**.`;
+  }
+  if (q.includes("flag") || q.includes("exception") || q.includes("no commitment")) {
+    return `There are **${line("- Open cost control flags")}** open cost control flags (commitment variance, no commitment on file, etc.). Pending approvals over the threshold are tracked separately under Approvals.`;
+  }
+  if (q.includes("approv") && q.includes("cost")) {
+    return `Pending cost approvals: **${line("- Pending cost approvals")}**. Threshold: **${line("- Approval threshold")}**.`;
+  }
+  if (q.includes("category") || q.includes("labor") || q.includes("vendor")) {
+    return `Costs by category and average cost per project are in the live snapshot under COST & RESOURCE TRACKING. Open /costs on the dashboard for the full breakdown.`;
+  }
 
   return [
-    "I can answer from MainEvent’s live Billing & Compliance snapshot even without an AI key.",
+    "I can answer from MainEvent’s live Billing, Compliance, and Cost & Resources snapshot even without an AI key.",
     "",
     `- Outstanding A/R: ${line("- Total outstanding A/R")}`,
     `- Unearned deposits: ${line("- Unearned deposits (liability)")}`,
     `- Contract assets: ${line("- Contract assets (earned not billed)")}`,
-    `- Contract liabilities: ${line("- Contract liabilities (unearned deposits + deferred billed)")}`,
+    `- Actual costs: ${line("- Total actual costs")}`,
+    `- Open commitments: ${line("- Open commitments")}`,
+    `- Cost flags: ${line("- Open cost control flags")}`,
     "",
-    "Add a free GEMINI_API_KEY (or GROQ_API_KEY) to .env.local for full natural-language answers. Try asking about deposits, aging, contract assets, or recognition.",
+    "Add a free GEMINI_API_KEY (or GROQ_API_KEY) to .env.local for full natural-language answers. Try asking about deposits, aging, costs, commitments, or flags.",
   ].join("\n");
 }
 

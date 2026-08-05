@@ -26,11 +26,20 @@ const complianceLinks = [
   { href: "/compliance/policies", label: "Policies" },
 ];
 
+const costsLinks = [
+  { href: "/costs", label: "Cost dashboard" },
+  { href: "/costs/time", label: "Time entry" },
+  { href: "/costs/expenses", label: "Vendor & expenses" },
+  { href: "/costs/commitments", label: "Commitments" },
+  { href: "/costs/approvals", label: "Approval queue" },
+  { href: "/costs/flags", label: "Flags & exceptions" },
+  { href: "/costs/reports", label: "Reports / export" },
+];
+
 const teamModules = [
   { label: "Users & Roles", owner: "Brandon" },
   { label: "Contracts & Engagements", owner: "Gabriel" },
   { label: "Work & Performance", owner: "Jacob" },
-  { label: "Cost & Resources", owner: "Walker" },
   { label: "Profitability", owner: "Joseph" },
   { label: "Dashboards", owner: "Grayson" },
   { label: "Controls", owner: "Carson" },
@@ -44,8 +53,13 @@ function isComplianceRoute(pathname: string) {
   return pathname === "/compliance" || pathname.startsWith("/compliance/");
 }
 
+function isCostsRoute(pathname: string) {
+  return pathname === "/costs" || pathname.startsWith("/costs/");
+}
+
 function isLinkActive(pathname: string, href: string) {
-  if (href === "/billing" || href === "/compliance") return pathname === href;
+  if (href === "/billing" || href === "/compliance" || href === "/costs")
+    return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -153,8 +167,10 @@ export function AppShell({
   const pathname = usePathname();
   const billingActive = isBillingRoute(pathname);
   const complianceActive = isComplianceRoute(pathname);
+  const costsActive = isCostsRoute(pathname);
   const [billingOpen, setBillingOpen] = useState(billingActive);
   const [complianceOpen, setComplianceOpen] = useState(complianceActive);
+  const [costsOpen, setCostsOpen] = useState(costsActive);
 
   useEffect(() => {
     if (billingActive) setBillingOpen(true);
@@ -163,6 +179,10 @@ export function AppShell({
   useEffect(() => {
     if (complianceActive) setComplianceOpen(true);
   }, [complianceActive]);
+
+  useEffect(() => {
+    if (costsActive) setCostsOpen(true);
+  }, [costsActive]);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -209,6 +229,15 @@ export function AppShell({
               active={complianceActive}
               controlsId="compliance-nav-submenu"
               links={complianceLinks}
+              pathname={pathname}
+            />
+            <NavAccordion
+              title="Cost & Resources"
+              open={costsOpen}
+              onToggle={() => setCostsOpen((o) => !o)}
+              active={costsActive}
+              controlsId="costs-nav-submenu"
+              links={costsLinks}
               pathname={pathname}
             />
           </ul>

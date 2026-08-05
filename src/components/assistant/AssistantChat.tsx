@@ -7,8 +7,8 @@ type Msg = { role: "user" | "assistant"; content: string };
 const STARTERS = [
   "How much unearned deposit liability do we have?",
   "What’s our contract asset (earned not billed)?",
-  "Which invoices are in 90+ aging?",
-  "Explain how MainEvent recognizes revenue under ASC 606.",
+  "How much have we committed vs actual costs?",
+  "What cost flags need attention?",
 ];
 
 export function AssistantChat() {
@@ -22,7 +22,7 @@ export function AssistantChat() {
     {
       role: "assistant",
       content:
-        "Hi — I’m the MainEvent finance assistant. Ask about A/R, deposits, contract assets/liabilities, recognition, or aging. I use live numbers from Billing & Compliance.",
+        "Hi — I’m the MainEvent finance assistant. Ask about A/R, deposits, ASC 606, or Cost & Resources (commitments, actuals, approvals, flags). I use live numbers from Billing, Compliance, and Costs.",
     },
   ]);
   const endRef = useRef<HTMLDivElement>(null);
@@ -91,7 +91,7 @@ export function AssistantChat() {
           <div className="border-b border-[var(--line)] bg-[var(--ink)] px-4 py-3 text-white">
             <p className="text-sm font-semibold">MainEvent assistant</p>
             <p className="mt-0.5 text-[11px] text-white/60">
-              Live A/R & ASC 606 snapshot
+              Live Billing, Compliance & Costs
               {provider ? ` · ${provider}` : ""}
             </p>
           </div>
@@ -147,7 +147,7 @@ export function AssistantChat() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about deposits, aging, assets…"
+                placeholder="Ask about deposits, costs, flags…"
                 disabled={pending}
                 className="min-w-0 flex-1 rounded-md border border-[var(--line)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
               />
