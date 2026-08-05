@@ -5,6 +5,17 @@ import { createClient } from "@/lib/supabase/server";
 import { invoiceOutstanding } from "./queries";
 import { recomputeCustomerPaymentStats } from "./stats";
 import { runAgingCheck } from "./aging-check";
+import {
+  requirePermission,
+  toActionError,
+  AccessDeniedError,
+} from "@/features/access/enforce";
+import {
+  denyAdminAccountingByDefault,
+  denyCoordinatorFinancialAccess,
+  denyPmIndependentInvoiceCollection,
+} from "@/features/access/sod";
+import { appendAccessAudit } from "@/features/access/audit";
 
 function revalidateBilling() {
   revalidatePath("/billing");
@@ -15,6 +26,24 @@ function revalidateBilling() {
   revalidatePath("/billing/alerts");
   revalidatePath("/billing/determine");
   revalidatePath("/billing/recurring");
+}
+
+async function assertBillingActor(
+  permission: "billing.write" | "billing.payment" | "billing.void" | "billing.read" | "compliance.recognize",
+) {
+  const session = await requirePermission(permission);
+  const coord = denyCoordinatorFinancialAccess(session.roleKey);
+  if (!coord.allowed) throw new AccessDeniedError(coord);
+  const admin = denyAdminAccountingByDefault(session.roleKey);
+  if (!admin.allowed) throw new AccessDeniedError(admin);
+  if (
+    permission === "billing.write" ||
+    permission === "billing.payment"
+  ) {
+    const pm = denyPmIndependentInvoiceCollection(session.roleKey);
+    if (!pm.allowed) throw new AccessDeniedError(pm);
+  }
+  return session;
 }
 
 async function nextInvoiceNumber(): Promise<string> {
@@ -51,6 +80,7 @@ export async function createAndIssueInvoice(input: {
   issue?: boolean;
 }): Promise<ActionResult> {
   try {
+    const session = await assertBillingActor("billing.write");
     const supabase = createClient();
     const { data: contract, error: cErr } = await supabase
       .from("contracts")
@@ -138,14 +168,24 @@ export async function createAndIssueInvoice(input: {
     }
 
     revalidateBilling();
+    await appendAccessAudit({
+      actorUserId: session.id,
+      actorName: session.fullName,
+      actorRole: session.roleKey,
+      action: input.issue === false ? "invoice_draft_created" : "invoice_issued",
+      recordType: "invoice",
+      recordId: inv.id,
+      detail: `Invoice ${invoiceNumber} for contract ${input.contract_id}`,
+    });
     return { ok: true, id: inv.id };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return toActionError(e);
   }
 }
 
 export async function recognizeRevenue(invoiceId: string): Promise<ActionResult> {
   try {
+    const session = await assertBillingActor("compliance.recognize");
     const supabase = createClient();
     const { data: inv, error } = await supabase
       .from("invoices")
@@ -214,14 +254,24 @@ export async function recognizeRevenue(invoiceId: string): Promise<ActionResult>
     revalidatePath("/compliance");
     revalidatePath("/compliance/recognition");
     revalidatePath("/compliance/audit");
+    await appendAccessAudit({
+      actorUserId: session.id,
+      actorName: session.fullName,
+      actorRole: session.roleKey,
+      action: "revenue_recognized",
+      recordType: "invoice",
+      recordId: invoiceId,
+      detail: "Deferred → earned with evidence gate",
+    });
     return { ok: true, id: invoiceId };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return toActionError(e);
   }
 }
 
 export async function voidInvoice(invoiceId: string): Promise<ActionResult> {
   try {
+    await assertBillingActor("billing.void");
     const outstanding = await invoiceOutstanding(invoiceId);
     const supabase = createClient();
     const { data: inv, error } = await supabase
@@ -283,6 +333,7 @@ export async function recordPaymentAndApply(input: {
   apply_amount: number;
 }): Promise<ActionResult> {
   try {
+    const session = await assertBillingActor("billing.payment");
     const supabase = createClient();
     const { data: inv, error: invErr } = await supabase
       .from("invoices")
@@ -378,6 +429,7 @@ export async function recordDeposit(input: {
   received_at: string;
 }): Promise<ActionResult> {
   try {
+    await assertBillingActor("billing.write");
     const supabase = createClient();
     const { data, error } = await supabase
       .from("deposits")
@@ -658,6 +710,7 @@ export async function issueDeterminedBill(input: {
   auto_apply_draft?: boolean;
 }): Promise<ActionResult> {
   try {
+    await assertBillingActor("billing.write");
     const { buildDeterminationForContract } = await import("./determination-service");
     const built = await buildDeterminationForContract(
       input.contract_id,
