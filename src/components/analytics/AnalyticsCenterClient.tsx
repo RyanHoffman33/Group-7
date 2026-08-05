@@ -153,7 +153,7 @@ export function AnalyticsCenterClient({
             showLegend={false}
           />
           <p className="mt-3 text-xs text-[var(--muted)]">
-            Model: {forecast.method} (from full history; filters apply to charts/KPIs above)
+            Model: {forecast.method} (full history; filters apply to charts/KPIs)
           </p>
         </Panel>
       </div>

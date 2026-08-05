@@ -25,7 +25,7 @@ export default async function AnalyticsProjectionsPage() {
     <div>
       <PageHeader
         title="Analytics · Projections"
-        description="Forward-looking revenue and cost projections from a trend/seasonal model, with scenario stress and AI commentary."
+        description="Forward-looking revenue and cost projections from an ensemble forecast tuned for short monthly history, with scenario stress and AI commentary."
       />
       <p className="mb-4 text-xs text-[var(--muted)]">
         <Link href="/analytics" className="text-[var(--accent)] hover:underline">

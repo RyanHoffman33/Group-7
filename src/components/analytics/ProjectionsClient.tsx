@@ -61,7 +61,9 @@ export function ProjectionsClient({
   return (
     <div>
       <p className="mb-4 text-xs text-[var(--muted)]">
-        Model: {method} · Inputs: {source}
+        Model: {method} · Inputs: {source}. Blends damped trend, level
+        smoothing, robust regression, and run-rate so recognition-lag zeros
+        do not collapse the outlook.
       </p>
 
       <div className="mb-4 flex flex-wrap gap-2">
