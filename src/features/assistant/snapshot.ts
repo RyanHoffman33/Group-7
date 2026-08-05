@@ -28,6 +28,35 @@ import {
   listProfitabilityInputs,
   listRecognitionEvidence,
 } from "@/features/gaap/queries";
+import { createClient } from "@/lib/supabase/server";
+
+/** id (UUID) → human contract_number (ME-…) for assistant lookups. */
+async function contractNumberById(): Promise<Map<string, string>> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("contracts")
+    .select("id, contract_number");
+  if (error) throw error;
+  const map = new Map<string, string>();
+  for (const row of data ?? []) {
+    const id = row.id as string;
+    const num = (row.contract_number as string | null)?.trim();
+    if (id && num) map.set(id, num);
+  }
+  return map;
+}
+
+function contractLabel(
+  contractId: string | undefined,
+  eventName: string | undefined,
+  numbers: Map<string, string>,
+): string {
+  const me = contractId ? numbers.get(contractId) : undefined;
+  const name = eventName?.trim() || "Unknown event";
+  if (me) return `${me} | ${name}`;
+  if (contractId) return `${name} (id ${contractId})`;
+  return name;
+}
 
 /**
  * Live MainEvent snapshot for the assistant — numbers come from Supabase,
@@ -50,6 +79,7 @@ export async function buildCompanySnapshot(): Promise<string> {
     costFlags,
     costCommitments,
     costApprovals,
+    contractNumbers,
   ] = await Promise.all([
     getDashboardMetrics(),
     listContractPositions(),
@@ -66,6 +96,7 @@ export async function buildCompanySnapshot(): Promise<string> {
     listExceptionCosts(),
     listCommittedCosts(),
     listPendingApprovals(),
+    contractNumberById(),
   ]);
 
   const totals = await getPositionTotals(positions);
@@ -80,10 +111,10 @@ export async function buildCompanySnapshot(): Promise<string> {
     .join("\n");
 
   const positionLines = positions
-    .map(
-      (p) =>
-        `- ${p.event_name} (${p.customer_name}): contract ${formatCurrency(p.contract_value)}, earned ${formatCurrency(p.earned_to_date)}, billed ${formatCurrency(p.billed_to_date)}, asset ${formatCurrency(p.contract_asset)}, liability ${formatCurrency(p.total_contract_liability)}, open AR ${formatCurrency(p.open_ar)}, perf ${p.performance_complete ? "complete" : "in progress"}`,
-    )
+    .map((p) => {
+      const label = contractLabel(p.contract_id, p.event_name, contractNumbers);
+      return `- ${label} (${p.customer_name}): contract ${formatCurrency(p.contract_value)}, earned ${formatCurrency(p.earned_to_date)}, billed ${formatCurrency(p.billed_to_date)}, recognized ${formatCurrency(p.recognized_revenue_billed)}, asset ${formatCurrency(p.contract_asset)}, liability ${formatCurrency(p.total_contract_liability)}, open AR ${formatCurrency(p.open_ar)}, perf ${p.performance_complete ? "complete" : "in progress"}`;
+    })
     .join("\n");
 
   const profitLines = profitability
@@ -93,10 +124,10 @@ export async function buildCompanySnapshot(): Promise<string> {
         p.direct_event_cogs > 0 ||
         p.reimbursable_passthrough > 0,
     )
-    .map(
-      (p) =>
-        `- ${p.event_name}: recognized rev ${formatCurrency(p.recognized_revenue)}, direct COGS ${formatCurrency(p.direct_event_cogs)}, passthrough ${formatCurrency(p.reimbursable_passthrough)}, implied margin ${formatCurrency(p.recognized_revenue - p.direct_event_cogs)}`,
-    )
+    .map((p) => {
+      const label = contractLabel(p.contract_id, p.event_name, contractNumbers);
+      return `- ${label}: recognized rev ${formatCurrency(p.recognized_revenue)}, direct COGS ${formatCurrency(p.direct_event_cogs)}, passthrough ${formatCurrency(p.reimbursable_passthrough)}, implied margin ${formatCurrency(p.recognized_revenue - p.direct_event_cogs)}`;
+    })
     .join("\n");
 
   const policyLines = policies
@@ -105,18 +136,22 @@ export async function buildCompanySnapshot(): Promise<string> {
     .join("\n");
 
   const modLines = mods
-    .map(
-      (m) =>
-        `- ${m.mod_number} on ${m.event_name}: Δ ${formatCurrency(m.price_change)}, ${m.accounting_treatment}, status ${m.status}`,
-    )
+    .map((m) => {
+      const label = contractLabel(
+        m.contract_id,
+        m.event_name,
+        contractNumbers,
+      );
+      return `- ${m.mod_number} on ${label}: Δ ${formatCurrency(m.price_change)}, ${m.accounting_treatment}, status ${m.status}`;
+    })
     .join("\n");
 
   const costLines = costs
     .slice(0, 12)
-    .map(
-      (c) =>
-        `- ${c.event_name}: ${c.classification} ${formatCurrency(c.amount)} (${c.notes ?? "no note"})`,
-    )
+    .map((c) => {
+      const label = contractLabel(c.contract_id, c.event_name, contractNumbers);
+      return `- ${label}: ${c.classification} ${formatCurrency(c.amount)} (${c.notes ?? "no note"})`;
+    })
     .join("\n");
 
   const costCategoryLines = costBreakdown
@@ -226,6 +261,7 @@ ${policyLines || "(none)"}
 RULES FOR ANSWERS
 - Use ONLY the numbers above. Do not invent invoices, customers, costs, or dollar amounts.
 - If something is not in the snapshot, say you do not have that detail in the live data.
+- Contract keys: lines are labeled with human contract_number (ME-YYYY-…) then event name. When the user cites ME-…, match that contract_number — it is NOT a UUID primary key. Prefer PER-CONTRACT POSITION "recognized" and PROFITABILITY INPUTS "recognized rev" for recognition questions.
 - Prefer plain business language; mention ASC 606 / liability / asset when relevant.
 - For costs: distinguish commitments vs actuals, approvals vs control flags, and Cost & Resources tracking vs GAAP cost classification.
 - Keep answers concise (2–6 short paragraphs or bullets).
@@ -235,4 +271,5 @@ RULES FOR ANSWERS
 export const ASSISTANT_SYSTEM = `You are MainEvent's internal finance assistant for an event-production Contract-to-Cash system.
 You help students and teammates understand Billing & A/R, ASC 606 Compliance, and Cost & Resource Tracking using a live data snapshot.
 Be accurate, concise, and educational. Never invent financial figures.
+Contracts are identified by human contract_number (e.g. ME-2026-222222222220) and/or event name; ME- numbers are contract_number values, not UUIDs.
 When asked about costs, use the COST & RESOURCE TRACKING section (actuals, commitments, approvals, flags by category) — not only GAAP cost classifications.`;

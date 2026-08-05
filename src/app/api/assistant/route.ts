@@ -101,6 +101,19 @@ async function callGroq(
   return text;
 }
 
+const ME_CONTRACT_RE = /\bME-\d{4}-\d+\b/i;
+
+/** Pull a PER-CONTRACT / PROFITABILITY line for a human ME- contract number. */
+function findContractSnapshotLine(
+  snapshot: string,
+  contractNumber: string,
+): string | null {
+  const key = contractNumber.toUpperCase();
+  const rows = snapshot.split("\n").filter((l) => l.trim().startsWith("- "));
+  const hit = rows.find((l) => l.toUpperCase().includes(key));
+  return hit?.trim() ?? null;
+}
+
 /** Deterministic fallback when no AI key is configured — still useful for demos. */
 function answerFromSnapshot(snapshot: string, question: string): string {
   const q = question.toLowerCase();
@@ -112,6 +125,15 @@ function answerFromSnapshot(snapshot: string, question: string): string {
     const idx = row.indexOf(":");
     return idx >= 0 ? row.slice(idx + 1).trim() : row.trim();
   };
+
+  const meMatch = question.match(ME_CONTRACT_RE);
+  if (meMatch) {
+    const contractLine = findContractSnapshotLine(snapshot, meMatch[0]);
+    if (contractLine) {
+      return `From the live snapshot for **${meMatch[0]}**:\n\n${contractLine}\n\n(ME-… is the human contract_number. Recognized amounts appear as "recognized" / "recognized rev" on that line.)`;
+    }
+    return `I do not see contract_number **${meMatch[0]}** in the live PER-CONTRACT POSITION or PROFITABILITY snapshot. Check the number (seeded IDs look like ME-2026-222222222201) or ask by event name.`;
+  }
 
   if (q.includes("deposit") || q.includes("unearned")) {
     return `From the live snapshot, unearned deposits (contract liability) are **${line("- Unearned deposits (liability)") ?? line("- Unearned deposits") ?? "see /compliance/deposits-retainers"}**. Deposits stay liabilities until applied/earned — cash alone is not revenue.`;
