@@ -48,6 +48,7 @@ export function ContractsTable({ rows }: Props) {
       list = list.filter(
         (r) =>
           r.contract_number?.toLowerCase().includes(query) ||
+          r.id?.toLowerCase().includes(query) ||
           r.event_name?.toLowerCase().includes(query) ||
           r.customer_name?.toLowerCase().includes(query) ||
           r.project_manager_label?.toLowerCase().includes(query),
@@ -227,7 +228,7 @@ export function ContractsTable({ rows }: Props) {
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
+            <table className="w-full min-w-[1100px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wider text-[var(--muted)]">
                 <tr className="border-b border-[var(--line)]">
                   <th className="pb-2 font-medium">Contract</th>
@@ -236,6 +237,8 @@ export function ContractsTable({ rows }: Props) {
                   <th className="pb-2 font-medium">PM</th>
                   <th className="pb-2 font-medium">Original</th>
                   <th className="pb-2 font-medium">Revised</th>
+                  <th className="pb-2 font-medium">Billed</th>
+                  <th className="pb-2 font-medium">Paid</th>
                   <th className="pb-2 font-medium">Deposit</th>
                   <th className="pb-2 font-medium">Status</th>
                   <th className="pb-2 font-medium">Next milestone</th>
@@ -274,6 +277,12 @@ export function ContractsTable({ rows }: Props) {
                     </td>
                     <td className="py-3">
                       <Money amount={Number(r.contract_value)} />
+                    </td>
+                    <td className="py-3">
+                      <Money amount={Number(r.billed_to_date)} />
+                    </td>
+                    <td className="py-3">
+                      <Money amount={Number(r.paid_to_date)} />
                     </td>
                     <td className="py-3">
                       <StatusPill tone={depositTone(r.deposit_status)}>

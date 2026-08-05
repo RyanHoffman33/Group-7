@@ -36,15 +36,24 @@ export async function listContracts(): Promise<Contract[]> {
   return (data ?? []) as Contract[];
 }
 
-export async function getContract(id: string): Promise<Contract | null> {
+export async function getContract(idOrNumber: string): Promise<Contract | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const key = idOrNumber.trim();
+  const byId = await supabase
     .from("contracts")
     .select("*")
-    .eq("id", id)
+    .eq("id", key)
     .maybeSingle();
-  if (error) throw error;
-  return data as Contract | null;
+  if (byId.error) throw byId.error;
+  if (byId.data) return byId.data as Contract;
+
+  const byNumber = await supabase
+    .from("contracts")
+    .select("*")
+    .eq("contract_number", key)
+    .maybeSingle();
+  if (byNumber.error) throw byNumber.error;
+  return (byNumber.data as Contract) ?? null;
 }
 
 export async function listContractsByCustomer(

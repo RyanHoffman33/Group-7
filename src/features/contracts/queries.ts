@@ -20,7 +20,64 @@ export type ContractListRow = EngagementContract & {
   next_milestone_label: string | null;
   next_milestone_due: string | null;
   action_hint: string | null;
+  /** Σ invoice.total excluding void/canceled/draft */
+  billed_to_date: number;
+  /** Σ payment_applications on those invoices */
+  paid_to_date: number;
+  /** Σ (invoice.total − apps) for open A/R statuses */
+  open_ar: number;
+  /** GREATEST(0, contract_value − billed_to_date) */
+  unbilled_remaining: number;
 };
+
+export type ContractActivityItem = {
+  id: string;
+  event_type: string;
+  summary: string;
+  actor_label: string;
+  from_status: string | null;
+  to_status: string | null;
+  created_at: string;
+  href?: string | null;
+};
+
+export type ContractInvoiceSummary = {
+  id: string;
+  invoice_number: string;
+  status: string;
+  total: number;
+  paid: number;
+  outstanding: number;
+  due_date: string;
+  issue_date: string;
+  recognition_status: string;
+};
+
+export type ContractPaymentSummary = {
+  id: string;
+  payment_id: string;
+  invoice_id: string;
+  invoice_number: string;
+  amount: number;
+  paid_at: string;
+  method: string | null;
+  reference: string | null;
+};
+
+export type ContractDepositSummary = {
+  id: string;
+  amount: number;
+  status: string;
+  received_at: string;
+};
+
+const EXCLUDED_INVOICE_STATUSES = new Set(["void", "canceled", "draft"]);
+const OPEN_AR_STATUSES = new Set([
+  "issued",
+  "unpaid",
+  "partially_paid",
+  "disputed",
+]);
 
 export type DepositInfo = {
   required: number;
@@ -78,6 +135,50 @@ async function depositTotalsByContract(): Promise<Map<string, number>> {
   return map;
 }
 
+type CashPosition = { billed: number; paid: number; open_ar: number };
+
+async function billingCashByContract(): Promise<Map<string, CashPosition>> {
+  const supabase = createClient();
+  const { data: invoices, error } = await supabase
+    .from("invoices")
+    .select("id, contract_id, total, status");
+  if (error) throw error;
+
+  const active = (invoices ?? []).filter(
+    (i) => !EXCLUDED_INVOICE_STATUSES.has(String(i.status)),
+  );
+  const paidByInvoice = new Map<string, number>();
+  const ids = active.map((i) => i.id as string);
+  if (ids.length) {
+    const { data: apps, error: appErr } = await supabase
+      .from("payment_applications")
+      .select("invoice_id, amount")
+      .in("invoice_id", ids);
+    if (appErr) throw appErr;
+    for (const a of apps ?? []) {
+      paidByInvoice.set(
+        a.invoice_id as string,
+        (paidByInvoice.get(a.invoice_id as string) ?? 0) + num(a.amount),
+      );
+    }
+  }
+
+  const map = new Map<string, CashPosition>();
+  for (const inv of active) {
+    const cid = inv.contract_id as string;
+    const billed = num(inv.total);
+    const paid = paidByInvoice.get(inv.id as string) ?? 0;
+    const cur = map.get(cid) ?? { billed: 0, paid: 0, open_ar: 0 };
+    cur.billed += billed;
+    cur.paid += paid;
+    if (OPEN_AR_STATUSES.has(String(inv.status))) {
+      cur.open_ar += Math.max(0, billed - paid);
+    }
+    map.set(cid, cur);
+  }
+  return map;
+}
+
 function actionHint(
   c: EngagementContract,
   depositStatus: DepositInfo["status"],
@@ -108,13 +209,14 @@ export async function listCustomersForContracts() {
 
 export async function listContractsDetailed(): Promise<ContractListRow[]> {
   const supabase = createClient();
-  const [{ data: contracts, error }, { data: customers }, deposits] =
+  const [{ data: contracts, error }, { data: customers }, deposits, cash] =
     await Promise.all([
       supabase.from("contracts").select("*").order("created_at", {
         ascending: false,
       }),
       supabase.from("customers").select("id, name"),
       depositTotalsByContract(),
+      billingCashByContract(),
     ]);
   if (error) throw error;
 
@@ -153,6 +255,7 @@ export async function listContractsDetailed(): Promise<ContractListRow[]> {
   return (contracts ?? []).map((raw) => {
     const c = raw as EngagementContract;
     const received = deposits.get(c.id) ?? 0;
+    const position = cash.get(c.id) ?? { billed: 0, paid: 0, open_ar: 0 };
     const slice = {
       status: c.status,
       deposit_required: Boolean(c.deposit_required),
@@ -170,24 +273,37 @@ export async function listContractsDetailed(): Promise<ContractListRow[]> {
       else deposit_status = "pending";
     }
     const next = nextByContract.get(c.id);
+    const contractValue = num(c.contract_value);
     return {
       ...c,
       original_contract_value: slice.original_contract_value,
       change_order_value_total: num(c.change_order_value_total),
-      contract_value: num(c.contract_value),
+      contract_value: contractValue,
       customer_name: customerMap.get(c.customer_id) ?? "Unknown",
       deposits_received_total: received,
       deposit_status,
       next_milestone_label: next?.label ?? null,
       next_milestone_due: next?.due ?? null,
       action_hint: actionHint(c, deposit_status),
+      billed_to_date: position.billed,
+      paid_to_date: position.paid,
+      open_ar: position.open_ar,
+      unbilled_remaining: Math.max(0, contractValue - position.billed),
     };
   });
 }
 
-export async function getContract(id: string): Promise<ContractListRow | null> {
+/** Resolve by UUID primary key or human contract_number (e.g. ME-2026-…). */
+export async function getContract(
+  idOrNumber: string,
+): Promise<ContractListRow | null> {
   const rows = await listContractsDetailed();
-  return rows.find((r) => r.id === id) ?? null;
+  const key = idOrNumber.trim();
+  return (
+    rows.find((r) => r.id === key) ??
+    rows.find((r) => r.contract_number === key) ??
+    null
+  );
 }
 
 export async function listMilestones(contractId: string) {
@@ -247,16 +363,243 @@ export async function listDocuments(contractId: string) {
   return data ?? [];
 }
 
-export async function listAuditEvents(contractId: string) {
+export async function listAuditEvents(
+  contractId: string,
+): Promise<ContractActivityItem[]> {
+  return listContractActivity(contractId);
+}
+
+/** Unified timeline: contract audit + invoices, payments, deposits, change orders. */
+export async function listContractActivity(
+  contractId: string,
+): Promise<ContractActivityItem[]> {
+  const supabase = createClient();
+  const [
+    { data: audit, error: auditErr },
+    { data: invoices, error: invErr },
+    { data: deposits, error: depErr },
+  ] = await Promise.all([
+    supabase
+      .from("contract_audit_events")
+      .select("*")
+      .eq("contract_id", contractId)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("invoices")
+      .select("id, invoice_number, status, total, created_at, issue_date")
+      .eq("contract_id", contractId),
+    supabase
+      .from("deposits")
+      .select("id, amount, status, received_at, created_at")
+      .eq("contract_id", contractId),
+  ]);
+  if (auditErr) throw auditErr;
+  if (invErr) throw invErr;
+  if (depErr) throw depErr;
+
+  const items: ContractActivityItem[] = [];
+
+  for (const e of audit ?? []) {
+    items.push({
+      id: `audit-${e.id}`,
+      event_type: String(e.event_type),
+      summary: String(e.summary),
+      actor_label: String(e.actor_label ?? "System"),
+      from_status: (e.from_status as string) ?? null,
+      to_status: (e.to_status as string) ?? null,
+      created_at: String(e.created_at),
+      href: null,
+    });
+  }
+
+  const invIds = (invoices ?? []).map((i) => i.id as string);
+  const paidByInvoice = new Map<string, number>();
+  type AppRow = {
+    id: string;
+    invoice_id: string;
+    amount: number;
+    created_at?: string;
+    payments?: {
+      paid_at?: string;
+      method?: string;
+      reference?: string | null;
+    } | null;
+  };
+  let apps: AppRow[] = [];
+  if (invIds.length) {
+    const { data: appRows, error: appErr } = await supabase
+      .from("payment_applications")
+      .select("id, invoice_id, amount, created_at, payments(paid_at, method, reference)")
+      .in("invoice_id", invIds);
+    if (appErr) throw appErr;
+    apps = (appRows ?? []) as AppRow[];
+    for (const a of apps) {
+      paidByInvoice.set(
+        a.invoice_id,
+        (paidByInvoice.get(a.invoice_id) ?? 0) + num(a.amount),
+      );
+    }
+  }
+
+  for (const inv of invoices ?? []) {
+    const total = num(inv.total);
+    const paid = paidByInvoice.get(inv.id as string) ?? 0;
+    items.push({
+      id: `invoice-${inv.id}`,
+      event_type: "invoice",
+      summary: `Invoice ${inv.invoice_number} · ${String(inv.status)} · $${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${paid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} paid)`,
+      actor_label: "Billing",
+      from_status: null,
+      to_status: String(inv.status),
+      created_at: String(inv.created_at ?? inv.issue_date),
+      href: `/billing/invoices/${inv.id}`,
+    });
+  }
+
+  const invNumber = new Map(
+    (invoices ?? []).map((i) => [i.id as string, String(i.invoice_number)]),
+  );
+  for (const a of apps) {
+    const paidAt = a.payments?.paid_at ?? a.created_at ?? new Date().toISOString();
+    const method = a.payments?.method ? ` via ${a.payments.method}` : "";
+    items.push({
+      id: `payment-${a.id}`,
+      event_type: "payment",
+      summary: `Payment $${num(a.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} applied to ${invNumber.get(a.invoice_id) ?? "invoice"}${method}`,
+      actor_label: "Billing",
+      from_status: null,
+      to_status: null,
+      created_at: String(paidAt),
+      href: `/billing/invoices/${a.invoice_id}`,
+    });
+  }
+
+  for (const d of deposits ?? []) {
+    items.push({
+      id: `deposit-${d.id}`,
+      event_type: "deposit",
+      summary: `Deposit $${num(d.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${String(d.status)}`,
+      actor_label: "Billing",
+      from_status: null,
+      to_status: String(d.status),
+      created_at: String(d.received_at ?? d.created_at),
+      href: "/billing/deposits",
+    });
+  }
+
+  items.sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+  return items.slice(0, 150);
+}
+
+export async function listContractInvoices(
+  contractId: string,
+): Promise<ContractInvoiceSummary[]> {
+  const supabase = createClient();
+  const { data: invoices, error } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, status, total, due_date, issue_date, recognition_status")
+    .eq("contract_id", contractId)
+    .order("issue_date", { ascending: false });
+  if (error) throw error;
+
+  const ids = (invoices ?? []).map((i) => i.id as string);
+  const paidByInvoice = new Map<string, number>();
+  if (ids.length) {
+    const { data: apps, error: appErr } = await supabase
+      .from("payment_applications")
+      .select("invoice_id, amount")
+      .in("invoice_id", ids);
+    if (appErr) throw appErr;
+    for (const a of apps ?? []) {
+      paidByInvoice.set(
+        a.invoice_id as string,
+        (paidByInvoice.get(a.invoice_id as string) ?? 0) + num(a.amount),
+      );
+    }
+  }
+
+  return (invoices ?? []).map((inv) => {
+    const total = num(inv.total);
+    const paid = EXCLUDED_INVOICE_STATUSES.has(String(inv.status))
+      ? 0
+      : (paidByInvoice.get(inv.id as string) ?? 0);
+    return {
+      id: inv.id as string,
+      invoice_number: String(inv.invoice_number),
+      status: String(inv.status),
+      total,
+      paid,
+      outstanding: EXCLUDED_INVOICE_STATUSES.has(String(inv.status))
+        ? 0
+        : Math.max(0, total - paid),
+      due_date: String(inv.due_date),
+      issue_date: String(inv.issue_date),
+      recognition_status: String(inv.recognition_status),
+    };
+  });
+}
+
+export async function listContractPayments(
+  contractId: string,
+): Promise<ContractPaymentSummary[]> {
+  const invoices = await listContractInvoices(contractId);
+  if (invoices.length === 0) return [];
+  const supabase = createClient();
+  const invMap = new Map(invoices.map((i) => [i.id, i.invoice_number]));
+  const { data: apps, error } = await supabase
+    .from("payment_applications")
+    .select("id, invoice_id, amount, payments(id, paid_at, method, reference)")
+    .in(
+      "invoice_id",
+      invoices.map((i) => i.id),
+    );
+  if (error) throw error;
+
+  return (apps ?? [])
+    .map((a) => {
+      const p = a.payments as {
+        id?: string;
+        paid_at?: string;
+        method?: string;
+        reference?: string | null;
+      } | null;
+      return {
+        id: a.id as string,
+        payment_id: String(p?.id ?? a.id),
+        invoice_id: a.invoice_id as string,
+        invoice_number: invMap.get(a.invoice_id as string) ?? "—",
+        amount: num(a.amount),
+        paid_at: String(p?.paid_at ?? ""),
+        method: p?.method ?? null,
+        reference: p?.reference ?? null,
+      };
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.paid_at || 0).getTime() - new Date(a.paid_at || 0).getTime(),
+    );
+}
+
+export async function listContractDeposits(
+  contractId: string,
+): Promise<ContractDepositSummary[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("contract_audit_events")
-    .select("*")
+    .from("deposits")
+    .select("id, amount, status, received_at")
     .eq("contract_id", contractId)
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .order("received_at", { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((d) => ({
+    id: d.id as string,
+    amount: num(d.amount),
+    status: String(d.status),
+    received_at: String(d.received_at),
+  }));
 }
 
 export async function listChangeOrders(contractId?: string) {

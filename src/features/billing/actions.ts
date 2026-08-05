@@ -27,6 +27,8 @@ function revalidateBilling() {
   revalidatePath("/billing/alerts");
   revalidatePath("/billing/determine");
   revalidatePath("/billing/recurring");
+  revalidatePath("/contracts");
+  revalidatePath("/contracts/list");
 }
 
 async function assertBillingActor(
@@ -169,6 +171,7 @@ export async function createAndIssueInvoice(input: {
     }
 
     revalidateBilling();
+    revalidatePath(`/contracts/${input.contract_id}`);
     await appendAccessAudit({
       actorUserId: session.id,
       actorName: session.fullName,
@@ -417,6 +420,8 @@ export async function recordPaymentAndApply(input: {
 
     await recomputeCustomerPaymentStats(input.customer_id);
     revalidateBilling();
+    revalidatePath("/contracts");
+    revalidatePath(`/contracts/${inv.contract_id}`);
     return { ok: true, id: payment.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -543,6 +548,8 @@ export async function applyDepositToInvoice(input: {
       .eq("id", input.invoice_id);
 
     revalidateBilling();
+    revalidatePath("/contracts");
+    revalidatePath(`/contracts/${dep.contract_id}`);
     return { ok: true, id: dep.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

@@ -9,17 +9,30 @@ type Option = { id: string; label: string; customer_id?: string };
 export function CreateInvoiceForm({
   customers,
   contracts,
+  defaultCustomerId,
+  defaultContractId,
 }: {
   customers: Option[];
   contracts: Option[];
+  defaultCustomerId?: string;
+  defaultContractId?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [customerId, setCustomerId] = useState(customers[0]?.id ?? "");
+  const initialCustomer =
+    defaultCustomerId ||
+    contracts.find((c) => c.id === defaultContractId)?.customer_id ||
+    customers[0]?.id ||
+    "";
+  const [customerId, setCustomerId] = useState(initialCustomer);
   const filtered = contracts.filter(
     (c) => !customerId || c.customer_id === customerId,
   );
+  const defaultContract =
+    defaultContractId && filtered.some((c) => c.id === defaultContractId)
+      ? defaultContractId
+      : filtered[0]?.id ?? "";
 
   return (
     <form
@@ -71,6 +84,7 @@ export function CreateInvoiceForm({
         <select
           name="contract_id"
           required
+          defaultValue={defaultContract}
           className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2"
         >
           {filtered.map((c) => (

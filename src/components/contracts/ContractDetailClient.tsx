@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import {
   addContractDocument,
   approveChangeOrder,
@@ -11,7 +11,13 @@ import {
   submitContractForApproval,
 } from "@/features/contracts/actions";
 import { formatDate, formatLabel } from "@/features/billing/aging";
-import type { ContractListRow } from "@/features/contracts/queries";
+import type {
+  ContractActivityItem,
+  ContractDepositSummary,
+  ContractInvoiceSummary,
+  ContractListRow,
+  ContractPaymentSummary,
+} from "@/features/contracts/queries";
 import {
   STATUS_LABELS,
   depositTone,
@@ -25,6 +31,7 @@ const TABS = [
   "Scope and Services",
   "Financial Terms",
   "Payment Schedule",
+  "Billing",
   "Event and Engagement",
   "Approvals",
   "Change Orders",
@@ -33,6 +40,63 @@ const TABS = [
 ] as const;
 
 type Tab = (typeof TABS)[number];
+
+function invoiceTone(status: string) {
+  if (status === "paid") return "ok" as const;
+  if (status === "void" || status === "canceled") return "neutral" as const;
+  if (status === "partially_paid") return "warn" as const;
+  if (status === "disputed") return "danger" as const;
+  if (status === "unpaid" || status === "issued") return "accent" as const;
+  return "neutral" as const;
+}
+
+function methodRateFields(contract: ContractListRow) {
+  const m = contract.billing_method;
+  const rows: { label: string; value: ReactNode }[] = [];
+  if (m === "hourly" && Number(contract.hourly_rate) > 0) {
+    rows.push({
+      label: "Hourly rate",
+      value: <Money amount={Number(contract.hourly_rate)} />,
+    });
+  }
+  if (m === "cost_plus" && Number(contract.markup_percent) > 0) {
+    rows.push({
+      label: "Markup %",
+      value: `${Number(contract.markup_percent)}%`,
+    });
+  }
+  if (m === "retainer" && Number(contract.retainer_amount) > 0) {
+    rows.push({
+      label: "Retainer amount",
+      value: <Money amount={Number(contract.retainer_amount)} />,
+    });
+  }
+  if (m === "recurring" && Number(contract.recurring_amount) > 0) {
+    rows.push({
+      label: "Recurring amount",
+      value: <Money amount={Number(contract.recurring_amount)} />,
+    });
+  }
+  if (m === "placement_fee" && Number(contract.placement_fee_percent) > 0) {
+    rows.push({
+      label: "Placement fee %",
+      value: `${Number(contract.placement_fee_percent)}%`,
+    });
+  }
+  if (m === "progress" && Number(contract.progress_percent) > 0) {
+    rows.push({
+      label: "Progress %",
+      value: `${Number(contract.progress_percent)}%`,
+    });
+  }
+  if (m === "per_service" && Number(contract.per_service_rate) > 0) {
+    rows.push({
+      label: "Per-service rate",
+      value: <Money amount={Number(contract.per_service_rate)} />,
+    });
+  }
+  return rows;
+}
 
 export function ContractDetailClient({
   contract,
@@ -43,6 +107,9 @@ export function ContractDetailClient({
   documents,
   audit,
   changeOrders,
+  invoices = [],
+  payments = [],
+  deposits = [],
 }: {
   contract: ContractListRow;
   lines: Record<string, unknown>[];
@@ -50,8 +117,11 @@ export function ContractDetailClient({
   milestones: Record<string, unknown>[];
   approvals: Record<string, unknown>[];
   documents: Record<string, unknown>[];
-  audit: Record<string, unknown>[];
+  audit: ContractActivityItem[];
   changeOrders: Record<string, unknown>[];
+  invoices?: ContractInvoiceSummary[];
+  payments?: ContractPaymentSummary[];
+  deposits?: ContractDepositSummary[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("Overview");
@@ -84,6 +154,7 @@ export function ContractDetailClient({
 
   const field =
     "w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm";
+  const rateRows = methodRateFields(contract);
 
   return (
     <div className="space-y-6">
@@ -99,6 +170,9 @@ export function ContractDetailClient({
             <p className="mt-1 text-sm text-[var(--muted)]">
               {contract.customer_name} · PM {contract.project_manager_label} ·{" "}
               {formatDate(contract.event_start)}
+            </p>
+            <p className="mt-1 font-mono text-xs text-[var(--muted)]">
+              ID {contract.id}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -118,7 +192,7 @@ export function ContractDetailClient({
             </dd>
           </div>
           <div>
-            <dt className="text-[var(--muted)]">Revised value</dt>
+            <dt className="text-[var(--muted)]">Revised CV</dt>
             <dd className="font-semibold">
               <Money amount={Number(contract.contract_value)} />
             </dd>
@@ -133,6 +207,32 @@ export function ContractDetailClient({
             <dt className="text-[var(--muted)]">Next required action</dt>
             <dd className="font-semibold">
               {contract.action_hint ?? "None"}
+            </dd>
+          </div>
+        </dl>
+        <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm border-t border-[var(--line)] pt-3">
+          <div>
+            <dt className="text-[var(--muted)]">Billed to date</dt>
+            <dd className="font-semibold">
+              <Money amount={Number(contract.billed_to_date)} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--muted)]">Paid to date</dt>
+            <dd className="font-semibold">
+              <Money amount={Number(contract.paid_to_date)} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--muted)]">Open A/R</dt>
+            <dd className="font-semibold">
+              <Money amount={Number(contract.open_ar)} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--muted)]">Unbilled remaining</dt>
+            <dd className="font-semibold">
+              <Money amount={Number(contract.unbilled_remaining)} />
             </dd>
           </div>
         </dl>
@@ -178,6 +278,10 @@ export function ContractDetailClient({
                 <dd>{formatLabel(contract.billing_method)}</dd>
               </div>
               <div className="flex justify-between gap-2 border-b border-[var(--line)] pb-2">
+                <dt className="text-[var(--muted)]">Currency</dt>
+                <dd>{contract.currency || "USD"}</dd>
+              </div>
+              <div className="flex justify-between gap-2 border-b border-[var(--line)] pb-2">
                 <dt className="text-[var(--muted)]">Performance complete</dt>
                 <dd>{contract.performance_complete ? "Yes" : "No"}</dd>
               </div>
@@ -185,6 +289,12 @@ export function ContractDetailClient({
                 <dt className="text-[var(--muted)]">Deposit received</dt>
                 <dd>
                   <Money amount={Number(contract.deposits_received_total)} />
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2 border-b border-[var(--line)] pb-2">
+                <dt className="text-[var(--muted)]">Invoice collections</dt>
+                <dd>
+                  <Money amount={Number(contract.paid_to_date)} />
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
@@ -195,6 +305,24 @@ export function ContractDetailClient({
                 </dd>
               </div>
             </dl>
+            {(contract.notes || contract.internal_memo) && (
+              <div className="mt-4 space-y-2 border-t border-[var(--line)] pt-3 text-sm">
+                {contract.notes ? (
+                  <div>
+                    <div className="text-[var(--muted)]">Notes / SOW</div>
+                    <p className="mt-1 whitespace-pre-wrap">{contract.notes}</p>
+                  </div>
+                ) : null}
+                {contract.internal_memo ? (
+                  <div>
+                    <div className="text-[var(--muted)]">Internal memo</div>
+                    <p className="mt-1 whitespace-pre-wrap">
+                      {contract.internal_memo}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </Panel>
           <Panel title="Quick actions">
             <div className="space-y-3">
@@ -258,10 +386,16 @@ export function ContractDetailClient({
                 Open Approval Queue
               </Link>
               <Link
-                href="/billing/invoices"
+                href={`/billing/invoices?contract_id=${contract.id}`}
                 className="block text-sm font-medium text-[var(--accent)]"
               >
-                Open Billing invoices
+                Open invoices for this contract
+              </Link>
+              <Link
+                href="/billing/payments"
+                className="block text-sm font-medium text-[var(--accent)]"
+              >
+                Open payments desk
               </Link>
               <Link
                 href="/contracts/closeout"
@@ -270,6 +404,78 @@ export function ContractDetailClient({
                 Closeout desk
               </Link>
             </div>
+          </Panel>
+          <Panel title="Lifecycle">
+            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-[var(--muted)]">Submitted</dt>
+                <dd>
+                  {formatDate(contract.submitted_at)}
+                  {contract.submitted_by ? ` · ${contract.submitted_by}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Approved</dt>
+                <dd>
+                  {formatDate(contract.approved_at)}
+                  {contract.approved_by ? ` · ${contract.approved_by}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Activated</dt>
+                <dd>{formatDate(contract.activated_at)}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Completed</dt>
+                <dd>{formatDate(contract.completed_at)}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Closed</dt>
+                <dd>{formatDate(contract.closed_at)}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Version</dt>
+                <dd>{contract.version ?? 1}</dd>
+              </div>
+              {contract.canceled_at ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-[var(--muted)]">Canceled</dt>
+                  <dd>
+                    {formatDate(contract.canceled_at)}
+                    {contract.cancel_reason
+                      ? ` · ${contract.cancel_reason}`
+                      : ""}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </Panel>
+          <Panel title="Invoices at a glance">
+            {invoices.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No invoices yet.</p>
+            ) : (
+              <ul className="divide-y divide-[var(--line)] text-sm">
+                {invoices.slice(0, 5).map((inv) => (
+                  <li key={inv.id} className="flex justify-between gap-2 py-2">
+                    <Link
+                      href={`/billing/invoices/${inv.id}`}
+                      className="font-medium text-[var(--accent)]"
+                    >
+                      {inv.invoice_number}
+                    </Link>
+                    <span>
+                      <Money amount={inv.total} /> · {formatLabel(inv.status)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link
+              href={`/billing/invoices?contract_id=${contract.id}`}
+              className="mt-3 inline-block text-sm font-medium text-[var(--accent)]"
+            >
+              View all invoices →
+            </Link>
           </Panel>
         </div>
       )}
@@ -283,14 +489,27 @@ export function ContractDetailClient({
               <table className="w-full text-left text-sm">
                 <thead className="text-xs uppercase text-[var(--muted)]">
                   <tr className="border-b border-[var(--line)]">
+                    <th className="pb-2">Type</th>
                     <th className="pb-2">Description</th>
+                    <th className="pb-2">Qty</th>
                     <th className="pb-2">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {lines.map((l) => (
                     <tr key={String(l.id)} className="border-b border-[var(--line)]">
-                      <td className="py-2">{String(l.description)}</td>
+                      <td className="py-2">
+                        {formatLabel(String(l.line_type ?? "line"))}
+                      </td>
+                      <td className="py-2">
+                        {String(l.description)}
+                        {l.is_optional ? (
+                          <span className="ml-1 text-xs text-[var(--muted)]">
+                            (optional)
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-2">{Number(l.quantity ?? 1)}</td>
                       <td className="py-2">
                         <Money amount={Number(l.amount)} />
                       </td>
@@ -311,7 +530,16 @@ export function ContractDetailClient({
                     {String(d.title)}
                     <div className="text-xs text-[var(--muted)]">
                       {String(d.phase)} · {String(d.status)}
+                      {d.commercial_amount != null
+                        ? ` · $${Number(d.commercial_amount).toLocaleString()}`
+                        : ""}
+                      {d.is_performance_obligation ? " · PO" : ""}
                     </div>
+                    {d.description ? (
+                      <p className="mt-1 text-[var(--muted)]">
+                        {String(d.description)}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -336,11 +564,34 @@ export function ContractDetailClient({
               </dd>
             </div>
             <div>
+              <dt className="text-[var(--muted)]">Billed / Paid / Open A/R</dt>
+              <dd className="font-semibold">
+                <Money amount={Number(contract.billed_to_date)} /> /{" "}
+                <Money amount={Number(contract.paid_to_date)} /> /{" "}
+                <Money amount={Number(contract.open_ar)} />
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[var(--muted)]">Unbilled remaining</dt>
+              <dd className="font-semibold">
+                <Money amount={Number(contract.unbilled_remaining)} />
+              </dd>
+            </div>
+            <div>
               <dt className="text-[var(--muted)]">Deposit required</dt>
               <dd>
                 {contract.deposit_required
                   ? `${contract.deposit_percent}% of original`
                   : "No"}
+                {contract.minimum_deposit_amount
+                  ? ` (min $${Number(contract.minimum_deposit_amount).toLocaleString()})`
+                  : ""}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[var(--muted)]">Deposit received</dt>
+              <dd>
+                <Money amount={Number(contract.deposits_received_total)} />
               </dd>
             </div>
             <div>
@@ -348,8 +599,23 @@ export function ContractDetailClient({
               <dd>
                 <Money amount={Number(contract.discount_amount ?? 0)} /> /{" "}
                 {Number(contract.discount_percent ?? 0)}%
+                {contract.discount_requires_approval
+                  ? contract.discount_approved
+                    ? " · approved"
+                    : " · needs approval"
+                  : ""}
               </dd>
             </div>
+            <div>
+              <dt className="text-[var(--muted)]">Requires deposit before work</dt>
+              <dd>{contract.requires_deposit_before_work ? "Yes" : "No"}</dd>
+            </div>
+            {rateRows.map((r) => (
+              <div key={r.label}>
+                <dt className="text-[var(--muted)]">{r.label}</dt>
+                <dd>{r.value}</dd>
+              </div>
+            ))}
             <div className="sm:col-span-2">
               <dt className="text-[var(--muted)]">Cancellation policy</dt>
               <dd className="mt-1">{contract.cancellation_policy_text ?? "—"}</dd>
@@ -370,7 +636,9 @@ export function ContractDetailClient({
                   <th className="pb-2">Type</th>
                   <th className="pb-2">Due</th>
                   <th className="pb-2">Amount</th>
+                  <th className="pb-2">% CV</th>
                   <th className="pb-2">Billed</th>
+                  <th className="pb-2">Done</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,14 +651,168 @@ export function ContractDetailClient({
                       <Money amount={Number(m.amount)} />
                     </td>
                     <td className="py-2">
-                      {m.billed_invoice_id ? "Yes" : "No"}
+                      {m.percent_of_contract != null
+                        ? `${Number(m.percent_of_contract)}%`
+                        : "—"}
                     </td>
+                    <td className="py-2">
+                      {m.billed_invoice_id ? (
+                        <Link
+                          href={`/billing/invoices/${String(m.billed_invoice_id)}`}
+                          className="text-[var(--accent)]"
+                        >
+                          Yes
+                        </Link>
+                      ) : (
+                        "No"
+                      )}
+                    </td>
+                    <td className="py-2">{m.completed ? "Yes" : "No"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </Panel>
+      )}
+
+      {tab === "Billing" && (
+        <div className="grid gap-4">
+          <div className="grid gap-3 sm:grid-cols-4 text-sm">
+            <Panel title="Billed">
+              <p className="text-lg font-semibold">
+                <Money amount={Number(contract.billed_to_date)} />
+              </p>
+            </Panel>
+            <Panel title="Paid">
+              <p className="text-lg font-semibold">
+                <Money amount={Number(contract.paid_to_date)} />
+              </p>
+            </Panel>
+            <Panel title="Open A/R">
+              <p className="text-lg font-semibold">
+                <Money amount={Number(contract.open_ar)} />
+              </p>
+            </Panel>
+            <Panel title="Unbilled">
+              <p className="text-lg font-semibold">
+                <Money amount={Number(contract.unbilled_remaining)} />
+              </p>
+            </Panel>
+          </div>
+          <Panel
+            title="Invoices"
+            action={
+              <Link
+                href={`/billing/invoices?contract_id=${contract.id}`}
+                className="text-sm font-medium text-[var(--accent)]"
+              >
+                Open filtered list
+              </Link>
+            }
+          >
+            {invoices.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No invoices.</p>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase text-[var(--muted)]">
+                  <tr className="border-b border-[var(--line)]">
+                    <th className="pb-2">Invoice</th>
+                    <th className="pb-2">Issued</th>
+                    <th className="pb-2">Due</th>
+                    <th className="pb-2">Total</th>
+                    <th className="pb-2">Paid</th>
+                    <th className="pb-2">Outstanding</th>
+                    <th className="pb-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((inv) => (
+                    <tr key={inv.id} className="border-b border-[var(--line)]">
+                      <td className="py-2">
+                        <Link
+                          href={`/billing/invoices/${inv.id}`}
+                          className="font-medium text-[var(--accent)]"
+                        >
+                          {inv.invoice_number}
+                        </Link>
+                      </td>
+                      <td className="py-2">{formatDate(inv.issue_date)}</td>
+                      <td className="py-2">{formatDate(inv.due_date)}</td>
+                      <td className="py-2">
+                        <Money amount={inv.total} />
+                      </td>
+                      <td className="py-2">
+                        <Money amount={inv.paid} />
+                      </td>
+                      <td className="py-2">
+                        <Money amount={inv.outstanding} />
+                      </td>
+                      <td className="py-2">
+                        <StatusPill tone={invoiceTone(inv.status)}>
+                          {formatLabel(inv.status)}
+                        </StatusPill>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Panel>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel title="Payments applied">
+              {payments.length === 0 ? (
+                <p className="text-sm text-[var(--muted)]">No payments applied.</p>
+              ) : (
+                <ul className="divide-y divide-[var(--line)] text-sm">
+                  {payments.map((p) => (
+                    <li key={p.id} className="py-2">
+                      <div className="flex justify-between gap-2">
+                        <Link
+                          href={`/billing/invoices/${p.invoice_id}`}
+                          className="font-medium text-[var(--accent)]"
+                        >
+                          {p.invoice_number}
+                        </Link>
+                        <Money amount={p.amount} />
+                      </div>
+                      <div className="text-xs text-[var(--muted)]">
+                        {formatDate(p.paid_at)}
+                        {p.method ? ` · ${formatLabel(p.method)}` : ""}
+                        {p.reference ? ` · ${p.reference}` : ""}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+            <Panel title="Deposits">
+              {deposits.length === 0 ? (
+                <p className="text-sm text-[var(--muted)]">No deposits.</p>
+              ) : (
+                <ul className="divide-y divide-[var(--line)] text-sm">
+                  {deposits.map((d) => (
+                    <li
+                      key={d.id}
+                      className="flex justify-between gap-2 py-2"
+                    >
+                      <span>
+                        {formatDate(d.received_at)} · {formatLabel(d.status)}
+                      </span>
+                      <Money amount={d.amount} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link
+                href="/billing/deposits"
+                className="mt-3 inline-block text-sm font-medium text-[var(--accent)]"
+              >
+                Deposits desk →
+              </Link>
+            </Panel>
+          </div>
+        </div>
       )}
 
       {tab === "Event and Engagement" && (
@@ -411,6 +833,25 @@ export function ContractDetailClient({
             <div>
               <dt className="text-[var(--muted)]">End</dt>
               <dd>{formatDate(contract.event_end)}</dd>
+            </div>
+            <div>
+              <dt className="text-[var(--muted)]">Venue</dt>
+              <dd>
+                {contract.venue_name ?? "—"}
+                {contract.venue_city ? `, ${contract.venue_city}` : ""}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[var(--muted)]">Project manager</dt>
+              <dd>{contract.project_manager_label}</dd>
+            </div>
+            <div>
+              <dt className="text-[var(--muted)]">Customer</dt>
+              <dd>{contract.customer_name}</dd>
+            </div>
+            <div>
+              <dt className="text-[var(--muted)]">Billing method</dt>
+              <dd>{formatLabel(contract.billing_method)}</dd>
             </div>
           </dl>
         </Panel>
@@ -468,7 +909,23 @@ export function ContractDetailClient({
                     <p className="text-xs text-[var(--muted)]">
                       Δ <Money amount={Number(m.price_change)} /> ·{" "}
                       {formatLabel(String(m.accounting_treatment))}
+                      {m.requested_by
+                        ? ` · requested by ${String(m.requested_by)}`
+                        : ""}
                     </p>
+                    {(m.prior_contract_value != null ||
+                      m.new_contract_value != null) && (
+                      <p className="text-xs text-[var(--muted)]">
+                        CV{" "}
+                        <Money amount={Number(m.prior_contract_value ?? 0)} /> →{" "}
+                        <Money amount={Number(m.new_contract_value ?? 0)} />
+                      </p>
+                    )}
+                    {m.scope_change_notes ? (
+                      <p className="mt-1 text-[var(--muted)]">
+                        {String(m.scope_change_notes)}
+                      </p>
+                    ) : null}
                     {m.status === "draft" ? (
                       <button
                         type="button"
@@ -658,17 +1115,28 @@ export function ContractDetailClient({
       )}
 
       {tab === "Audit History" && (
-        <Panel title="Audit trail">
+        <Panel title="Activity trail">
           {audit.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">No audit events yet.</p>
+            <p className="text-sm text-[var(--muted)]">No activity yet.</p>
           ) : (
             <ul className="divide-y divide-[var(--line)] text-sm">
               {audit.map((e) => (
-                <li key={String(e.id)} className="py-3">
-                  <div className="font-medium">{String(e.summary)}</div>
+                <li key={e.id} className="py-3">
+                  <div className="font-medium">
+                    {e.href ? (
+                      <Link href={e.href} className="text-[var(--accent)]">
+                        {e.summary}
+                      </Link>
+                    ) : (
+                      e.summary
+                    )}
+                  </div>
                   <div className="text-xs text-[var(--muted)]">
-                    {formatLabel(String(e.event_type))} · {String(e.actor_label)} ·{" "}
-                    {formatDate(String(e.created_at))}
+                    {formatLabel(e.event_type)} · {e.actor_label} ·{" "}
+                    {formatDate(e.created_at)}
+                    {e.from_status || e.to_status
+                      ? ` · ${e.from_status ?? "—"} → ${e.to_status ?? "—"}`
+                      : ""}
                   </div>
                 </li>
               ))}

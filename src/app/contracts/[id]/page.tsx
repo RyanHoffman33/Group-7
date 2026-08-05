@@ -2,8 +2,11 @@ import { notFound } from "next/navigation";
 import {
   getContract,
   listApprovals,
-  listAuditEvents,
+  listContractActivity,
   listChangeOrders,
+  listContractDeposits,
+  listContractInvoices,
+  listContractPayments,
   listDeliverables,
   listDocuments,
   listLineItems,
@@ -24,6 +27,8 @@ export default async function ContractDetailPage({
   const contract = await getContract(id);
   if (!contract) notFound();
 
+  const contractId = contract.id;
+
   const [
     lines,
     deliverables,
@@ -32,21 +37,27 @@ export default async function ContractDetailPage({
     documents,
     audit,
     changeOrders,
+    invoices,
+    payments,
+    deposits,
   ] = await Promise.all([
-    listLineItems(id),
-    listDeliverables(id),
-    listMilestones(id),
-    listApprovals(id),
-    listDocuments(id),
-    listAuditEvents(id),
-    listChangeOrders(id),
+    listLineItems(contractId),
+    listDeliverables(contractId),
+    listMilestones(contractId),
+    listApprovals(contractId),
+    listDocuments(contractId),
+    listContractActivity(contractId),
+    listChangeOrders(contractId),
+    listContractInvoices(contractId),
+    listContractPayments(contractId),
+    listContractDeposits(contractId),
   ]);
 
   return (
     <div>
       <PageHeader
         title="Contract workspace"
-        description="Internal engagement record — billing cash and recognition remain in Billing & Compliance."
+        description="Engagement commercial position with billing rollups — invoices, payments, and deposits for this contract."
         actions={
           <Link
             href="/contracts/list"
@@ -65,6 +76,9 @@ export default async function ContractDetailPage({
         documents={documents}
         audit={audit}
         changeOrders={changeOrders}
+        invoices={invoices}
+        payments={payments}
+        deposits={deposits}
       />
     </div>
   );

@@ -34,19 +34,23 @@ export type AgingRow = OutstandingRow & {
   days_past_due: number;
 };
 
-export async function listInvoices(): Promise<
-  (Invoice & { customer_name?: string; event_name?: string })[]
-> {
+export async function listInvoices(filters?: {
+  contractId?: string;
+}): Promise<(Invoice & { customer_name?: string; event_name?: string })[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("invoices")
-    .select("*, customers(name), contracts(event_name)")
+    .select("*, customers(name), contracts(event_name, contract_number)")
     .order("issue_date", { ascending: false });
+  if (filters?.contractId) {
+    q = q.eq("contract_id", filters.contractId);
+  }
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []).map((row) => {
     const r = row as Invoice & {
       customers?: { name: string } | null;
-      contracts?: { event_name: string } | null;
+      contracts?: { event_name: string; contract_number?: string } | null;
     };
     return {
       ...r,

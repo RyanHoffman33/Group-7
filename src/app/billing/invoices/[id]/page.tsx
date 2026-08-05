@@ -54,10 +54,24 @@ export default async function InvoiceDetailPage({
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <Link
+              href={`/billing/invoices?contract_id=${inv.contract_id}`}
+              className="text-sm text-[var(--accent)]"
+            >
+              ← Contract invoices
+            </Link>
+            {contract ? (
+              <Link
+                href={`/contracts/${inv.contract_id}`}
+                className="text-sm text-[var(--accent)]"
+              >
+                Contract workspace
+              </Link>
+            ) : null}
+            <Link
               href="/billing/invoices"
               className="text-sm text-[var(--accent)]"
             >
-              ← All invoices
+              All invoices
             </Link>
             <InvoiceActions
               invoiceId={inv.id}
