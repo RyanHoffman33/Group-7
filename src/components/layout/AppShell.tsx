@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AssistantChat } from "@/components/assistant/AssistantChat";
 
 const billingLinks = [
   { href: "/billing", label: "A/R Dashboard" },
@@ -246,6 +247,7 @@ export function AppShell({
         </header>
         <main className="px-6 py-8">{children}</main>
       </div>
+      <AssistantChat />
     </div>
   );
 }

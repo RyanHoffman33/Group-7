@@ -120,6 +120,21 @@ Do **not** rename the views below — they are the teammate API.
 
 Billing upstream stubs remain in [`src/features/billing/adapters/upstream.ts`](src/features/billing/adapters/upstream.ts).
 
+## MainEvent assistant (optional)
+
+The floating **Ask MainEvent** button opens a chat that answers from a **live** Billing + Compliance snapshot (A/R, deposits, contract assets/liabilities, policies).
+
+1. Get a free key at [Google AI Studio](https://aistudio.google.com/apikey) (or [Groq](https://console.groq.com/keys)).
+2. Add to `.env.local`:
+
+```bash
+GEMINI_API_KEY=your-key
+```
+
+3. Restart `npm run dev`. Without a key, the assistant still answers common questions from the snapshot (no LLM).
+
+API: `POST /api/assistant` with `{ "message": "..." }`.
+
 ## Deploy (later, after merge to main)
 
 Deploy the repo root to Vercel. Set:
