@@ -338,7 +338,12 @@ export function EventSubnav({
       <ul className="flex min-w-max gap-0.5 p-1">
         {items.map((item) => {
           const href = item.href.replace("[id]", eventId);
-          const active = activeHref === href || activeHref.startsWith(`${href}/`);
+          // Overview is `/events/:id` — must match exactly so it does not
+          // stay active on `/events/:id/emails` and other child routes.
+          const active =
+            href === `/events/${eventId}`
+              ? activeHref === href
+              : activeHref === href || activeHref.startsWith(`${href}/`);
           return (
             <li key={item.href}>
               <a

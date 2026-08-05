@@ -63,14 +63,14 @@ export const permissions: Permission[] = (
 ).map((key) => ({ key, ...PERM_META[key] }));
 
 export const roles: RoleDefinition[] = [
-  { id: "role-admin", key: "system_admin", name: "System Administrator", description: "Manages users and roles — not default accounting transaction authority", permissionKeys: ROLE_PERMISSIONS.system_admin, homePath: "/home" },
-  { id: "role-exec", key: "executive", name: "Executive", description: "Broad read access; major exception approvals above thresholds", permissionKeys: ROLE_PERMISSIONS.executive, homePath: "/home" },
-  { id: "role-pm", key: "project_manager", name: "Project Manager", description: "Assigned event ops; ready-for-billing — not payment posting", permissionKeys: ROLE_PERMISSIONS.project_manager, homePath: "/home" },
-  { id: "role-coord", key: "event_coordinator", name: "Event Coordinator", description: "Assigned operational work — no AR, P&L, or recognition", permissionKeys: ROLE_PERMISSIONS.event_coordinator, homePath: "/home" },
-  { id: "role-acct", key: "accounting", name: "Accounting", description: "Invoices, payments, recognition — not self-approval of exceptions", permissionKeys: ROLE_PERMISSIONS.accounting, homePath: "/home" },
+  { id: "role-admin", key: "system_admin", name: "System Administrator", description: "Manages users and roles — not default accounting transaction authority", permissionKeys: ROLE_PERMISSIONS.system_admin, homePath: "/dashboard" },
+  { id: "role-exec", key: "executive", name: "Executive", description: "Broad read access; major exception approvals above thresholds", permissionKeys: ROLE_PERMISSIONS.executive, homePath: "/dashboard" },
+  { id: "role-pm", key: "project_manager", name: "Project Manager", description: "Assigned event ops; ready-for-billing — not payment posting", permissionKeys: ROLE_PERMISSIONS.project_manager, homePath: "/dashboard" },
+  { id: "role-coord", key: "event_coordinator", name: "Event Coordinator", description: "Assigned operational work — no AR, P&L, or recognition", permissionKeys: ROLE_PERMISSIONS.event_coordinator, homePath: "/dashboard/employee" },
+  { id: "role-acct", key: "accounting", name: "Accounting", description: "Invoices, payments, recognition — not self-approval of exceptions", permissionKeys: ROLE_PERMISSIONS.accounting, homePath: "/dashboard/accounting" },
   { id: "role-vendor", key: "vendor", name: "Vendor", description: "Assigned work only — no internal P&L", permissionKeys: ROLE_PERMISSIONS.vendor, homePath: "/vendor" },
-  { id: "role-customer", key: "customer", name: "Customer", description: "Own event portal — approvals and invoices only", permissionKeys: ROLE_PERMISSIONS.customer, homePath: "/home" },
-  { id: "role-dept", key: "department_manager", name: "Department Manager", description: "Independent approver — not routine data entry", permissionKeys: ROLE_PERMISSIONS.department_manager, homePath: "/home" },
+  { id: "role-customer", key: "customer", name: "Customer", description: "Own event portal — approvals and invoices only", permissionKeys: ROLE_PERMISSIONS.customer, homePath: "/dashboard/customer" },
+  { id: "role-dept", key: "department_manager", name: "Department Manager", description: "Independent approver — not routine data entry", permissionKeys: ROLE_PERMISSIONS.department_manager, homePath: "/dashboard" },
   { id: "role-attendee", key: "attendee", name: "Attendee", description: "Own registration and attendee-facing info only", permissionKeys: ROLE_PERMISSIONS.attendee, homePath: "/attendee" },
 ];
 /** Demo logins â€” password for all: `demo` */
@@ -137,7 +137,7 @@ export const users: AppUser[] = [
     demoPassword: DEMO_PASSWORD,
     roleKey: "customer",
     status: "active",
-    organization: "NovaTech Industries",
+    organization: "Delta Consulting",
     lastLoginAt: null,
     createdAt: "2026-04-15",
   },

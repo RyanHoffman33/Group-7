@@ -6,8 +6,12 @@ import {
 import {
   APPROACHING_BUDGET_THRESHOLD,
   getManagerDashboardData,
+  type ManagerDashboardData,
 } from "@/features/dashboard/queries";
 import { Money, PageHeader, Panel, StatCard } from "@/components/billing/ui";
+import { managerBoardLinks } from "@/features/users/role-nav";
+import { getSessionUser } from "@/features/users/session";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -261,11 +265,35 @@ function AgingDonut({
 }
 
 export default async function ManagerDashboardPage() {
-  const data = await getManagerDashboardData();
+  const session = await getSessionUser();
+  if (!session) redirect("/login");
+
+  let data: ManagerDashboardData;
+  try {
+    data = await getManagerDashboardData();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unable to load dashboard.";
+    return (
+      <div className="space-y-4">
+        <PageHeader
+          title="Manager Dashboard"
+          description="Portfolio overview for your role."
+        />
+        <Panel title="Could not load live data">
+          <p className="text-sm text-[var(--muted)]">{message}</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Check Supabase connectivity, then refresh. Sidebar modules still work.
+          </p>
+        </Panel>
+      </div>
+    );
+  }
+
+  const links = managerBoardLinks(session.roleKey);
   const greetingName = data.managerFirstName;
   const greeting = greetingName
     ? `Welcome back, ${greetingName}!`
-    : "Welcome back!";
+    : `Welcome back, ${session.fullName.split(" ")[0]}!`;
 
   const attention = data.attention.slice(0, PREVIEW);
   const deadlines = data.deadlines.slice(0, PREVIEW);
@@ -308,15 +336,15 @@ export default async function ManagerDashboardPage() {
         <PageHeader compact title="Manager Dashboard" description={greeting} />
         <div className="flex items-center gap-2 pt-1">
           <Link
-            href="/compliance/costs"
+            href={links.costs}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:bg-[#f7f9fb]"
-            aria-label="Vendor finder"
-            title="Vendor finder"
+            aria-label="Costs"
+            title="Costs"
           >
             <IconVendorFinder />
           </Link>
           <Link
-            href="/billing/alerts"
+            href={links.alerts}
             className="relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:bg-[#f7f9fb]"
             aria-label="Alerts"
             title="Billing alerts"
@@ -379,7 +407,7 @@ export default async function ManagerDashboardPage() {
             compact
             className="min-h-0 flex-1"
             title="Events at Risk"
-            action={<ViewAllLink href="/compliance" />}
+            action={<ViewAllLink href={links.events} />}
             bodyClassName="px-3 py-0.5"
           >
             {attention.length === 0 ? (
@@ -417,7 +445,7 @@ export default async function ManagerDashboardPage() {
             compact
             className="min-h-0 flex-1"
             title="Event Profitability"
-            action={<ViewAllLink href="/compliance/costs" />}
+            action={<ViewAllLink href={links.costs} />}
             bodyClassName="px-3 py-0.5"
           >
             {profitRows.length === 0 ? (
@@ -464,7 +492,7 @@ export default async function ManagerDashboardPage() {
             compact
             className="min-h-0 flex-1"
             title="Upcoming Deadlines"
-            action={<ViewAllLink href="/compliance" />}
+            action={<ViewAllLink href={links.events} />}
             bodyClassName="px-3 py-0.5"
           >
             {deadlines.length === 0 ? (
@@ -505,7 +533,7 @@ export default async function ManagerDashboardPage() {
             compact
             className="min-h-0 flex-1"
             title="Pending Approvals"
-            action={<ViewAllLink href="/compliance/modifications" />}
+            action={<ViewAllLink href={links.changeOrders} />}
             bodyClassName="px-3 py-0.5"
           >
             {approvals.length === 0 ? (
@@ -569,7 +597,7 @@ export default async function ManagerDashboardPage() {
             compact
             className="min-h-0 flex-1"
             title="Outstanding A/R Aging"
-            action={<ViewAllLink href="/billing/aging" />}
+            action={<ViewAllLink href={links.aging} />}
             bodyClassName="flex flex-col justify-center px-3 py-2.5"
           >
             {agingTotal <= 0 ? (

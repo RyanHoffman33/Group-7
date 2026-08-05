@@ -1,4 +1,4 @@
-﻿import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import {
   buildAgingReport,
   getDashboardMetrics,
@@ -154,7 +154,7 @@ async function listWorkEventStatus(): Promise<WorkEventStatus[]> {
     .from("v_work_event_status")
     .select("*");
   if (error) {
-    // View may be unavailable in some environments â€” fall back gracefully.
+    // View may be unavailable in some environments — fall back gracefully.
     console.warn("v_work_event_status unavailable:", error.message);
     return [];
   }
@@ -434,7 +434,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
         reason: "Over budget",
         severity: "urgent",
         amount: actual - budgeted,
-        href: "/compliance/costs",
+        href: "/costs",
       });
     } else if (pct >= APPROACHING_BUDGET_THRESHOLD) {
       attention.push({
@@ -445,7 +445,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
         reason: `Approaching budget limit (${Math.round(pct * 100)}%)`,
         severity: "warning",
         amount: budgeted - actual,
-        href: "/compliance/costs",
+        href: "/costs",
       });
     }
   }
@@ -462,7 +462,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
       reason: `Unexpected / over-committed ${formatLabel(String(e.category))} cost`,
       severity: "urgent",
       amount: num(e.amount),
-      href: "/compliance/costs",
+      href: "/costs",
     });
   }
 
@@ -482,7 +482,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
       reason: `Overdue task: ${a.title}`,
       severity: "urgent",
       date: String(a.scheduled_end),
-      href: "/compliance",
+      href: "/contracts",
     });
   }
 
@@ -500,7 +500,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
       severity: "warning",
       amount: m.price_change,
       date: m.created_at,
-      href: "/compliance/modifications",
+      href: "/contracts/change-orders",
     });
   }
 
@@ -561,7 +561,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
       reason: "Event approaching with incomplete work",
       severity: "warning",
       date: w.event_start,
-      href: "/compliance",
+      href: "/contracts",
     });
   }
 
@@ -579,7 +579,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
       severity: "warning",
       amount: e.estimated_amount != null ? num(e.estimated_amount) : undefined,
       date: e.created_at ? String(e.created_at) : null,
-      href: "/compliance",
+      href: "/contracts",
     });
   }
 
@@ -621,7 +621,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
   });
 
   const overdueAging = aging.filter((r) => r.days_past_due > 0);
-  // Auth / Users & Roles not wired yet â€” avoid hard-coding a demo manager name.
+  // Auth / Users & Roles not wired yet — avoid hard-coding a demo manager name.
   const managerFirstName: string | null = null;
 
   const todayLabel = today.toLocaleDateString("en-US", {
@@ -719,7 +719,7 @@ function buildUpcomingEvents(
       return {
         contractId: c.id,
         eventName: c.event_name,
-        customerName: c.customers?.name ?? w?.customer_name ?? "â€”",
+        customerName: c.customers?.name ?? w?.customer_name ?? "—",
         eventStart: w?.event_start ?? null,
         eventEnd: w?.event_end ?? null,
         billingMethod: c.billing_method,
@@ -728,7 +728,7 @@ function buildUpcomingEvents(
         progressPercent:
           c.progress_percent != null ? Number(c.progress_percent) : null,
         deliverableProgress,
-        href: "/compliance",
+        href: "/contracts",
       };
     })
     .filter((r) => r.eventStart != null)
@@ -762,7 +762,7 @@ function buildDeadlines(args: {
     rows.push({
       id: `ms-${m.id}`,
       name: String(m.label),
-      eventName: nameById.get(String(m.contract_id)) ?? "â€”",
+      eventName: nameById.get(String(m.contract_id)) ?? "—",
       dueDate: due,
       status: dpd > 0 ? "Overdue" : "Upcoming",
       overdue: dpd > 0,
@@ -778,11 +778,11 @@ function buildDeadlines(args: {
     rows.push({
       id: `as-${a.id}`,
       name: String(a.title),
-      eventName: nameById.get(String(a.contract_id)) ?? "â€”",
+      eventName: nameById.get(String(a.contract_id)) ?? "—",
       dueDate: due,
       status: dpd > 0 ? "Overdue" : formatLabel(String(a.status)),
       overdue: dpd > 0,
-      href: "/compliance",
+      href: "/contracts",
     });
   }
 
@@ -803,11 +803,11 @@ function buildDeadlines(args: {
     rows.push({
       id: `mod-dl-${m.id}`,
       name: `Change order ${m.mod_number} approval`,
-      eventName: m.event_name ?? nameById.get(m.contract_id) ?? "â€”",
+      eventName: m.event_name ?? nameById.get(m.contract_id) ?? "—",
       dueDate: m.effective_date,
       status: formatLabel(m.status),
       overdue: daysPastDue(m.effective_date, args.today) > 0 && m.status === "draft",
-      href: "/compliance/modifications",
+      href: "/contracts/change-orders",
     });
   }
 
@@ -860,12 +860,12 @@ function buildPendingApprovals(args: {
     rows.push({
       id: `pa-mod-${m.id}`,
       type: "Change order",
-      eventName: m.event_name ?? "â€”",
+      eventName: m.event_name ?? "—",
       requestor: m.approved_by ?? null,
       amount: m.price_change,
       submittedAt: m.created_at,
       status: formatLabel(m.status),
-      href: "/compliance/modifications",
+      href: "/contracts/change-orders",
     });
   }
 
@@ -875,7 +875,7 @@ function buildPendingApprovals(args: {
     rows.push({
       id: `pa-cost-${e.id}`,
       type: `Expense (${formatLabel(String(e.category))})`,
-      eventName: c?.event_name ?? "â€”",
+      eventName: c?.event_name ?? "—",
       requestor: e.entered_by
         ? String(e.entered_by)
         : e.vendor_name
@@ -884,7 +884,7 @@ function buildPendingApprovals(args: {
       amount: num(e.amount),
       submittedAt: e.entered_at ? String(e.entered_at) : null,
       status: "Pending approval",
-      href: "/compliance/costs",
+      href: "/costs",
     });
   }
 
@@ -895,12 +895,12 @@ function buildPendingApprovals(args: {
     rows.push({
       id: `pa-exc-${e.id}`,
       type: `Work exception (${formatLabel(String(e.exception_type))})`,
-      eventName: c?.event_name ?? "â€”",
+      eventName: c?.event_name ?? "—",
       requestor: null,
       amount: e.estimated_amount != null ? num(e.estimated_amount) : null,
       submittedAt: e.created_at ? String(e.created_at) : null,
       status: formatLabel(st),
-      href: "/compliance",
+      href: "/contracts",
     });
   }
 

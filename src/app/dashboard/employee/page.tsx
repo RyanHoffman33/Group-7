@@ -140,7 +140,7 @@ export default async function EmployeeDashboardPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/compliance"
+              href="/events/evt-ops-1/issues"
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--line)] bg-[var(--surface)] px-2.5 text-[12px] font-semibold text-[var(--ink)] hover:bg-[#f7f9fb]"
               title="Request feedback"
             >
@@ -148,7 +148,7 @@ export default async function EmployeeDashboardPage() {
               Request feedback
             </Link>
             <Link
-              href="/compliance"
+              href="/events/evt-ops-1/issues"
               className="inline-flex h-8 items-center rounded-md border border-[var(--line)] bg-[var(--surface)] px-2.5 text-[12px] font-semibold text-[var(--ink)] hover:bg-[#f7f9fb]"
             >
               Report issue
@@ -217,7 +217,7 @@ export default async function EmployeeDashboardPage() {
           compact
           className="h-full"
           title="My Tasks"
-          action={<ViewLink href="/compliance" label="View all" />}
+          action={<ViewLink href="/events/evt-ops-1/tasks" label="View all" />}
           bodyClassName="px-3 py-1"
         >
           <ul>
@@ -287,7 +287,7 @@ export default async function EmployeeDashboardPage() {
           compact
           className="h-full"
           title="Upcoming Assignments"
-          action={<ViewLink href="/compliance" label="View all" />}
+          action={<ViewLink href="/events/evt-ops-1/tasks" label="View all" />}
           bodyClassName="px-3 py-1"
         >
           <ul>
@@ -385,7 +385,7 @@ export default async function EmployeeDashboardPage() {
           compact
           className="h-full"
           title="Issues / Exceptions"
-          action={<ViewLink href="/compliance" label="Report issue" />}
+          action={<ViewLink href="/events/evt-ops-1/issues" label="Report issue" />}
           bodyClassName="px-3 py-2"
         >
           {SAMPLE_ISSUES.map((iss) => (
@@ -407,7 +407,7 @@ export default async function EmployeeDashboardPage() {
           compact
           className="h-full"
           title="Expenses"
-          action={<ViewLink href="/compliance/costs" label="Submit expense" />}
+          action={<ViewLink href="/costs/expenses" label="Submit expense" />}
           bodyClassName="px-3 py-2"
         >
           {SAMPLE_EXPENSES.map((exp) => (

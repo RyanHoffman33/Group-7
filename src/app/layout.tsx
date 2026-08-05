@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { listAlerts } from "@/features/billing/queries";
 import { navSectionsForRole } from "@/features/users/role-nav";
 import { getSessionUser } from "@/features/users/session";
+import type { AppRole } from "@/features/users/types";
 import "./globals.css";
 
 const display = Fraunces({
@@ -24,6 +25,29 @@ export const metadata: Metadata = {
     "MainEvent Contract-to-Cash — role-based dashboards and access control",
 };
 
+const BILLING_ALERT_ROLES: AppRole[] = [
+  "system_admin",
+  "executive",
+  "project_manager",
+  "accounting",
+  "department_manager",
+];
+
+async function alertCountForRole(roleKey: AppRole): Promise<number> {
+  if (!BILLING_ALERT_ROLES.includes(roleKey)) return 0;
+  try {
+    const alerts = await Promise.race([
+      listAlerts(false),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("alert timeout")), 2500),
+      ),
+    ]);
+    return alerts.length;
+  } catch {
+    return 0;
+  }
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -39,13 +63,7 @@ export default async function RootLayout({
     );
   }
 
-  let alertCount = 0;
-  try {
-    const alerts = await listAlerts(false);
-    alertCount = alerts.length;
-  } catch {
-    alertCount = 0;
-  }
+  const alertCount = await alertCountForRole(session.roleKey);
 
   return (
     <html lang="en" className={`${display.variable} ${body.variable} h-full`}>

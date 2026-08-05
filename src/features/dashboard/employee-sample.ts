@@ -27,7 +27,7 @@ export const SAMPLE_NEXT_EVENT = {
   venue: "Grand Ballroom — Harbor Convention Center",
   role: "Lead A/V Technician",
   customerName: "Northstar Financial Group",
-  href: "/compliance",
+  href: "/events/evt-ops-1",
 };
 
 export const SAMPLE_TASKS = [
@@ -39,7 +39,7 @@ export const SAMPLE_TASKS = [
     status: "overdue" as EmployeeTaskStatus,
     priority: "High",
     instructions: "Verify dock access and power drops with venue ops.",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
     canMarkComplete: false,
   },
   {
@@ -50,7 +50,7 @@ export const SAMPLE_TASKS = [
     status: "due_soon" as EmployeeTaskStatus,
     priority: "High",
     instructions: "Label kits for keynote + breakout rooms.",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
     canMarkComplete: false,
   },
   {
@@ -61,7 +61,7 @@ export const SAMPLE_TASKS = [
     status: "due_soon" as EmployeeTaskStatus,
     priority: "Medium",
     instructions: "Photo breaker panels and note circuit limits.",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
     canMarkComplete: false,
   },
   {
@@ -72,7 +72,7 @@ export const SAMPLE_TASKS = [
     status: "scheduled" as EmployeeTaskStatus,
     priority: "Medium",
     instructions: "Capture timing changes after client rehearsal.",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
     canMarkComplete: false,
   },
   {
@@ -83,7 +83,7 @@ export const SAMPLE_TASKS = [
     status: "completed" as EmployeeTaskStatus,
     priority: "Low",
     instructions: "Logged in shop inventory sheet.",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
     canMarkComplete: false,
   },
 ];
@@ -99,7 +99,7 @@ export const SAMPLE_ASSIGNMENTS = [
     venue: "Grand Ballroom",
     role: "Lead A/V Technician",
     status: "scheduled" as EmployeeAssignmentStatus,
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
   },
   {
     id: "asg-2",
@@ -111,7 +111,7 @@ export const SAMPLE_ASSIGNMENTS = [
     venue: "Innovation Hall",
     role: "Stage Technician",
     status: "scheduled" as EmployeeAssignmentStatus,
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
   },
   {
     id: "asg-3",
@@ -123,7 +123,7 @@ export const SAMPLE_ASSIGNMENTS = [
     venue: "Riverfront Pavilion",
     role: "Audio Support",
     status: "scheduled" as EmployeeAssignmentStatus,
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
   },
   {
     id: "asg-4",
@@ -135,7 +135,7 @@ export const SAMPLE_ASSIGNMENTS = [
     venue: "Lakeside Retreat",
     role: "Setup Crew",
     status: "scheduled" as EmployeeAssignmentStatus,
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
   },
 ];
 
@@ -150,7 +150,7 @@ export const SAMPLE_HOURS = {
     { label: "Thu", hours: 6.5 },
     { label: "Fri", hours: 0 },
   ],
-  enterTimeHref: "/compliance/costs",
+  enterTimeHref: "/costs/time",
 };
 
 /** Temporary sample feed — no notifications table in Supabase yet. */
@@ -183,7 +183,7 @@ export const SAMPLE_ISSUES = [
     type: "Schedule conflict",
     status: "submitted",
     submittedAt: "2026-08-04",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
   },
 ];
 
@@ -195,7 +195,7 @@ export const SAMPLE_EXPENSES = [
     amount: 86.4,
     status: "pending_approval",
     description: "Gaffer tape & labels",
-    href: "/compliance/costs",
+    href: "/costs/expenses",
   },
 ];
 
@@ -205,20 +205,20 @@ export const SAMPLE_DOCUMENTS = [
     name: "Year-End Gala — Run of show",
     eventName: "Year-End Gala",
     kind: "Schedule",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
   },
   {
     id: "doc-2",
     name: "Grand Ballroom power plan",
     eventName: "Year-End Gala",
     kind: "Venue",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
   },
   {
     id: "doc-3",
     name: "A/V setup checklist",
     eventName: "Year-End Gala",
     kind: "Instructions",
-    href: "/compliance",
+    href: "/events/evt-ops-1/tasks",
   },
 ];

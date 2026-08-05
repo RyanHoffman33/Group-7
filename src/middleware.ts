@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { allowedRoutePrefixes, homePathForRole } from "@/features/users/role-nav";
+import { allowedRoutePrefixes, canAccessDashboardPath, homePathForRole } from "@/features/users/role-nav";
 import type { AppRole } from "@/features/users/types";
 
 const SESSION_COOKIE = "mainevent_demo_session";
@@ -59,6 +59,18 @@ export function middleware(request: NextRequest) {
   }
 
   if (parsed?.roleKey && !isLogin && !isAccessDenied) {
+    const isDashboard =
+      pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+    if (isDashboard) {
+      if (!canAccessDashboardPath(parsed.roleKey, pathname)) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/access-denied";
+        url.searchParams.set("from", pathname);
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.next();
+    }
+
     const allowed = allowedRoutePrefixes(parsed.roleKey);
     const ok = allowed.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),

@@ -1,4 +1,4 @@
-/** Temporary sample data for Customer Dashboard until auth + client portal wiring. */
+/** Customer portal demo data — interactive UI owns runtime state. */
 
 export type CustomerMilestoneStatus = "complete" | "action_needed" | "upcoming";
 
@@ -10,52 +10,139 @@ export type CustomerInvoiceStatus =
   | "disputed"
   | "canceled";
 
-export const SAMPLE_CUSTOMER = {
-  /** Auth not wired — organization label for greeting when set. */
-  organizationName: "Delta Consulting" as string | null,
-  firstName: null as string | null,
+export type CustomerActionStatus = "pending" | "approved" | "changes_requested";
+
+export type CustomerEvent = {
+  id: string;
+  eventName: string;
+  eventDate: string;
+  venue: string;
+  venueAddress: string;
+  eventType: string;
+  status: string;
+  guestCount: number;
+  managerName: string;
+  managerRole: string;
+  managerEmail: string;
+  managerPhone: string;
+  heroImage: string;
+  heroAlt: string;
+  summary: string;
+  agenda: { time: string; item: string }[];
+  inclusions: string[];
 };
 
-/** Multiple events for selector demo — only this customer's sample events. */
-export const SAMPLE_CUSTOMER_EVENTS = [
+export type CustomerActionItem = {
+  id: string;
+  title: string;
+  eventId: string;
+  eventName: string;
+  dueDate: string;
+  explanation: string;
+  detail: string;
+  options: string[];
+  status: CustomerActionStatus;
+};
+
+export type CustomerInvoice = {
+  id: string;
+  invoiceNumber: string;
+  eventId: string;
+  description: string;
+  issueDate: string;
+  dueDate: string;
+  amount: number;
+  amountPaid: number;
+  balance: number;
+  status: CustomerInvoiceStatus;
+  lineItems: { label: string; amount: number }[];
+};
+
+export type CustomerPayment = {
+  id: string;
+  paidAt: string;
+  invoiceOrEvent: string;
+  amount: number;
+  reference: string;
+  status: string;
+  method: string;
+};
+
+export type CustomerDocument = {
+  id: string;
+  name: string;
+  kind: string;
+  eventId: string;
+  summary: string;
+  body: string;
+};
+
+export const SAMPLE_CUSTOMER_EVENTS: CustomerEvent[] = [
   {
     id: "evt-delta-leadership",
     eventName: "Delta Leadership Conference",
     eventDate: "2026-09-18",
     venue: "The Jefferson Hotel",
+    venueAddress: "101 W Franklin St, Richmond, VA 23220",
     eventType: "Corporate conference",
     status: "Planning",
     guestCount: 250,
     managerName: "Emily Gray",
     managerRole: "Event Manager",
     managerEmail: "emily.gray@mainevent.example",
-    href: "/compliance",
+    managerPhone: "(804) 555-0142",
     heroImage: "/brand/customer-conference-hero.png?v=2",
     heroAlt: "Conference session in a hotel ballroom",
+    summary:
+      "Two-day leadership conference with general session, breakouts, and evening reception. MainEvent is producing AV, staging, and guest experience.",
+    agenda: [
+      { time: "7:30 AM", item: "Registration & breakfast" },
+      { time: "9:00 AM", item: "Opening keynote — Grand Ballroom" },
+      { time: "12:00 PM", item: "Working lunch" },
+      { time: "1:30 PM", item: "Breakout tracks" },
+      { time: "5:30 PM", item: "Networking reception" },
+    ],
+    inclusions: [
+      "Full AV package (LED wall, mics, staging)",
+      "Registration & badge printing",
+      "Catering coordination",
+      "On-site production crew",
+    ],
   },
   {
     id: "evt-delta-holiday",
     eventName: "Delta Holiday Reception",
     eventDate: "2026-12-12",
     venue: "Grand Ballroom",
+    venueAddress: "101 W Franklin St, Richmond, VA 23220",
     eventType: "Reception",
     status: "Confirmed",
     guestCount: 120,
     managerName: "Emily Gray",
     managerRole: "Event Manager",
     managerEmail: "emily.gray@mainevent.example",
-    href: "/compliance",
+    managerPhone: "(804) 555-0142",
     heroImage: "/brand/customer-holiday-reception-hero.png?v=1",
     heroAlt: "Holiday reception in a decorated event space",
+    summary:
+      "Evening holiday reception for clients and partners with cocktail service, entertainment, and branded photo moment.",
+    agenda: [
+      { time: "6:00 PM", item: "Doors & welcome drinks" },
+      { time: "6:45 PM", item: "Remarks from leadership" },
+      { time: "7:15 PM", item: "Dinner service" },
+      { time: "9:00 PM", item: "Entertainment & networking" },
+    ],
+    inclusions: [
+      "Room layout & décor package",
+      "House sound & lighting",
+      "Photo backdrop",
+      "Event-night staffing",
+    ],
   },
-] as const;
+];
 
 export const SAMPLE_ACTIVE_EVENT_ID = SAMPLE_CUSTOMER_EVENTS[0].id;
 
-/**
- * Progress derived from milestone completion count (sample only).
- * Not a hard-coded decorative percentage.
- */
 export const SAMPLE_MILESTONES = [
   {
     id: "ms-1",
@@ -63,6 +150,7 @@ export const SAMPLE_MILESTONES = [
     status: "complete" as CustomerMilestoneStatus,
     date: "2026-05-01",
     dateLabel: "May 1, 2026",
+    eventId: "evt-delta-leadership",
   },
   {
     id: "ms-2",
@@ -70,6 +158,7 @@ export const SAMPLE_MILESTONES = [
     status: "complete" as CustomerMilestoneStatus,
     date: "2026-05-05",
     dateLabel: "May 5, 2026",
+    eventId: "evt-delta-leadership",
   },
   {
     id: "ms-3",
@@ -77,6 +166,7 @@ export const SAMPLE_MILESTONES = [
     status: "complete" as CustomerMilestoneStatus,
     date: "2026-05-12",
     dateLabel: "May 12, 2026",
+    eventId: "evt-delta-leadership",
   },
   {
     id: "ms-4",
@@ -84,6 +174,7 @@ export const SAMPLE_MILESTONES = [
     status: "action_needed" as CustomerMilestoneStatus,
     date: "2026-08-08",
     dateLabel: "Due Aug 8, 2026",
+    eventId: "evt-delta-leadership",
   },
   {
     id: "ms-5",
@@ -91,6 +182,7 @@ export const SAMPLE_MILESTONES = [
     status: "upcoming" as CustomerMilestoneStatus,
     date: "2026-09-01",
     dateLabel: "Due Sept 1, 2026",
+    eventId: "evt-delta-leadership",
   },
   {
     id: "ms-6",
@@ -98,80 +190,98 @@ export const SAMPLE_MILESTONES = [
     status: "upcoming" as CustomerMilestoneStatus,
     date: "2026-09-10",
     dateLabel: "Due Sept 10, 2026",
+    eventId: "evt-delta-leadership",
   },
 ];
 
-export const SAMPLE_ACTION_ITEMS = [
+export const SAMPLE_ACTION_ITEMS: CustomerActionItem[] = [
   {
     id: "act-1",
     title: "Approve catering selection",
+    eventId: "evt-delta-leadership",
     eventName: "Delta Leadership Conference",
     dueDate: "2026-08-08",
     explanation: "Review the proposed menu package and confirm dietary accommodations.",
-    href: "/compliance/modifications",
+    detail:
+      "Chef proposes plated lunch (chicken + vegetarian) with gluten-free option, plus AM/PM coffee breaks. Estimated per-person cost is within your contracted catering allowance.",
+    options: [
+      "Plated lunch — chicken or vegetarian",
+      "Gluten-free plates available on request",
+      "Coffee & tea service (morning + afternoon)",
+      "Reception hors d'oeuvres for 250",
+    ],
+    status: "pending",
   },
   {
     id: "act-2",
     title: "Approve updated floor plan",
+    eventId: "evt-delta-leadership",
     eventName: "Delta Leadership Conference",
     dueDate: "2026-08-09",
     explanation: "Confirm seating layout and stage orientation for the general session.",
-    href: "/compliance",
+    detail:
+      "Revised floor plan moves the LED wall 8 feet upstage and adds two breakout clusters near the foyer. Capacity remains 250 seated.",
+    options: [
+      "Theater seating for keynote (250)",
+      "LED wall centered on south wall",
+      "Two breakout pods near foyer",
+      "Registration desk at Franklin St entrance",
+    ],
+    status: "pending",
   },
 ];
 
-export const SAMPLE_FINANCIAL = {
-  contractTotal: 50000,
-  amountInvoiced: 50000,
-  amountPaid: 37500,
-  outstandingBalance: 12500,
-  nextPaymentDue: "2026-09-10",
-  nextPaymentAmount: 12500,
-  /** Simulated recording only — not live payment processing. */
-  paymentCtaHref: "/billing/payments",
-  paymentCtaLabel: "View payment options",
-};
-
-export const SAMPLE_INVOICES = [
+export const SAMPLE_INVOICES: CustomerInvoice[] = [
   {
     id: "inv-101",
     invoiceNumber: "INV-101",
+    eventId: "evt-delta-leadership",
     description: "Deposit",
     issueDate: "2026-05-05",
     dueDate: "2026-05-05",
     amount: 12500,
     amountPaid: 12500,
     balance: 0,
-    status: "paid" as CustomerInvoiceStatus,
-    href: "/billing/invoices",
+    status: "paid",
+    lineItems: [
+      { label: "Production deposit (25%)", amount: 12500 },
+    ],
   },
   {
     id: "inv-102",
     invoiceNumber: "INV-102",
+    eventId: "evt-delta-leadership",
     description: "Milestone 1",
     issueDate: "2026-07-20",
     dueDate: "2026-07-20",
     amount: 25000,
     amountPaid: 25000,
     balance: 0,
-    status: "paid" as CustomerInvoiceStatus,
-    href: "/billing/invoices",
+    status: "paid",
+    lineItems: [
+      { label: "AV & staging progress billing", amount: 18000 },
+      { label: "Labor commitment", amount: 7000 },
+    ],
   },
   {
     id: "inv-103",
     invoiceNumber: "INV-103",
+    eventId: "evt-delta-leadership",
     description: "Final",
     issueDate: "2026-08-01",
     dueDate: "2026-09-10",
     amount: 12500,
     amountPaid: 0,
     balance: 12500,
-    status: "unpaid" as CustomerInvoiceStatus,
-    href: "/billing/invoices",
+    status: "unpaid",
+    lineItems: [
+      { label: "Final production balance", amount: 10000 },
+      { label: "On-site contingency", amount: 2500 },
+    ],
   },
 ];
 
-export const SAMPLE_PAYMENTS = [
+export const SAMPLE_PAYMENTS: CustomerPayment[] = [
   {
     id: "pay-1",
     paidAt: "2026-05-05",
@@ -179,7 +289,7 @@ export const SAMPLE_PAYMENTS = [
     amount: 12500,
     reference: "ACH-88421",
     status: "Recorded",
-    href: "/billing/payments",
+    method: "ACH",
   },
   {
     id: "pay-2",
@@ -188,29 +298,61 @@ export const SAMPLE_PAYMENTS = [
     amount: 25000,
     reference: "Wire-22910",
     status: "Recorded",
-    href: "/billing/payments",
+    method: "Wire",
   },
 ];
 
-/** Customer-safe document labels only (sample). */
-export const SAMPLE_DOCUMENTS = [
+export const SAMPLE_DOCUMENTS: CustomerDocument[] = [
   {
     id: "doc-1",
     name: "Signed Event Contract",
     kind: "Contract",
-    href: "/compliance",
+    eventId: "evt-delta-leadership",
+    summary: "Master services agreement and event statement of work.",
+    body: `MAINEVENT — EVENT SERVICES AGREEMENT
+
+Client: Delta Consulting
+Event: Delta Leadership Conference
+Date: September 18, 2026
+Venue: The Jefferson Hotel, Richmond, VA
+
+Contract value: $50,000
+Deposit: $12,500 (received)
+Payment schedule: Deposit · Milestone · Final
+
+This demo document is shown for portal walkthrough only.`,
   },
   {
     id: "doc-2",
     name: "Approved Floor Plan",
     kind: "Floor plan",
-    href: "/compliance",
+    eventId: "evt-delta-leadership",
+    summary: "Latest seating and stage layout pending your confirmation.",
+    body: `FLOOR PLAN — GRAND BALLROOM (Rev C)
+
+• Stage / LED wall: South wall, centered
+• Theater seats: 250
+• Breakout pods: Foyer east & west
+• Registration: Franklin St entrance
+• ADA access: East corridor
+
+Status: Awaiting client approval in portal.`,
   },
   {
     id: "doc-3",
     name: "Event Day Schedule",
     kind: "Schedule",
-    href: "/compliance",
+    eventId: "evt-delta-leadership",
+    summary: "Run of show for conference day.",
+    body: `RUN OF SHOW — SEPT 18, 2026
+
+07:30  Registration & breakfast
+09:00  Opening keynote
+12:00  Working lunch
+13:30  Breakout tracks
+17:30  Networking reception
+
+Crew call: 05:30 · Client walkthrough: 06:45`,
   },
 ];
 
@@ -233,4 +375,19 @@ export function daysUntil(dateStr: string, asOf: Date = new Date()): number {
   const target = new Date(`${dateStr}T00:00:00`);
   const start = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate());
   return Math.ceil((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function financialFromInvoices(invoices: CustomerInvoice[]) {
+  const contractTotal = invoices.reduce((s, i) => s + i.amount, 0);
+  const amountPaid = invoices.reduce((s, i) => s + i.amountPaid, 0);
+  const outstandingBalance = invoices.reduce((s, i) => s + i.balance, 0);
+  const nextOpen = invoices.find((i) => i.balance > 0);
+  return {
+    contractTotal,
+    amountPaid,
+    outstandingBalance,
+    nextPaymentDue: nextOpen?.dueDate ?? null,
+    nextPaymentAmount: nextOpen?.balance ?? 0,
+    nextInvoiceId: nextOpen?.id ?? null,
+  };
 }
