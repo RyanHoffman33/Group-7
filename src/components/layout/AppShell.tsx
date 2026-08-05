@@ -26,13 +26,19 @@ const complianceLinks = [
   { href: "/compliance/policies", label: "Policies" },
 ];
 
+const dashboardLinks = [
+  { href: "/dashboard", label: "Manager Dashboard" },
+  { href: "/dashboard/employee", label: "Employee Dashboard" },
+  { href: "/dashboard/accounting", label: "Accounting Dashboard" },
+  { href: "/dashboard/customer", label: "Customer Dashboard" },
+];
+
 const teamModules = [
   { label: "Users & Roles", owner: "Brandon" },
   { label: "Contracts & Engagements", owner: "Gabriel" },
   { label: "Work & Performance", owner: "Jacob" },
   { label: "Cost & Resources", owner: "Walker" },
   { label: "Profitability", owner: "Joseph" },
-  { label: "Dashboards", owner: "Grayson" },
   { label: "Controls", owner: "Carson" },
 ];
 
@@ -44,8 +50,13 @@ function isComplianceRoute(pathname: string) {
   return pathname === "/compliance" || pathname.startsWith("/compliance/");
 }
 
+function isDashboardRoute(pathname: string) {
+  return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+}
+
 function isLinkActive(pathname: string, href: string) {
   if (href === "/billing" || href === "/compliance") return pathname === href;
+  if (href === "/dashboard") return pathname === "/dashboard";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -153,8 +164,10 @@ export function AppShell({
   const pathname = usePathname();
   const billingActive = isBillingRoute(pathname);
   const complianceActive = isComplianceRoute(pathname);
+  const dashboardActive = isDashboardRoute(pathname);
   const [billingOpen, setBillingOpen] = useState(billingActive);
   const [complianceOpen, setComplianceOpen] = useState(complianceActive);
+  const [dashboardOpen, setDashboardOpen] = useState(dashboardActive);
 
   useEffect(() => {
     if (billingActive) setBillingOpen(true);
@@ -163,6 +176,10 @@ export function AppShell({
   useEffect(() => {
     if (complianceActive) setComplianceOpen(true);
   }, [complianceActive]);
+
+  useEffect(() => {
+    if (dashboardActive) setDashboardOpen(true);
+  }, [dashboardActive]);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -211,6 +228,15 @@ export function AppShell({
               links={complianceLinks}
               pathname={pathname}
             />
+            <NavAccordion
+              title="Dashboards"
+              open={dashboardOpen}
+              onToggle={() => setDashboardOpen((o) => !o)}
+              active={dashboardActive}
+              controlsId="dashboard-nav-submenu"
+              links={dashboardLinks}
+              pathname={pathname}
+            />
           </ul>
         </nav>
 
@@ -232,20 +258,33 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="min-w-0">
-        <header className="border-b border-[var(--line)] bg-[var(--surface)] px-6 py-4">
+      <div className="flex min-h-screen min-w-0 flex-col">
+        <header
+          className={`shrink-0 border-b border-[var(--line)] bg-[var(--surface)] ${
+            dashboardActive ? "px-3 py-1.5" : "px-6 py-4"
+          }`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                 GAAP · Contract-to-Cash
               </p>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                Deposits as liabilities · Revenue on performance · Auditable A/R
-              </p>
+              {!dashboardActive ? (
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Deposits as liabilities · Revenue on performance · Auditable
+                  A/R
+                </p>
+              ) : null}
             </div>
           </div>
         </header>
-        <main className="px-6 py-8">{children}</main>
+        <main
+          className={
+            dashboardActive ? "flex-1 px-2 py-2" : "px-6 py-8"
+          }
+        >
+          {children}
+        </main>
       </div>
       <AssistantChat />
     </div>
