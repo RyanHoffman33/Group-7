@@ -22,14 +22,21 @@ export default async function ProfitExceptionsPage() {
     <div>
       <PageHeader
         title="Profitability exceptions"
-        description="Anomalies surfaced by v_profit_exceptions — margin, billing, and cost-integrity findings. Collections and aging live with Billing & A/R."
         actions={
-          <Link
-            href="/profitability"
-            className="text-sm text-[var(--accent)] hover:underline"
-          >
-            ← Overview
-          </Link>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Link
+              href="/analytics"
+              className="text-[var(--accent)] hover:underline"
+            >
+              ← Analytics Center
+            </Link>
+            <Link
+              href="/profitability"
+              className="text-[var(--accent)] hover:underline"
+            >
+              ← Profitability
+            </Link>
+          </div>
         }
       />
 

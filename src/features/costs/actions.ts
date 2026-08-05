@@ -8,7 +8,7 @@ import {
   DEFAULT_LABOR_RATE,
   type CostCategory,
 } from "@/features/costs/config";
-import { computeCommitmentFlags } from "@/features/costs/flags";
+import { computeCommitmentFlags, hasAnyFlag } from "@/features/costs/flags";
 import {
   contractHasIssuedInvoice,
   getBudgetVsActual,
@@ -19,6 +19,7 @@ import type {
   CostApprovalStatus,
   CostCommitmentStatus,
   CostEntryType,
+  CostHistoryAction,
 } from "@/lib/supabase/types";
 
 function revalidateCosts(contractId?: string, entryId?: string) {
@@ -36,7 +37,7 @@ function revalidateCosts(contractId?: string, entryId?: string) {
 
 async function logHistory(input: {
   costEntryId: string;
-  action: "created" | "updated" | "approved" | "rejected" | "actualized";
+  action: CostHistoryAction;
   actor: string;
   detail?: string;
   before?: Record<string, unknown> | null;
@@ -486,6 +487,77 @@ export async function rejectCostEntry(
       detail: "Cost rejected",
       before: snapshotRow(data as Record<string, unknown>),
       after: { approval_status: "rejected" },
+    });
+
+    revalidateCosts(data.contract_id as string, id);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed" };
+  }
+}
+
+/**
+ * Mark control flags as resolved without clearing boolean flag columns
+ * (audit trail preserved). Mirrors billing acknowledgeAlert pattern.
+ */
+export async function resolveCostFlags(
+  id: string,
+  opts?: { note?: string; actorLabel?: string },
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const supabase = createClient();
+    const { data, error: loadErr } = await supabase
+      .from("cost_entries")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (loadErr) return { ok: false, error: loadErr.message };
+    if (!data) return { ok: false, error: "Cost entry not found." };
+
+    const flagSnapshot = {
+      flag_late_entry: Boolean(data.flag_late_entry),
+      flag_duplicate_invoice: Boolean(data.flag_duplicate_invoice),
+      flag_over_committed: Boolean(data.flag_over_committed),
+      flag_after_billing: Boolean(data.flag_after_billing),
+      flag_actual_exceeds_committed: Boolean(data.flag_actual_exceeds_committed),
+      flag_no_commitment: Boolean(data.flag_no_commitment),
+      amount: Number(data.amount),
+      commitment_status: data.commitment_status as CostCommitmentStatus,
+      prior_committed_amount:
+        data.prior_committed_amount == null
+          ? null
+          : Number(data.prior_committed_amount),
+      flags_resolved_at: (data.flags_resolved_at as string | null) ?? null,
+      approval_status: data.approval_status as CostApprovalStatus,
+    };
+
+    if (!hasAnyFlag(flagSnapshot))
+      return { ok: false, error: "Entry has no flags to resolve." };
+    if (flagSnapshot.flags_resolved_at)
+      return { ok: false, error: "Flags are already resolved." };
+
+    const actor = opts?.actorLabel?.trim() || "finance.user";
+    const note = opts?.note?.trim() || null;
+    const resolvedAt = new Date().toISOString();
+    const patch = {
+      flags_resolved_at: resolvedAt,
+      flags_resolved_by: actor,
+      flags_resolution_note: note,
+    };
+
+    const { error } = await supabase
+      .from("cost_entries")
+      .update(patch)
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+
+    await logHistory({
+      costEntryId: id,
+      action: "flags_resolved",
+      actor,
+      detail: note ?? "Control flags marked resolved",
+      before: snapshotRow(data as Record<string, unknown>),
+      after: patch,
     });
 
     revalidateCosts(data.contract_id as string, id);

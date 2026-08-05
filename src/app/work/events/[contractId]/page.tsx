@@ -25,6 +25,8 @@ import {
   ObligationStatusCard,
 } from "@/components/work/ContractScan";
 import { EngagementHeaderWithException } from "@/components/work/ExceptionReportToggle";
+import { canStartWork, STATUS_LABELS } from "@/features/contracts/status";
+import type { ContractStatus } from "@/features/contracts/status";
 
 export const dynamic = "force-dynamic";
 
@@ -202,6 +204,8 @@ export default async function WorkEventPage({
 
   if (!status) notFound();
 
+  const workAllowed = canStartWork(status.contract_status);
+  const depositBlocked = status.contract_status === "deposit_pending";
   const hint = riskHint(status);
   const days = daysUntilEvent(status.event_end ?? status.event_start);
   const phases: DeliverablePhase[] = ["planning", "execution", "wrapup"];
@@ -311,6 +315,41 @@ export default async function WorkEventPage({
       {hint ? (
         <div className="mb-4 rounded-lg border border-[var(--warn)]/30 bg-[#fff7eb] px-4 py-3 text-sm text-[var(--warn)]">
           {hint}
+        </div>
+      ) : null}
+
+      {!workAllowed ? (
+        <div
+          className="mb-4 rounded-lg border border-[var(--danger)]/35 bg-[#fef2f2] px-4 py-3 text-sm"
+          role="status"
+        >
+          <p className="font-semibold text-[var(--danger)]">
+            {depositBlocked
+              ? "Deposit required before work can start"
+              : "Production locked"}
+          </p>
+          <p className="mt-1 text-[var(--ink)]">
+            Contract status:{" "}
+            <strong>
+              {STATUS_LABELS[status.contract_status as ContractStatus] ??
+                status.contract_status.replaceAll("_", " ")}
+            </strong>
+            . Check-in, completion, and time/materials are blocked until the
+            engagement is <strong>Active</strong>
+            {depositBlocked
+              ? " (after the required customer deposit is recorded in Billing)."
+              : "."}
+          </p>
+          {depositBlocked ? (
+            <p className="mt-2">
+              <Link
+                href="/billing/deposits"
+                className="font-semibold text-[var(--accent)] hover:underline"
+              >
+                Record deposit →
+              </Link>
+            </p>
+          ) : null}
         </div>
       ) : null}
 

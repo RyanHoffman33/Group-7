@@ -27,23 +27,15 @@ export default async function UsersDashboardPage() {
     <div>
       <PageHeader
         title="Users & Roles"
-        description="Directory, role templates, and permission gates for MainEvent. Seed data only — swap the directory adapter when Supabase Auth and teammate modules are ready. Do not rename GAAP views when wiring RLS."
         actions={
           <Link
             href="/users/directory"
-            className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white"
+            className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold !text-white hover:bg-[#1a2d45]"
           >
             Open directory
           </Link>
         }
       />
-
-      <div className="mb-4 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--ink)]">
-        <strong className="font-semibold">Working alone for now.</strong> Billing
-        &amp; Compliance stay available as the template shell. Users &amp; Roles
-        uses local seed data so you can build without waiting on Contracts,
-        Costs, or other inputs.
-      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

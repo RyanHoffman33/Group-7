@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   AccessAuditEntry,
   AppUser,
   EventHealthItem,
@@ -35,11 +35,12 @@ const PERM_META: Record<
   "costs.write": { label: "Post costs", module: "Cost & Resources", description: "Create/update cost entries" },
   "costs.classify": { label: "Classify costs", module: "Cost & Resources", description: "Accounting cost classification" },
   "profitability.read": { label: "View profitability", module: "Financial confidential", description: "Margins and event profitability" },
+  "analytics.read": { label: "Analytics Center", module: "Analytics", description: "Historical KPIs and ML projections" },
   "ar.read": { label: "View accounts receivable", module: "Financial confidential", description: "Company AR aging and outstanding balances" },
   "recognition.read": { label: "View revenue recognition", module: "Financial confidential", description: "Earned vs unearned status" },
   "dashboards.executive": { label: "Executive dashboards", module: "Dashboards", description: "Portfolio KPIs" },
   "controls.approve": { label: "Control approvals", module: "Controls", description: "Approve gated actions" },
-  "approvals.queue": { label: "Approval queue", module: "Department Manager", description: "Risk-ranked internal approvals" },
+  "approvals.queue": { label: "Approval Queue", module: "Department Manager", description: "Risk-ranked internal approvals" },
   "exceptions.approve_major": { label: "Major exception approval", module: "Executive", description: "Approve write-offs, discounts, overrides above thresholds" },
   "attendee.portal": { label: "Attendee portal", module: "Attendee", description: "Own registration, QR pass, agenda" },
   "events.operate": { label: "Operate events", module: "Event Operations", description: "Event-level planning and registration" },

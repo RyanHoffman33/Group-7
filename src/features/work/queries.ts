@@ -136,6 +136,84 @@ export async function listAssignmentsForContract(
   });
 }
 
+/** Vendor-facing assignments + linked cost invoice refs for portal accuracy. */
+export async function listVendorFacingWork(): Promise<
+  {
+    id: string;
+    title: string;
+    status: string;
+    event_name: string | null;
+    scheduled_start: string | null;
+    scheduled_end: string | null;
+    location: string | null;
+    invoice_ref: string | null;
+    cost_amount: number | null;
+  }[]
+> {
+  const supabase = createClient();
+  const { data: parties } = await supabase
+    .from("work_parties")
+    .select("id")
+    .eq("party_type", "vendor")
+    .eq("active", true);
+  const partyIds = (parties ?? []).map((p) => p.id as string);
+  if (!partyIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("work_assignments")
+    .select(
+      "id, title, status, scheduled_start, scheduled_end, location, contract_id, contracts(event_name)",
+    )
+    .in("assignee_party_id", partyIds)
+    .order("scheduled_start", { ascending: true });
+  if (error) throw error;
+
+  const contractIds = [
+    ...new Set((data ?? []).map((r) => r.contract_id as string).filter(Boolean)),
+  ];
+  const { data: costs } = contractIds.length
+    ? await supabase
+        .from("cost_entries")
+        .select("contract_id, invoice_ref, amount, vendor_name")
+        .in("contract_id", contractIds)
+        .not("invoice_ref", "is", null)
+    : { data: [] as { contract_id: string; invoice_ref: string; amount: number; vendor_name: string | null }[] };
+
+  const costByContract = new Map<
+    string,
+    { invoice_ref: string; amount: number }
+  >();
+  for (const c of costs ?? []) {
+    const name = (c.vendor_name ?? "").toLowerCase();
+    if (name.includes("brightstage") || name.includes("stage") || !costByContract.has(c.contract_id)) {
+      costByContract.set(c.contract_id, {
+        invoice_ref: c.invoice_ref as string,
+        amount: num(c.amount),
+      });
+    }
+  }
+
+  return (data ?? []).map((row) => {
+    const contracts = row.contracts as
+      | { event_name: string | null }
+      | { event_name: string | null }[]
+      | null;
+    const c = Array.isArray(contracts) ? contracts[0] : contracts;
+    const cost = costByContract.get(row.contract_id as string);
+    return {
+      id: row.id as string,
+      title: row.title as string,
+      status: row.status as string,
+      event_name: c?.event_name ?? null,
+      scheduled_start: (row.scheduled_start as string | null) ?? null,
+      scheduled_end: (row.scheduled_end as string | null) ?? null,
+      location: (row.location as string | null) ?? null,
+      invoice_ref: cost?.invoice_ref ?? null,
+      cost_amount: cost?.amount ?? null,
+    };
+  });
+}
+
 export async function getAssignmentDetail(
   assignmentId: string,
 ): Promise<WorkAssignmentDetail | null> {
@@ -563,7 +641,10 @@ export function filterWorkEvents(
       );
     case "at_risk":
       return events.filter(
-        (e) => e.outstanding_pct >= 40 || e.pending_exceptions > 0,
+        (e) =>
+          e.outstanding_pct >= 40 ||
+          e.pending_exceptions > 0 ||
+          e.contract_status === "deposit_pending",
       );
     case "exceptions":
       return events.filter((e) => e.pending_exceptions > 0);

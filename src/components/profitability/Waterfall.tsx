@@ -63,7 +63,19 @@ export function Waterfall({
       kind: "cost",
     },
     {
-      label: "Gross margin",
+      label: "Open commitments",
+      amount: -event.committed_cost_open,
+      hint: "Not yet actual — reduces margin at risk",
+      kind: "cost",
+    },
+    {
+      label: "Margin at risk",
+      amount: event.contract_value - event.actual_cost_total - event.committed_cost_open,
+      hint: "Contract − actual − open commitments (live production view)",
+      kind: "margin",
+    },
+    {
+      label: "Gross margin (recognized)",
       amount: event.gross_margin,
       hint:
         event.gross_margin_pct == null

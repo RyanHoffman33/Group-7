@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { canStartWork } from "@/features/contracts/status";
 import type {
   ExceptionType,
   TimeMaterialEntryType,
@@ -13,6 +14,43 @@ function revalidateWork(paths?: string[]) {
   revalidatePath("/work");
   revalidatePath("/work/exceptions");
   for (const p of paths ?? []) revalidatePath(p);
+}
+
+/** Block crew spend / check-in until contract is Active (deposit satisfied). */
+async function assertWorkAuthorized(
+  contractId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("contracts")
+    .select("status, deposit_required, event_name")
+    .eq("id", contractId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false, error: "Contract not found." };
+  if (canStartWork(data.status)) return { ok: true };
+  if (data.status === "deposit_pending") {
+    return {
+      ok: false,
+      error: `Work is blocked — required deposit not received for “${data.event_name}”. Record the deposit in Billing before check-in or cost entry.`,
+    };
+  }
+  return {
+    ok: false,
+    error: `Work is blocked — contract status is “${String(data.status).replaceAll("_", " ")}”. Only Active engagements can start production.`,
+  };
+}
+
+async function contractIdForAssignment(
+  assignmentId: string,
+): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("work_assignments")
+    .select("contract_id")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  return (data?.contract_id as string | undefined) ?? null;
 }
 
 /** Defaults for assignee + customer contact on new obligations. */
@@ -64,6 +102,11 @@ export async function checkInAssignment(
   performedByPartyId?: string,
 ): Promise<ActionResult> {
   try {
+    const contractId = await contractIdForAssignment(assignmentId);
+    if (!contractId) return { ok: false, error: "Assignment not found." };
+    const gate = await assertWorkAuthorized(contractId);
+    if (!gate.ok) return gate;
+
     const supabase = createClient();
     const now = new Date().toISOString();
 
@@ -130,6 +173,11 @@ export async function completeAssignment(input: {
   completedBeforeApproval?: boolean;
 }): Promise<ActionResult> {
   try {
+    const contractId = await contractIdForAssignment(input.assignmentId);
+    if (!contractId) return { ok: false, error: "Assignment not found." };
+    const gate = await assertWorkAuthorized(contractId);
+    if (!gate.ok) return gate;
+
     const supabase = createClient();
     const now = new Date().toISOString();
 
@@ -214,6 +262,11 @@ export async function addTimeMaterial(input: {
   recordedByPartyId?: string;
 }): Promise<ActionResult> {
   try {
+    const contractId = await contractIdForAssignment(input.assignmentId);
+    if (!contractId) return { ok: false, error: "Assignment not found." };
+    const gate = await assertWorkAuthorized(contractId);
+    if (!gate.ok) return gate;
+
     const supabase = createClient();
     const { data, error } = await supabase
       .from("work_time_materials")

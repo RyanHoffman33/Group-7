@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { formatDate, formatLabel } from "@/features/billing/aging";
 import { categoryLabel } from "@/features/costs/config";
 import { getCostEntry, listCostHistory } from "@/features/costs/queries";
-import { activeFlags, flagReasons } from "@/features/costs/flags";
+import { activeFlags, flagReasons, hasUnresolvedFlags } from "@/features/costs/flags";
 import {
   ActualizeCostButton,
   CostEditForm,
+  ResolveFlagsForm,
 } from "@/components/costs/Actions";
 import {
   CostFlagPills,
@@ -33,6 +34,7 @@ export default async function CostDetailPage({
   const flags = activeFlags(entry);
   const reasons = flagReasons(entry);
   const history = await listCostHistory(id);
+  const canResolve = hasUnresolvedFlags(entry);
 
   return (
     <div>
@@ -49,7 +51,13 @@ export default async function CostDetailPage({
         }
       />
 
-      <CostFlagsBanner flags={flags} reasons={reasons} />
+      <CostFlagsBanner
+        flags={flags}
+        reasons={reasons}
+        resolvedAt={entry.flags_resolved_at}
+        resolvedBy={entry.flags_resolved_by}
+        resolutionNote={entry.flags_resolution_note}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Panel title="Entry">
@@ -185,6 +193,15 @@ export default async function CostDetailPage({
         </Panel>
 
         <div className="space-y-4">
+          {canResolve ? (
+            <Panel title="Resolve flags">
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                Mark control exceptions complete after correction. Flag indicators
+                stay on the record for audit; they leave the open Flags queue.
+              </p>
+              <ResolveFlagsForm entryId={entry.id} />
+            </Panel>
+          ) : null}
           {entry.commitment_status === "committed" ? (
             <Panel title="Actualize commitment">
               <ActualizeCostButton

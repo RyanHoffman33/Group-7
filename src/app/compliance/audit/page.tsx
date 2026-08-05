@@ -32,7 +32,7 @@ export default async function AuditPage({
     <div>
       <PageHeader
         title="Audit pack"
-        description="Append-only ledger browser plus recognition evidence. Export JSON/CSV for demo walkthroughs. Carson can gate recognition / mod apply once Controls + roles exist."
+        description="Append-only ledger plus recognition evidence. Export JSON, ledger CSV, or a QuickBooks Online–style journal CSV for bookkeeper import."
         actions={<AuditExportButton packJson={JSON.stringify(pack)} />}
       />
 

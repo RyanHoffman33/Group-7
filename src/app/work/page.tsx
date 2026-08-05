@@ -32,8 +32,14 @@ export default async function WorkDashboardPage({
   const events = await listWorkEventStatuses();
 
   const atRisk = events.filter(
-    (e) => e.outstanding_pct >= 40 || e.pending_exceptions > 0,
+    (e) =>
+      e.outstanding_pct >= 40 ||
+      e.pending_exceptions > 0 ||
+      e.contract_status === "deposit_pending",
   );
+  const depositBlocked = events.filter(
+    (e) => e.contract_status === "deposit_pending",
+  ).length;
   const totalOutstanding = events.reduce(
     (s, e) => s + e.outstanding_count,
     0,
@@ -105,7 +111,11 @@ export default async function WorkDashboardPage({
           <StatCard
             label="At-risk events"
             value={String(atRisk.length)}
-            hint="≥40% outstanding or exceptions"
+            hint={
+              depositBlocked > 0
+                ? `${depositBlocked} waiting on deposit`
+                : "≥40% outstanding, exceptions, or deposit hold"
+            }
             tone={
               filter === "at_risk"
                 ? "accent"
@@ -270,6 +280,11 @@ export default async function WorkDashboardPage({
                       <td className="py-3">
                         <Link href={`/work/events/${e.contract_id}`}>
                           <div className="flex flex-wrap gap-1">
+                            {e.contract_status === "deposit_pending" ? (
+                              <StatusPill tone="danger">
+                                Deposit required
+                              </StatusPill>
+                            ) : null}
                             {risk ? (
                               <StatusPill tone="danger">
                                 {days != null && days <= 7

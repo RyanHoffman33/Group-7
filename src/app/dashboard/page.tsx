@@ -17,10 +17,6 @@ export const dynamic = "force-dynamic";
 
 const PREVIEW = 5;
 
-/** Temporary sample values until live event counts/lists are wired reliably. */
-const SAMPLE_ACTIVE_EVENTS = 7;
-const SAMPLE_UPCOMING_EVENTS_COUNT = 4;
-
 const AGING_COLORS = {
   "0-30": "#2f9a57",
   "31-60": "#f0a202",
@@ -136,12 +132,6 @@ function SeverityDot({ severity }: { severity: "urgent" | "warning" }) {
 function shortDay(dateStr: string): string {
   const d = new Date(`${dateStr.includes("T") ? dateStr : dateStr + "T00:00:00"}`);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function isPastDeadline(dateStr: string, today: Date): boolean {
-  const d = new Date(`${dateStr.includes("T") ? dateStr : dateStr + "T00:00:00"}`);
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return d < start;
 }
 
 function ViewAllLink({ href, label = "View all" }: { href: string; label?: string }) {
@@ -300,10 +290,9 @@ export default async function ManagerDashboardPage() {
   const budgetRows = data.budgetVsActual.slice(0, PREVIEW);
   const profitRows = data.profitability.slice(0, PREVIEW);
   const approvals = data.pendingApprovals.slice(0, PREVIEW);
-  const today = new Date();
 
-  const activeEventsKpi = SAMPLE_ACTIVE_EVENTS;
-  const upcomingEventsKpi = SAMPLE_UPCOMING_EVENTS_COUNT;
+  const activeEventsKpi = data.kpis.activeEvents;
+  const upcomingEventsKpi = data.kpis.upcomingEvents;
   const alertBadge = data.ar.openAlertCount || data.ar.overdueInvoiceCount;
 
   const agingBuckets = [
@@ -445,7 +434,7 @@ export default async function ManagerDashboardPage() {
             compact
             className="min-h-0 flex-1"
             title="Event Profitability"
-            action={<ViewAllLink href={links.costs} />}
+            action={<ViewAllLink href="/profitability" />}
             bodyClassName="px-3 py-0.5"
           >
             {profitRows.length === 0 ? (
@@ -490,7 +479,7 @@ export default async function ManagerDashboardPage() {
         <div className="flex min-h-0 flex-col gap-2">
           <Panel
             compact
-            className="min-h-0 flex-1"
+            className="min-h-0 flex-1 border-l-4 border-l-[#2563eb]"
             title="Upcoming Deadlines"
             action={<ViewAllLink href={links.events} />}
             bodyClassName="px-3 py-0.5"
@@ -513,13 +502,7 @@ export default async function ManagerDashboardPage() {
                           {d.eventName}
                         </p>
                       </div>
-                      <span
-                        className={`shrink-0 text-[12px] font-semibold tabular-nums ${
-                          isPastDeadline(d.dueDate, today)
-                            ? "text-[#e11d48]"
-                            : "text-[var(--ink)]"
-                        }`}
-                      >
+                      <span className="shrink-0 text-[12px] font-medium tabular-nums text-[var(--ink)]">
                         {shortDay(d.dueDate)}
                       </span>
                     </Link>
@@ -531,7 +514,7 @@ export default async function ManagerDashboardPage() {
 
           <Panel
             compact
-            className="min-h-0 flex-1"
+            className="min-h-0 flex-1 border-l-4 border-l-[#d97706]"
             title="Pending Approvals"
             action={<ViewAllLink href={links.changeOrders} />}
             bodyClassName="px-3 py-0.5"
@@ -557,11 +540,11 @@ export default async function ManagerDashboardPage() {
                         </p>
                       </div>
                       {row.amount != null ? (
-                        <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[#e11d48]">
+                        <span className="shrink-0 rounded-md bg-[#fff7eb] px-2 py-0.5 text-[12px] font-semibold tabular-nums text-[#d97706]">
                           {formatCurrency(row.amount)}
                         </span>
                       ) : (
-                        <span className="shrink-0 text-[11px] text-[var(--muted)]">
+                        <span className="shrink-0 rounded-md bg-[#fff7eb] px-2 py-0.5 text-[11px] font-medium text-[#d97706]">
                           {row.status}
                         </span>
                       )}

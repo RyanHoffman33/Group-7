@@ -25,7 +25,22 @@ export default async function ProfitabilityPage() {
     <div>
       <PageHeader
         title="Profitability"
-        description="Event margins on the billed-recognized basis — the same revenue the GAAP compliance pages report. Pass-throughs excluded from margin; overhead as period expense. Read from the v_profit_* views."
+        actions={
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Link
+              href="/analytics"
+              className="text-[var(--accent)] hover:underline"
+            >
+              ← Analytics Center
+            </Link>
+            <Link
+              href="/profitability/exceptions"
+              className="text-[var(--accent)] hover:underline"
+            >
+              Exceptions →
+            </Link>
+          </div>
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

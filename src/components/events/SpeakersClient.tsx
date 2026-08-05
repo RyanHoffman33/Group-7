@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useTransition, useState, useEffect } from "react";
 import { AlertCard, ProgressBar, SpeakerCard } from "@/components/dashboard";
 import { Panel, StatusPill } from "@/components/billing/ui";
 import { toggleSpeakerRequirement } from "@/features/events/actions";
@@ -16,15 +16,37 @@ export function SpeakersClient({
 }) {
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  /** Local checklist state so toggles feel immediate and stay clickable. */
+  const [localSpeakers, setLocalSpeakers] = useState(speakers);
 
-  const visible = speakers.filter((s) =>
+  useEffect(() => {
+    setLocalSpeakers(speakers);
+  }, [speakers]);
+
+  const visible = localSpeakers.filter((s) =>
     isStaff ? true : s.publicVisible && s.status !== "Canceled",
   );
+
+  function toggleLocal(speakerId: string, key: string) {
+    setLocalSpeakers((prev) =>
+      prev.map((s) => {
+        if (s.id !== speakerId) return s;
+        return {
+          ...s,
+          requirements: s.requirements.map((r) =>
+            r.key === key ? { ...r, done: !r.done } : r,
+          ),
+        };
+      }),
+    );
+  }
 
   return (
     <div className="space-y-4">
       {message ? <AlertCard tone="ok" title="Updated" body={message} /> : null}
-      {speakers.some(
+      {error ? <AlertCard tone="warn" title="Could not update" body={error} /> : null}
+      {localSpeakers.some(
         (s) => s.materialsStatus !== "complete" && s.status !== "Canceled",
       ) ? (
         <AlertCard
@@ -78,23 +100,35 @@ export function SpeakersClient({
                     Private contact: {s.privateEmail ?? "—"}
                   </p>
                   {s.status !== "Canceled" ? (
-                    <ul className="mt-3 space-y-1">
+                    <ul className="mt-3 space-y-1.5">
                       {s.requirements.map((r) => (
                         <li key={r.key}>
-                          <label className="flex items-center gap-2 text-sm">
+                          <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 text-sm hover:bg-[#f7f9fb]">
                             <input
                               type="checkbox"
+                              className="h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--line)] accent-[var(--accent)]"
                               checked={r.done}
                               disabled={pending}
-                              onChange={() =>
+                              onChange={() => {
+                                setError(null);
+                                toggleLocal(s.id, r.key);
                                 start(async () => {
                                   const res = await toggleSpeakerRequirement(
                                     s.id,
                                     r.key,
                                   );
-                                  if (res.ok) setMessage(res.message);
-                                })
-                              }
+                                  if (res.ok) {
+                                    setMessage(res.message);
+                                  } else {
+                                    toggleLocal(s.id, r.key);
+                                    setError(
+                                      "error" in res
+                                        ? res.error
+                                        : "Update failed.",
+                                    );
+                                  }
+                                });
+                              }}
                             />
                             <span
                               className={

@@ -8,8 +8,8 @@ import { useCustomerPortal } from "@/components/dashboard/CustomerPortalContext"
 
 const NAV = [
   { href: "/dashboard/customer", label: "Overview", exact: true },
-  { href: "/dashboard/customer/event", label: "Event details" },
-  { href: "/dashboard/customer/actions", label: "Action items" },
+  { href: "/dashboard/customer/event", label: "Event Details" },
+  { href: "/dashboard/customer/actions", label: "Action Items" },
   { href: "/dashboard/customer/invoices", label: "Invoices" },
   { href: "/dashboard/customer/payments", label: "Payments" },
   { href: "/dashboard/customer/documents", label: "Documents" },

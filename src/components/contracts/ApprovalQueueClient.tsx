@@ -50,7 +50,7 @@ export function ApprovalQueueClient({ rows }: { rows: ContractListRow[] }) {
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[var(--line)] p-10 text-center">
           <p className="font-[family-name:var(--font-display)] text-xl">
-            Approval queue is empty
+            Approval Queue is empty
           </p>
           <p className="mt-2 text-sm text-[var(--muted)]">
             No contracts are pending project manager approval.

@@ -10,6 +10,7 @@ export type NavSection =
   | "work"
   | "costs"
   | "profitability"
+  | "analytics"
   | "events"
   | "attendee"
   | "vendor"
@@ -82,7 +83,11 @@ export function navSectionsForRole(roleKey: AppRole): NavSection[] {
     roleHasPermission(roleKey, "profitability.read") &&
     !INTERNAL_FINANCE_BLOCKED.includes(roleKey)
   ) {
+    // Nested under Analytics Center in the sidebar (not a top-level accordion).
     sections.push("profitability");
+  }
+  if (roleHasPermission(roleKey, "analytics.read")) {
+    sections.push("analytics");
   }
   if (roleHasPermission(roleKey, "attendee.portal") && roleKey === "attendee") {
     sections.push("attendee");
@@ -252,6 +257,9 @@ export function allowedRoutePrefixes(roleKey: AppRole): string[] {
   ) {
     prefixes.push("/profitability");
   }
+  if (roleHasPermission(roleKey, "analytics.read")) {
+    prefixes.push("/analytics");
+  }
 
   const dashboardHome = homePathForRole(roleKey);
   if (dashboardHome.startsWith("/dashboard")) {
@@ -289,6 +297,7 @@ export function allowedRoutePrefixes(roleKey: AppRole): string[] {
       "costs.read",
       "expenses.submit",
       "profitability.read",
+      "analytics.read",
       "contracts.read",
       "users.read",
     ])

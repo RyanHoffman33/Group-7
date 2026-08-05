@@ -392,6 +392,9 @@ export type CostEntry = {
   flag_actual_exceeds_committed: boolean;
   flag_no_commitment: boolean;
   prior_committed_amount: number | null;
+  flags_resolved_at: string | null;
+  flags_resolved_by: string | null;
+  flags_resolution_note: string | null;
   created_at: string;
 };
 
@@ -400,7 +403,8 @@ export type CostHistoryAction =
   | "updated"
   | "approved"
   | "rejected"
-  | "actualized";
+  | "actualized"
+  | "flags_resolved";
 
 export type CostEntryHistory = {
   id: string;

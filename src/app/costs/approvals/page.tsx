@@ -19,7 +19,7 @@ export default async function ApprovalsPage() {
   return (
     <div>
       <PageHeader
-        title="Approval queue"
+        title="Approval Queue"
         description={`Costs at or above $${APPROVAL_THRESHOLD.toLocaleString()} wait here until a manager approves or rejects.`}
       />
 

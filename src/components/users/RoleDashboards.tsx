@@ -548,12 +548,12 @@ export function DepartmentManagerDashboard({ user }: { user: SessionUser }) {
         ))}
       </div>
       <div className="mt-4">
-        <Panel title="Approval queues">
+        <Panel title="Approval Queues">
           <p className="text-sm text-[var(--muted)]">
             Expenses · Discounts · Contracts · Refunds · Write-offs · Budget overrides
           </p>
           <a href="/approvals" className="mt-3 inline-block text-sm text-[var(--accent)] hover:underline">
-            Open approval queue →
+            Open Approval Queue →
           </a>
         </Panel>
       </div>

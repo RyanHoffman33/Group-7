@@ -172,6 +172,12 @@ export default async function AccountingDashboardPage() {
             ) : null}
           </Link>
           <Link
+            href="/compliance/audit"
+            className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink)] hover:bg-[#f7f9fb]"
+          >
+            Export journals
+          </Link>
+          <Link
             href="/billing/aging"
             className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink)] hover:bg-[#f7f9fb]"
           >

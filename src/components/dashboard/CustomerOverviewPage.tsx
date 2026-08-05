@@ -157,18 +157,41 @@ export function CustomerOverviewPage() {
               </dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[var(--muted)]">Paid to date</dt>
-              <dd className="font-semibold tabular-nums text-[#2f9a57]">
-                <Money amount={financial.amountPaid} />
+              <dt className="text-[var(--muted)]">Deposit (paid / billed)</dt>
+              <dd className="font-semibold tabular-nums">
+                <Money amount={financial.depositPaid} />
+                <span className="font-normal text-[var(--muted)]">
+                  {" "}
+                  / <Money amount={financial.depositBilled} />
+                </span>
               </dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[var(--muted)]">Remaining balance</dt>
+              <dt className="text-[var(--muted)]">Progress invoices remaining</dt>
+              <dd className="font-semibold tabular-nums text-[#d97706]">
+                <Money amount={financial.progressRemaining} />
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2 border-t border-[var(--line)] pt-2">
+              <dt className="text-[var(--muted)]">Open balance</dt>
               <dd className="font-semibold tabular-nums text-[#d97706]">
                 <Money amount={financial.outstandingBalance} />
               </dd>
             </div>
           </dl>
+          <p className="mt-2 text-[11px] text-[var(--muted)]">
+            Deposits are held against your event until production milestones are
+            billed. Status:{" "}
+            <span className="font-medium text-[var(--ink)]">
+              {financial.depositStatus === "satisfied"
+                ? "Deposit satisfied"
+                : financial.depositStatus === "partial"
+                  ? "Deposit partially paid"
+                  : financial.depositStatus === "due"
+                    ? "Deposit due"
+                    : "No deposit invoice"}
+            </span>
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href="/dashboard/customer/invoices"

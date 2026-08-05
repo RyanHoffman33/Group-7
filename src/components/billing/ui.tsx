@@ -124,7 +124,7 @@ export function StatusPill({
 
 export function PageHeader({
   title,
-  description,
+  description: _description,
   actions,
   compact = false,
 }: {
@@ -133,6 +133,8 @@ export function PageHeader({
   actions?: React.ReactNode;
   compact?: boolean;
 }) {
+  // Build-time instructional notes under headers are intentionally not shown.
+  void _description;
   if (compact) {
     return (
       <div className="mb-0 flex flex-wrap items-center justify-between gap-2">
@@ -140,11 +142,6 @@ export function PageHeader({
           <h2 className="font-[family-name:var(--font-display)] text-[1.5rem] leading-tight text-[var(--ink)]">
             {title}
           </h2>
-          {description ? (
-            <p className="mt-0.5 text-[12px] leading-snug text-[var(--muted)]">
-              {description}
-            </p>
-          ) : null}
         </div>
         {actions}
       </div>
@@ -157,11 +154,6 @@ export function PageHeader({
         <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--ink)]">
           {title}
         </h2>
-        {description ? (
-          <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">
-            {description}
-          </p>
-        ) : null}
       </div>
       {actions}
     </div>

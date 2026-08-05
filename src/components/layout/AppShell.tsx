@@ -8,25 +8,26 @@ import { logoutAction } from "@/features/users/actions";
 import type { AppRole } from "@/features/users/types";
 import { roleHasPermission } from "@/features/access/matrix";
 import { homePathForRole, type NavSection } from "@/features/users/role-nav";
+import { DemoRoleSwitcher } from "@/components/layout/DemoRoleSwitcher";
 
 const billingLinksAll = [
   { href: "/billing", label: "A/R Dashboard" },
-  { href: "/billing/determine", label: "Determine charges" },
+  { href: "/billing/determine", label: "Determine Charges" },
   { href: "/billing/invoices", label: "Invoices" },
   { href: "/billing/payments", label: "Payments" },
   { href: "/billing/deposits", label: "Deposits" },
-  { href: "/billing/recurring", label: "Recurring & drafts" },
+  { href: "/billing/recurring", label: "Recurring & Drafts" },
   { href: "/billing/aging", label: "Aging & Collections" },
   { href: "/billing/alerts", label: "Billing Alerts" },
 ];
 
 const complianceLinks = [
-  { href: "/compliance", label: "Contract position" },
+  { href: "/compliance", label: "Contract Position" },
   { href: "/compliance/recognition", label: "Recognition" },
-  { href: "/compliance/deposits-retainers", label: "Deposits & retainers" },
+  { href: "/compliance/deposits-retainers", label: "Deposits & Retainers" },
   { href: "/compliance/modifications", label: "Modifications" },
-  { href: "/compliance/costs", label: "Cost classification" },
-  { href: "/compliance/audit", label: "Audit pack" },
+  { href: "/compliance/costs", label: "Cost Classification" },
+  { href: "/compliance/audit", label: "Audit Pack" },
   { href: "/compliance/policies", label: "Policies" },
 ];
 
@@ -36,25 +37,25 @@ const usersLinksAll = [
   { href: "/users/roles", label: "Roles", needsManage: true },
   { href: "/users/permissions", label: "Permissions", needsManage: true },
   { href: "/users/assignments", label: "Assignments", needsManage: true },
-  { href: "/users/audit", label: "Access audit", needsAudit: true },
+  { href: "/users/audit", label: "Access Audit", needsAudit: true },
 ];
 
 const eventsLinks = [
-  { href: "/events", label: "All events" },
+  { href: "/events", label: "All Events" },
   { href: "/events/hub", label: "Event Hub" },
 ];
 
 const vendorLinks = [
-  { href: "/vendor/layouts/lay-1", label: "Theater layout" },
-  { href: "/vendor/layouts/lay-2", label: "Banquet layout" },
+  { href: "/vendor/layouts/lay-1", label: "Theater Layout" },
+  { href: "/vendor/layouts/lay-2", label: "Banquet Layout" },
 ];
 
-const attendeeLinks = [{ href: "/attendee/survey", label: "Event survey" }];
+const attendeeLinks = [{ href: "/attendee/survey", label: "Event Survey" }];
 
 const customerLinks = [
   { href: "/dashboard/customer", label: "Overview" },
-  { href: "/dashboard/customer/event", label: "Event details" },
-  { href: "/dashboard/customer/actions", label: "Action items" },
+  { href: "/dashboard/customer/event", label: "Event Details" },
+  { href: "/dashboard/customer/actions", label: "Action Items" },
   { href: "/dashboard/customer/invoices", label: "Invoices" },
   { href: "/dashboard/customer/payments", label: "Payments" },
   { href: "/dashboard/customer/documents", label: "Documents" },
@@ -70,28 +71,34 @@ const contractsLinksAll = [
 ];
 
 const workLinks = [
-  { href: "/work", label: "Event board" },
-  { href: "/work/exceptions", label: "Exception inbox" },
+  { href: "/work", label: "Event Board" },
+  { href: "/work/exceptions", label: "Exception Inbox" },
 ];
 
 const costsLinksFull = [
-  { href: "/costs", label: "Cost dashboard" },
-  { href: "/costs/time", label: "Time entry" },
-  { href: "/costs/expenses", label: "Vendor & expenses" },
+  { href: "/costs", label: "Cost Dashboard" },
+  { href: "/costs/time", label: "Time Entry" },
+  { href: "/costs/expenses", label: "Vendor & Expenses" },
   { href: "/costs/commitments", label: "Commitments" },
-  { href: "/costs/approvals", label: "Approval queue" },
-  { href: "/costs/flags", label: "Flags & exceptions" },
-  { href: "/costs/reports", label: "Reports / export" },
+  { href: "/costs/approvals", label: "Approval Queue" },
+  { href: "/costs/flags", label: "Flags & Exceptions" },
+  { href: "/costs/reports", label: "Reports / Export" },
 ];
 
 const costsLinksSubmit = [
-  { href: "/costs/time", label: "Time entry" },
-  { href: "/costs/expenses", label: "Submit expenses" },
+  { href: "/costs/time", label: "Time Entry" },
+  { href: "/costs/expenses", label: "Submit Expenses" },
 ];
 
-const profitabilityLinks = [
-  { href: "/profitability", label: "Portfolio overview" },
-  { href: "/profitability/exceptions", label: "Exceptions" },
+const analyticsCoreLinks = [
+  { href: "/analytics", label: "Overview" },
+  { href: "/analytics/history", label: "History" },
+  { href: "/analytics/projections", label: "Projections" },
+];
+
+const profitabilitySubLinks = [
+  { href: "/profitability", label: "Profitability" },
+  { href: "/profitability/exceptions", label: "Profitability Exceptions" },
 ];
 
 const billingLinksRead = [
@@ -171,6 +178,10 @@ function isProfitabilityRoute(pathname: string) {
   return pathname === "/profitability" || pathname.startsWith("/profitability/");
 }
 
+function isAnalyticsRoute(pathname: string) {
+  return pathname === "/analytics" || pathname.startsWith("/analytics/");
+}
+
 function isMyDashboardActive(pathname: string, roleKey: AppRole) {
   const home = homePathForRole(roleKey);
   if (home === "/dashboard") return pathname === "/dashboard";
@@ -200,6 +211,7 @@ function isLinkActive(pathname: string, href: string) {
     href === "/work" ||
     href === "/costs" ||
     href === "/profitability" ||
+    href === "/analytics" ||
     href === "/dashboard"
   ) {
     return pathname === href;
@@ -300,6 +312,8 @@ export function AppShell({
   const workActive = isWorkRoute(pathname);
   const costsActive = isCostsRoute(pathname);
   const profitabilityActive = isProfitabilityRoute(pathname);
+  const analyticsRouteActive = isAnalyticsRoute(pathname);
+  const analyticsCenterActive = analyticsRouteActive || profitabilityActive;
   const myDashboardHref = homePathForRole(session.roleKey);
   const myDashboardActive = isMyDashboardActive(pathname, session.roleKey);
   const showUsers = navSections.includes("users");
@@ -313,6 +327,12 @@ export function AppShell({
   const showWork = navSections.includes("work");
   const showCosts = navSections.includes("costs");
   const showProfitability = navSections.includes("profitability");
+  const showAnalyticsCore = navSections.includes("analytics");
+  const showAnalyticsCenter = showAnalyticsCore || showProfitability;
+  const analyticsCenterLinks = [
+    ...(showAnalyticsCore ? analyticsCoreLinks : []),
+    ...(showProfitability ? profitabilitySubLinks : []),
+  ];
   const showCustomer = navSections.includes("customer");
   const roleNav = navForRole(session.roleKey);
   const homeOnly =
@@ -328,7 +348,7 @@ export function AppShell({
     !showContracts &&
     !showWork &&
     !showCosts &&
-    !showProfitability;
+    !showAnalyticsCenter;
 
   const [billingOpen, setBillingOpen] = useState(billingActive);
   const [complianceOpen, setComplianceOpen] = useState(complianceActive);
@@ -340,7 +360,7 @@ export function AppShell({
   const [contractsOpen, setContractsOpen] = useState(contractsActive);
   const [workOpen, setWorkOpen] = useState(workActive);
   const [costsOpen, setCostsOpen] = useState(costsActive);
-  const [profitabilityOpen, setProfitabilityOpen] = useState(profitabilityActive);
+  const [analyticsOpen, setAnalyticsOpen] = useState(analyticsCenterActive);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -380,8 +400,8 @@ export function AppShell({
   }, [costsActive]);
 
   useEffect(() => {
-    if (profitabilityActive) setProfitabilityOpen(true);
-  }, [profitabilityActive]);
+    if (analyticsCenterActive) setAnalyticsOpen(true);
+  }, [analyticsCenterActive]);
 
   useEffect(() => {
     if (myDashboardActive && showCustomer) setCustomerOpen(true);
@@ -424,12 +444,12 @@ export function AppShell({
                     : "text-white/70 hover:bg-white/8 hover:text-white"
                 }`}
               >
-                My dashboard
+                My Dashboard
               </Link>
             </li>
             {showCustomer ? (
               <NavAccordion
-                title="My portal"
+                title="My Portal"
                 open={customerOpen}
                 onToggle={() => setCustomerOpen((o) => !o)}
                 active={myDashboardActive}
@@ -440,7 +460,7 @@ export function AppShell({
             ) : null}
             {showAttendee ? (
               <NavAccordion
-                title="My event"
+                title="My Event"
                 open={attendeeOpen}
                 onToggle={() => setAttendeeOpen((o) => !o)}
                 active={attendeeActive}
@@ -449,20 +469,9 @@ export function AppShell({
                 pathname={pathname}
               />
             ) : null}
-            {showUsers ? (
-              <NavAccordion
-                title="Users & Roles"
-                open={usersOpen}
-                onToggle={() => setUsersOpen((o) => !o)}
-                active={usersActive}
-                controlsId="users-nav-submenu"
-                links={roleNav.users}
-                pathname={pathname}
-              />
-            ) : null}
             {showEvents ? (
               <NavAccordion
-                title="Event operations"
+                title="Event Operations"
                 open={eventsOpen}
                 onToggle={() => setEventsOpen((o) => !o)}
                 active={eventsActive}
@@ -482,6 +491,17 @@ export function AppShell({
                 pathname={pathname}
               />
             ) : null}
+            {showContracts ? (
+              <NavAccordion
+                title="Contracts & Engagements"
+                open={contractsOpen}
+                onToggle={() => setContractsOpen((o) => !o)}
+                active={contractsActive}
+                controlsId="contracts-nav-submenu"
+                links={roleNav.contracts}
+                pathname={pathname}
+              />
+            ) : null}
             {showApprovals ? (
               <li>
                 <Link
@@ -496,14 +516,14 @@ export function AppShell({
                 </Link>
               </li>
             ) : null}
-            {showContracts ? (
+            {showWork ? (
               <NavAccordion
-                title="Contracts & Engagements"
-                open={contractsOpen}
-                onToggle={() => setContractsOpen((o) => !o)}
-                active={contractsActive}
-                controlsId="contracts-nav-submenu"
-                links={roleNav.contracts}
+                title="Progress Tracker"
+                open={workOpen}
+                onToggle={() => setWorkOpen((o) => !o)}
+                active={workActive}
+                controlsId="work-nav-submenu"
+                links={workLinks}
                 pathname={pathname}
               />
             ) : null}
@@ -519,6 +539,28 @@ export function AppShell({
                 badge={alertCount}
               />
             ) : null}
+            {showCosts ? (
+              <NavAccordion
+                title="Costs & Resources"
+                open={costsOpen}
+                onToggle={() => setCostsOpen((o) => !o)}
+                active={costsActive}
+                controlsId="costs-nav-submenu"
+                links={roleNav.costs}
+                pathname={pathname}
+              />
+            ) : null}
+            {showAnalyticsCenter ? (
+              <NavAccordion
+                title="Analytics Center"
+                open={analyticsOpen}
+                onToggle={() => setAnalyticsOpen((o) => !o)}
+                active={analyticsCenterActive}
+                controlsId="analytics-nav-submenu"
+                links={analyticsCenterLinks}
+                pathname={pathname}
+              />
+            ) : null}
             {showCompliance ? (
               <NavAccordion
                 title="GAAP Compliance"
@@ -530,36 +572,14 @@ export function AppShell({
                 pathname={pathname}
               />
             ) : null}
-            {showWork ? (
+            {showUsers ? (
               <NavAccordion
-                title="Work & Performance"
-                open={workOpen}
-                onToggle={() => setWorkOpen((o) => !o)}
-                active={workActive}
-                controlsId="work-nav-submenu"
-                links={workLinks}
-                pathname={pathname}
-              />
-            ) : null}
-            {showCosts ? (
-              <NavAccordion
-                title="Cost & Resources"
-                open={costsOpen}
-                onToggle={() => setCostsOpen((o) => !o)}
-                active={costsActive}
-                controlsId="costs-nav-submenu"
-                links={roleNav.costs}
-                pathname={pathname}
-              />
-            ) : null}
-            {showProfitability ? (
-              <NavAccordion
-                title="Profitability"
-                open={profitabilityOpen}
-                onToggle={() => setProfitabilityOpen((o) => !o)}
-                active={profitabilityActive}
-                controlsId="profitability-nav-submenu"
-                links={profitabilityLinks}
+                title="Users & Roles"
+                open={usersOpen}
+                onToggle={() => setUsersOpen((o) => !o)}
+                active={usersActive}
+                controlsId="users-nav-submenu"
+                links={roleNav.users}
                 pathname={pathname}
               />
             ) : null}
@@ -575,13 +595,14 @@ export function AppShell({
           <p className="text-sm font-medium text-white">{session.fullName}</p>
           <p className="text-xs text-white/50">{session.roleName}</p>
           <p className="truncate text-xs text-white/35">{session.email}</p>
+          <DemoRoleSwitcher currentEmail={session.email} />
           <button
             type="button"
             disabled={pending}
             onClick={() => startTransition(() => logoutAction())}
             className="mt-3 w-full rounded-md border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
           >
-            {pending ? "Signing out…" : "Sign out"}
+            {pending ? "Signing Out…" : "Sign Out"}
           </button>
         </div>
       </aside>
@@ -601,7 +622,7 @@ export function AppShell({
         </header>
         <main className="px-6 py-8">{children}</main>
       </div>
-      {showBilling || showCompliance || showProfitability || showCosts ? (
+      {showBilling || showCompliance || showCosts || showAnalyticsCenter ? (
         <AssistantChat />
       ) : null}
     </div>

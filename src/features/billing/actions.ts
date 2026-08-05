@@ -16,6 +16,7 @@ import {
   denyPmIndependentInvoiceCollection,
 } from "@/features/access/sod";
 import { appendAccessAudit } from "@/features/access/audit";
+import { tryActivateContractAfterDeposit } from "@/features/contracts/actions";
 
 function revalidateBilling() {
   revalidatePath("/billing");
@@ -452,7 +453,13 @@ export async function recordDeposit(input: {
       memo: `Unearned revenue liability — contract ${input.contract_id.slice(0, 8)}`,
     });
 
+    // Activate engagement when required deposit is met (deposit_pending → active).
+    await tryActivateContractAfterDeposit(input.contract_id);
+
     revalidateBilling();
+    revalidatePath("/work");
+    revalidatePath(`/work/events/${input.contract_id}`);
+    revalidatePath(`/contracts/${input.contract_id}`);
     return { ok: true, id: data.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

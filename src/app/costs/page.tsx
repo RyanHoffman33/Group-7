@@ -7,7 +7,7 @@ import {
   getCostDashboardStats,
   listContractsForCosts,
 } from "@/features/costs/queries";
-import { hasAnyFlag } from "@/features/costs/flags";
+import { belongsInFlagsQueue } from "@/features/costs/flags";
 import { CategoryBreakdown } from "@/components/costs/CategoryBreakdown";
 import { CostFlagPills } from "@/components/costs/CostFlagsBanner";
 import {
@@ -28,7 +28,12 @@ export default async function CostsHubPage() {
     getAverageCostPerProjectByCategory(),
   ]);
 
-  const flagged = stats.entries.filter((e) => hasAnyFlag(e)).slice(0, 8);
+  const flagged = stats.entries.filter((e) => belongsInFlagsQueue(e)).slice(0, 8);
+  const categoryTotalSum = avgByCategory.reduce((s, r) => s + r.total, 0);
+  const categoryProjectSum = avgByCategory.reduce(
+    (s, r) => s + r.projectCount,
+    0,
+  );
 
   return (
     <div>
@@ -121,6 +126,22 @@ export default async function CostsHubPage() {
                     </td>
                   </tr>
                 ))}
+                {avgByCategory.length > 0 ? (
+                  <tr className="border-t-2 border-[var(--line)] bg-[#f8fafb]">
+                    <td className="py-3 font-semibold text-[var(--ink)]">
+                      Total
+                    </td>
+                    <td className="py-3 font-semibold tabular-nums text-[var(--ink)]">
+                      —
+                    </td>
+                    <td className="py-3 font-semibold tabular-nums text-[var(--ink)]">
+                      {categoryProjectSum}
+                    </td>
+                    <td className="py-3 font-semibold tabular-nums text-[var(--ink)]">
+                      <Money amount={categoryTotalSum} />
+                    </td>
+                  </tr>
+                ) : null}
                 {avgByCategory.length === 0 ? (
                   <tr>
                     <td

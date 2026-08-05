@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { createContract } from "@/features/contracts/actions";
 import { formatCurrency } from "@/features/billing/aging";
 import { Panel } from "@/components/billing/ui";
@@ -24,11 +30,38 @@ const STEPS = [
 
 /** UI label → stored billing_method value (existing enum). */
 const BILLING_METHODS: { value: string; label: string }[] = [
-  { value: "fixed_price", label: "Fixed Price" },
-  { value: "milestone", label: "Milestone Billing" },
-  { value: "time_and_materials", label: "Time and Materials" },
-  { value: "cost_plus", label: "Cost Plus" },
-  { value: "progress", label: "Custom Payment Schedule" },
+  { value: "fixed_price", label: "Fixed price" },
+  { value: "milestone", label: "Milestone billing" },
+  { value: "time_and_materials", label: "Time and materials" },
+  { value: "cost_plus", label: "Cost plus" },
+  { value: "progress", label: "Custom payment schedule" },
+];
+
+const EVENT_TYPES: { value: string; label: string }[] = [
+  { value: "corporate_conference", label: "Corporate conference" },
+  { value: "product_launch", label: "Product launch" },
+  { value: "wedding", label: "Wedding" },
+  { value: "gala", label: "Gala" },
+  { value: "fundraiser", label: "Fundraiser" },
+  { value: "holiday_party", label: "Holiday party" },
+  { value: "trade_show", label: "Trade show" },
+  { value: "concert", label: "Concert" },
+  { value: "celebration", label: "Celebration" },
+  { value: "corporate_event", label: "Corporate event" },
+];
+
+const DELIVERABLE_PHASES: { value: string; label: string }[] = [
+  { value: "planning", label: "Planning" },
+  { value: "execution", label: "Execution" },
+  { value: "wrapup", label: "Wrap-up" },
+];
+
+const MILESTONE_TYPES: { value: string; label: string }[] = [
+  { value: "deposit", label: "Deposit" },
+  { value: "progress", label: "Progress" },
+  { value: "final", label: "Final" },
+  { value: "retainer", label: "Retainer" },
+  { value: "other", label: "Other" },
 ];
 
 function moneyRound(n: number) {
@@ -37,6 +70,14 @@ function moneyRound(n: number) {
 
 function billingLabel(value: string) {
   return BILLING_METHODS.find((m) => m.value === value)?.label ?? value;
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+      {children}
+    </span>
+  );
 }
 
 export function CreateContractWizard({ customers }: { customers: Customer[] }) {
@@ -562,7 +603,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         {step === 0 && (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm sm:col-span-2">
-              <span className="mb-1 block text-[var(--muted)]">Customer *</span>
+              <FieldLabel>Customer *</FieldLabel>
               <select
                 className={field}
                 value={customerId}
@@ -579,7 +620,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               </span>
             </label>
             <label className="text-sm sm:col-span-2">
-              <span className="mb-1 block text-[var(--muted)]">Event name *</span>
+              <FieldLabel>Event name *</FieldLabel>
               <input
                 className={field}
                 value={eventName}
@@ -591,34 +632,21 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               </span>
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">Event type</span>
+              <FieldLabel>Event type</FieldLabel>
               <select
                 className={field}
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value)}
               >
-                {[
-                  "corporate_conference",
-                  "product_launch",
-                  "wedding",
-                  "gala",
-                  "fundraiser",
-                  "holiday_party",
-                  "trade_show",
-                  "concert",
-                  "celebration",
-                  "corporate_event",
-                ].map((t) => (
-                  <option key={t} value={t}>
-                    {t.replaceAll("_", " ")}
+                {EVENT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
                   </option>
                 ))}
               </select>
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">
-                Project manager *
-              </span>
+              <FieldLabel>Project manager *</FieldLabel>
               <input
                 className={field}
                 value={pm}
@@ -626,7 +654,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">Event start *</span>
+              <FieldLabel>Event start *</FieldLabel>
               <input
                 type="datetime-local"
                 className={field}
@@ -635,7 +663,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">Event end</span>
+              <FieldLabel>Event end</FieldLabel>
               <input
                 type="datetime-local"
                 className={field}
@@ -644,7 +672,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">Venue</span>
+              <FieldLabel>Venue</FieldLabel>
               <input
                 className={field}
                 value={venueName}
@@ -652,7 +680,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">City</span>
+              <FieldLabel>City</FieldLabel>
               <input
                 className={field}
                 value={venueCity}
@@ -660,7 +688,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">Guest count</span>
+              <FieldLabel>Guest count</FieldLabel>
               <input
                 type="number"
                 min={0}
@@ -679,61 +707,69 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               {lines.map((l, i) => (
                 <div
                   key={i}
-                  className="mb-2 grid gap-2 sm:grid-cols-5"
+                  className="mb-3 grid gap-2 sm:grid-cols-5"
                 >
-                  <input
-                    className={`${field} sm:col-span-2`}
-                    placeholder="Description"
-                    value={l.description}
-                    onChange={(e) => {
-                      const next = [...lines];
-                      next[i] = { ...l, description: e.target.value };
-                      setLines(next);
-                    }}
-                  />
-                  <input
-                    type="number"
-                    className={field}
-                    placeholder="Qty"
-                    value={l.quantity}
-                    onChange={(e) => {
-                      const next = [...lines];
-                      const qty = Number(e.target.value);
-                      next[i] = {
-                        ...l,
-                        quantity: qty,
-                        amount: qty * l.unit_rate,
-                      };
-                      setLines(next);
-                    }}
-                  />
-                  <input
-                    type="number"
-                    className={field}
-                    placeholder="Rate"
-                    value={l.unit_rate}
-                    onChange={(e) => {
-                      const next = [...lines];
-                      const unit_rate = Number(e.target.value);
-                      next[i] = {
-                        ...l,
-                        unit_rate,
-                        amount: l.quantity * unit_rate,
-                      };
-                      setLines(next);
-                    }}
-                  />
-                  <input
-                    type="number"
-                    className={field}
-                    placeholder="Amount"
-                    value={l.amount}
-                    onChange={(e) => {
-                      const next = [...lines];
-                      next[i] = { ...l, amount: Number(e.target.value) };
-                      setLines(next);
-                    }}
-                  />
+                  <label className="text-sm sm:col-span-2">
+                    <FieldLabel>Description</FieldLabel>
+                    <input
+                      className={field}
+                      value={l.description}
+                      onChange={(e) => {
+                        const next = [...lines];
+                        next[i] = { ...l, description: e.target.value };
+                        setLines(next);
+                      }}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <FieldLabel>Quantity</FieldLabel>
+                    <input
+                      type="number"
+                      className={field}
+                      value={l.quantity}
+                      onChange={(e) => {
+                        const next = [...lines];
+                        const qty = Number(e.target.value);
+                        next[i] = {
+                          ...l,
+                          quantity: qty,
+                          amount: qty * l.unit_rate,
+                        };
+                        setLines(next);
+                      }}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <FieldLabel>Unit rate</FieldLabel>
+                    <input
+                      type="number"
+                      className={field}
+                      value={l.unit_rate}
+                      onChange={(e) => {
+                        const next = [...lines];
+                        const unit_rate = Number(e.target.value);
+                        next[i] = {
+                          ...l,
+                          unit_rate,
+                          amount: l.quantity * unit_rate,
+                        };
+                        setLines(next);
+                      }}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <FieldLabel>Amount</FieldLabel>
+                    <input
+                      type="number"
+                      className={field}
+                      value={l.amount}
+                      onChange={(e) => {
+                        const next = [...lines];
+                        next[i] = { ...l, amount: Number(e.target.value) };
+                        setLines(next);
+                      }}
+                    />
+                  </label>
                 </div>
               ))}
               <button
@@ -758,40 +794,49 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
             <div>
               <p className="mb-2 text-sm font-semibold">Deliverables</p>
               {deliverables.map((d, i) => (
-                <div key={i} className="mb-2 grid gap-2 sm:grid-cols-3">
-                  <input
-                    className={field}
-                    placeholder="Code"
-                    value={d.code}
-                    onChange={(e) => {
-                      const next = [...deliverables];
-                      next[i] = { ...d, code: e.target.value };
-                      setDeliverables(next);
-                    }}
-                  />
-                  <input
-                    className={field}
-                    placeholder="Title"
-                    value={d.title}
-                    onChange={(e) => {
-                      const next = [...deliverables];
-                      next[i] = { ...d, title: e.target.value };
-                      setDeliverables(next);
-                    }}
-                  />
-                  <select
-                    className={field}
-                    value={d.phase}
-                    onChange={(e) => {
-                      const next = [...deliverables];
-                      next[i] = { ...d, phase: e.target.value };
-                      setDeliverables(next);
-                    }}
-                  >
-                    <option value="planning">planning</option>
-                    <option value="execution">execution</option>
-                    <option value="wrapup">wrapup</option>
-                  </select>
+                <div key={i} className="mb-3 grid gap-2 sm:grid-cols-3">
+                  <label className="text-sm">
+                    <FieldLabel>Code</FieldLabel>
+                    <input
+                      className={field}
+                      value={d.code}
+                      onChange={(e) => {
+                        const next = [...deliverables];
+                        next[i] = { ...d, code: e.target.value };
+                        setDeliverables(next);
+                      }}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <FieldLabel>Title</FieldLabel>
+                    <input
+                      className={field}
+                      value={d.title}
+                      onChange={(e) => {
+                        const next = [...deliverables];
+                        next[i] = { ...d, title: e.target.value };
+                        setDeliverables(next);
+                      }}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <FieldLabel>Phase</FieldLabel>
+                    <select
+                      className={field}
+                      value={d.phase}
+                      onChange={(e) => {
+                        const next = [...deliverables];
+                        next[i] = { ...d, phase: e.target.value };
+                        setDeliverables(next);
+                      }}
+                    >
+                      {DELIVERABLE_PHASES.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
               ))}
               <button
@@ -821,12 +866,10 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               {/* Section 1 */}
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold text-[var(--ink)]">
-                  Contract Pricing
+                  Contract pricing
                 </h3>
                 <label className="block text-sm">
-                  <span className="mb-1 block text-[var(--muted)]">
-                    Billing Method
-                  </span>
+                  <FieldLabel>Billing method</FieldLabel>
                   <select
                     className={field}
                     value={billingMethod}
@@ -840,9 +883,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   </select>
                 </label>
                 <label className="block text-sm">
-                  <span className="mb-1 block text-[var(--muted)]">
-                    Gross Contract Value
-                  </span>
+                  <FieldLabel>Gross contract value</FieldLabel>
                   <input
                     type="number"
                     min={0}
@@ -865,9 +906,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   </span>
                 </label>
                 <label className="block text-sm">
-                  <span className="mb-1 block text-[var(--muted)]">
-                    Discount Type
-                  </span>
+                  <FieldLabel>Discount type</FieldLabel>
                   <select
                     className={field}
                     value={discountType}
@@ -875,33 +914,38 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       setDiscountTypeSafe(e.target.value as DiscountType)
                     }
                   >
-                    <option value="none">No Discount</option>
+                    <option value="none">No discount</option>
                     <option value="percent">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
+                    <option value="fixed">Fixed amount</option>
                   </select>
                 </label>
                 {discountType === "percent" ? (
                   <label className="block text-sm">
-                    <span className="mb-1 block text-[var(--muted)]">
-                      Percentage Discount
+                    <FieldLabel>Discount %</FieldLabel>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        className={`${field} pr-10`}
+                        value={discountPercentInput}
+                        onChange={(e) => setDiscountPercentInput(e.target.value)}
+                        placeholder="0"
+                        aria-label="Discount percent of gross contract value"
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-[var(--muted)]">
+                        %
+                      </span>
+                    </div>
+                    <span className="mt-1 block text-xs text-[var(--muted)]">
+                      Percent of gross contract value (0–100).
                     </span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step="0.01"
-                      className={field}
-                      value={discountPercentInput}
-                      onChange={(e) => setDiscountPercentInput(e.target.value)}
-                      placeholder="0"
-                    />
                   </label>
                 ) : null}
                 {discountType === "fixed" ? (
                   <label className="block text-sm">
-                    <span className="mb-1 block text-[var(--muted)]">
-                      Fixed Discount Amount
-                    </span>
+                    <FieldLabel>Fixed discount amount</FieldLabel>
                     <input
                       type="number"
                       min={0}
@@ -914,7 +958,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   </label>
                 ) : null}
                 <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-2 text-sm">
-                  <span className="text-[var(--muted)]">Net Contract Value</span>
+                  <span className="text-[var(--muted)]">Net contract value</span>
                   <p className="mt-0.5 font-semibold tabular-nums">
                     {formatCurrency(net)}
                   </p>
@@ -924,7 +968,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               {/* Section 2 */}
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold text-[var(--ink)]">
-                  Deposit Requirements
+                  Deposit requirements
                 </h3>
                 <label className="flex items-start gap-3 rounded-md border border-[var(--line)] bg-white px-3 py-3 text-sm">
                   <input
@@ -935,7 +979,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   />
                   <span>
                     <span className="font-medium text-[var(--ink)]">
-                      Deposit Required Before Work Begins
+                      Deposit required before work begins
                     </span>
                     <span className="mt-1 block text-xs text-[var(--muted)]">
                       Customer deposits are recorded as liabilities until the
@@ -946,9 +990,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 {depositRequired ? (
                   <>
                     <label className="block text-sm">
-                      <span className="mb-1 block text-[var(--muted)]">
-                        Deposit Type
-                      </span>
+                      <FieldLabel>Deposit type</FieldLabel>
                       <select
                         className={field}
                         value={depositType}
@@ -957,34 +999,36 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                         }
                       >
                         <option value="percent">Percentage</option>
-                        <option value="fixed">Fixed Amount</option>
+                        <option value="fixed">Fixed amount</option>
                       </select>
                     </label>
                     {depositType === "percent" ? (
                       <label className="block text-sm">
-                        <span className="mb-1 block text-[var(--muted)]">
-                          Deposit Percentage
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="0.01"
-                          className={field}
-                          value={depositPercentInput}
-                          onChange={(e) =>
-                            setDepositPercentInput(e.target.value)
-                          }
-                        />
+                        <FieldLabel>Deposit %</FieldLabel>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.01"
+                            className={`${field} pr-10`}
+                            value={depositPercentInput}
+                            onChange={(e) =>
+                              setDepositPercentInput(e.target.value)
+                            }
+                            aria-label="Deposit percent of net contract value"
+                          />
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-[var(--muted)]">
+                            %
+                          </span>
+                        </div>
                         <span className="mt-1 block text-xs text-[var(--muted)]">
-                          Applied to net contract value after discount.
+                          Percent of net contract value after discount (0–100).
                         </span>
                       </label>
                     ) : (
                       <label className="block text-sm">
-                        <span className="mb-1 block text-[var(--muted)]">
-                          Deposit Amount
-                        </span>
+                        <FieldLabel>Deposit amount</FieldLabel>
                         <input
                           type="number"
                           min={0}
@@ -998,7 +1042,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     )}
                     <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-2 text-sm">
                       <span className="text-[var(--muted)]">
-                        Calculated Deposit Required
+                        Calculated deposit required
                       </span>
                       <p className="mt-0.5 font-semibold tabular-nums">
                         {formatCurrency(depositCalc.amount)}
@@ -1017,12 +1061,12 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
             {/* Section 3 */}
             <section>
               <h3 className="mb-3 text-sm font-semibold text-[var(--ink)]">
-                Financial Summary
+                Financial summary
               </h3>
               <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
                 <dl className="space-y-3 text-sm">
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--muted)]">Gross Contract Value</dt>
+                    <dt className="text-[var(--muted)]">Gross contract value</dt>
                     <dd className="font-medium tabular-nums">
                       {formatCurrency(gross)}
                     </dd>
@@ -1036,19 +1080,19 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-3">
-                    <dt className="font-semibold">Net Contract Value</dt>
+                    <dt className="font-semibold">Net contract value</dt>
                     <dd className="font-semibold tabular-nums">
                       {formatCurrency(net)}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--muted)]">Required Deposit</dt>
+                    <dt className="text-[var(--muted)]">Required deposit</dt>
                     <dd className="font-medium tabular-nums">
                       {formatCurrency(depositCalc.amount)}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-3">
-                    <dt className="font-semibold">Remaining Contract Balance</dt>
+                    <dt className="font-semibold">Remaining contract balance</dt>
                     <dd className="font-semibold tabular-nums">
                       {formatCurrency(remainingBalance)}
                     </dd>
@@ -1075,65 +1119,75 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               </button>
             </div>
             {milestones.map((m, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-5">
-                <input
-                  className={field}
-                  placeholder="Key"
-                  value={m.milestone_key}
-                  onChange={(e) => {
-                    const next = [...milestones];
-                    next[i] = { ...m, milestone_key: e.target.value };
-                    setMilestones(next);
-                  }}
-                />
-                <input
-                  className={field}
-                  placeholder="Label"
-                  value={m.label}
-                  onChange={(e) => {
-                    const next = [...milestones];
-                    next[i] = { ...m, label: e.target.value };
-                    setMilestones(next);
-                  }}
-                />
-                <input
-                  type="number"
-                  className={field}
-                  placeholder="Amount"
-                  value={m.amount}
-                  onChange={(e) => {
-                    const next = [...milestones];
-                    next[i] = { ...m, amount: e.target.value };
-                    setMilestones(next);
-                  }}
-                />
-                <input
-                  type="date"
-                  className={field}
-                  value={m.due_date}
-                  onChange={(e) => {
-                    const next = [...milestones];
-                    next[i] = { ...m, due_date: e.target.value };
-                    setMilestones(next);
-                  }}
-                />
-                <select
-                  className={field}
-                  value={m.milestone_type}
-                  onChange={(e) => {
-                    const next = [...milestones];
-                    next[i] = { ...m, milestone_type: e.target.value };
-                    setMilestones(next);
-                  }}
-                >
-                  {["deposit", "progress", "final", "retainer", "other"].map(
-                    (t) => (
-                      <option key={t} value={t}>
-                        {t}
+              <div key={i} className="mb-1 grid gap-2 sm:grid-cols-5">
+                <label className="text-sm">
+                  <FieldLabel>Key</FieldLabel>
+                  <input
+                    className={field}
+                    value={m.milestone_key}
+                    onChange={(e) => {
+                      const next = [...milestones];
+                      next[i] = { ...m, milestone_key: e.target.value };
+                      setMilestones(next);
+                    }}
+                  />
+                </label>
+                <label className="text-sm">
+                  <FieldLabel>Label</FieldLabel>
+                  <input
+                    className={field}
+                    value={m.label}
+                    onChange={(e) => {
+                      const next = [...milestones];
+                      next[i] = { ...m, label: e.target.value };
+                      setMilestones(next);
+                    }}
+                  />
+                </label>
+                <label className="text-sm">
+                  <FieldLabel>Amount</FieldLabel>
+                  <input
+                    type="number"
+                    className={field}
+                    value={m.amount}
+                    onChange={(e) => {
+                      const next = [...milestones];
+                      next[i] = { ...m, amount: e.target.value };
+                      setMilestones(next);
+                    }}
+                  />
+                </label>
+                <label className="text-sm">
+                  <FieldLabel>Due date</FieldLabel>
+                  <input
+                    type="date"
+                    className={field}
+                    value={m.due_date}
+                    onChange={(e) => {
+                      const next = [...milestones];
+                      next[i] = { ...m, due_date: e.target.value };
+                      setMilestones(next);
+                    }}
+                  />
+                </label>
+                <label className="text-sm">
+                  <FieldLabel>Type</FieldLabel>
+                  <select
+                    className={field}
+                    value={m.milestone_type}
+                    onChange={(e) => {
+                      const next = [...milestones];
+                      next[i] = { ...m, milestone_type: e.target.value };
+                      setMilestones(next);
+                    }}
+                  >
+                    {MILESTONE_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
                       </option>
-                    ),
-                  )}
-                </select>
+                    ))}
+                  </select>
+                </label>
               </div>
             ))}
             <button
@@ -1161,7 +1215,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         {step === 4 && (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">Prepared by *</span>
+              <FieldLabel>Prepared by *</FieldLabel>
               <input
                 className={field}
                 value={createdBy}
@@ -1186,9 +1240,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         {step === 5 && (
           <div className="grid gap-3">
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">
-                Cancellation policy *
-              </span>
+              <FieldLabel>Cancellation policy *</FieldLabel>
               <textarea
                 className={field}
                 rows={4}
@@ -1197,17 +1249,24 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">
-                Default cancellation fee %
+              <FieldLabel>Default cancellation fee %</FieldLabel>
+              <div className="relative max-w-xs">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className={`${field} pr-10`}
+                  value={cancelFee}
+                  onChange={(e) => setCancelFee(e.target.value)}
+                  aria-label="Cancellation fee percent"
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-[var(--muted)]">
+                  %
+                </span>
+              </div>
+              <span className="mt-1 block text-xs text-[var(--muted)]">
+                Default fee as a percent of contract value if canceled (0–100).
               </span>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                className={field}
-                value={cancelFee}
-                onChange={(e) => setCancelFee(e.target.value)}
-              />
             </label>
           </div>
         )}
@@ -1215,7 +1274,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         {step === 6 && (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">Document title</span>
+              <FieldLabel>Document title</FieldLabel>
               <input
                 className={field}
                 value={docTitle}
@@ -1223,7 +1282,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[var(--muted)]">Document URL</span>
+              <FieldLabel>Document URL</FieldLabel>
               <input
                 className={field}
                 value={docUrl}
@@ -1232,7 +1291,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
             </label>
             <label className="text-sm sm:col-span-2">
-              <span className="mb-1 block text-[var(--muted)]">Internal notes</span>
+              <FieldLabel>Internal notes</FieldLabel>
               <textarea
                 className={field}
                 rows={3}
@@ -1259,7 +1318,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   Deposit:{" "}
                   {depositRequired
                     ? formatCurrency(depositCalc.amount)
-                    : "none"}
+                    : "None"}
                 </li>
                 <li>
                   Submit: {submitNow ? "Yes — pending approval" : "Save as draft"}

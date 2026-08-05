@@ -1,5 +1,8 @@
 -- Demo seed for Billing & A/R (ACCY628-FINAL-PROJECT)
 -- Re-run after truncating dependent tables if you need a clean slate.
+-- Year-span / integrity enrichment: also apply
+--   supabase/migrations/20260805210000_seed_data_overhaul.sql
+-- (safe upserts — does not truncate).
 
 TRUNCATE public.billing_alerts, public.ar_bucket_state, public.ar_ledger_entries,
   public.payment_applications, public.payments, public.invoice_lines, public.deposits,
@@ -33,7 +36,7 @@ INSERT INTO public.invoices (id, contract_id, customer_id, invoice_number, issue
   ('33333333-3333-3333-3333-333333333306', '22222222-2222-2222-2222-222222222203', '11111111-1111-1111-1111-111111111102', 'INV-2025-0006', '2025-11-10', '2025-12-25', 25000, 0, 25000, 'paid', 'recognized', 'final-hv-c', 'seed'),
   ('33333333-3333-3333-3333-333333333307', '22222222-2222-2222-2222-222222222202', '11111111-1111-1111-1111-111111111101', 'INV-2026-0007', CURRENT_DATE - 10, CURRENT_DATE + 20, 40000, 0, 40000, 'issued', 'deferred', 'deposit-milestone', 'seed'),
   ('33333333-3333-3333-3333-333333333308', '22222222-2222-2222-2222-222222222203', '11111111-1111-1111-1111-111111111102', 'INV-2026-0008', CURRENT_DATE - 50, CURRENT_DATE - 5, 20000, 0, 20000, 'partially_paid', 'recognized', 'balance-hv', 'seed'),
-  ('33333333-3333-3333-3333-333333333309', '22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111103', 'INV-2026-0009', CURRENT_DATE - 75, CURRENT_DATE - 60, 32000, 0, 32000, 'issued', 'deferred', 'launch-progress', 'seed'),
+  ('33333333-3333-3333-3333-333333333309', '22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111103', 'INV-2026-0009', CURRENT_DATE - 75, CURRENT_DATE - 60, 32000, 0, 32000, 'disputed', 'deferred', 'launch-progress', 'seed'),
   ('33333333-3333-3333-3333-333333333310', '22222222-2222-2222-2222-222222222205', '11111111-1111-1111-1111-111111111104', 'INV-2026-0010', CURRENT_DATE - 120, CURRENT_DATE - 90, 21000, 0, 21000, 'issued', 'recognized', 'wedding-final', 'seed'),
   ('33333333-3333-3333-3333-333333333311', '22222222-2222-2222-2222-222222222206', '11111111-1111-1111-1111-111111111105', 'INV-2026-0011', CURRENT_DATE - 40, CURRENT_DATE - 10, 18000, 0, 18000, 'issued', 'deferred', 'ball-progress', 'seed');
 

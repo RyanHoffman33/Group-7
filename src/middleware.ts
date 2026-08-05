@@ -43,6 +43,15 @@ export function middleware(request: NextRequest) {
 
   if (isStaticPublic) return NextResponse.next();
 
+  // Root always forwards to the role home (or login).
+  if (pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = parsed?.email
+      ? homePathForRole(parsed.roleKey ?? "customer")
+      : "/login";
+    return NextResponse.redirect(url);
+  }
+
   if (!parsed?.email && !isLogin) {
     if (isApi) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

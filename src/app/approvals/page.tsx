@@ -28,7 +28,7 @@ export default async function ApprovalsPage() {
   return (
     <div>
       <PageHeader
-        title="Approval queue"
+        title="Approval Queue"
         description="Independent review of expenses, discounts, write-offs, and change orders. Self-approval is blocked."
       />
       <div className="mb-4">

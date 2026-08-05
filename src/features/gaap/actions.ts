@@ -161,6 +161,40 @@ export async function applyModification(modId: string): Promise<ActionResult> {
 
     await updateContractValue(mod.contract_id, newValue);
 
+    // Track cumulative change-order value and add a billable schedule line for the Δ.
+    const { data: priorCo } = await supabase
+      .from("contracts")
+      .select("change_order_value_total")
+      .eq("id", mod.contract_id)
+      .maybeSingle();
+    const coTotal =
+      Number(priorCo?.change_order_value_total ?? 0) + priceChange;
+    await supabase
+      .from("contracts")
+      .update({ change_order_value_total: coTotal })
+      .eq("id", mod.contract_id);
+
+    if (Math.abs(priceChange) > 0.009) {
+      const { data: maxSeq } = await supabase
+        .from("contract_milestones")
+        .select("sequence_no")
+        .eq("contract_id", mod.contract_id)
+        .order("sequence_no", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextSeq = Number(maxSeq?.sequence_no ?? 0) + 1;
+      await supabase.from("contract_milestones").insert({
+        contract_id: mod.contract_id,
+        milestone_key: `co-${String(mod.mod_number ?? modId).slice(0, 24)}`,
+        label: `Change order ${mod.mod_number ?? ""}`.trim(),
+        amount: priceChange,
+        due_date: mod.effective_date || new Date().toISOString().slice(0, 10),
+        milestone_type: "other",
+        sequence_no: nextSeq,
+        percent_of_contract: null,
+      });
+    }
+
     const { error: upd } = await supabase
       .from("contract_modifications")
       .update({
@@ -174,12 +208,16 @@ export async function applyModification(modId: string): Promise<ActionResult> {
     await supabase.from("ar_ledger_entries").insert({
       invoice_id: null,
       entry_type: "contract_modification",
-      debit: 0,
-      credit: 0,
-      memo: `Mod ${mod.mod_number} (${mod.accounting_treatment as ModAccountingTreatment}): TP ${prior} → ${newValue} (Δ ${priceChange}). Historical invoices unchanged.`,
+      debit: priceChange > 0 ? priceChange : 0,
+      credit: priceChange < 0 ? Math.abs(priceChange) : 0,
+      memo: `Mod ${mod.mod_number} (${mod.accounting_treatment as ModAccountingTreatment}): TP ${prior} → ${newValue} (Δ ${priceChange}). Schedule line added for billing. Historical invoices unchanged.`,
     });
 
     revalidateGaap();
+    revalidatePath("/contracts");
+    revalidatePath(`/contracts/${mod.contract_id}`);
+    revalidatePath("/contracts/change-orders");
+    revalidatePath("/billing/determine");
     return { ok: true, id: modId };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

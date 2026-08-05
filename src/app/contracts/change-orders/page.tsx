@@ -12,8 +12,22 @@ export default async function ChangeOrdersPage() {
     <div>
       <PageHeader
         title="Change Orders"
-        description="Commercial change requests. Applied accounting treatment is coordinated with Compliance; historical invoices are not rewritten."
+        description="Commercial change requests. After Compliance applies an approved CO, contract value and change-order totals update and a payment-schedule line is added so Billing can invoice the delta without rewriting historical invoices."
       />
+      <p className="mb-4 text-sm text-[var(--muted)]">
+        Workflow: create/approve on the{" "}
+        <Link href="/contracts/list" className="text-[var(--accent)] hover:underline">
+          contract workspace
+        </Link>
+        , then apply on{" "}
+        <Link
+          href="/compliance/modifications"
+          className="text-[var(--accent)] hover:underline"
+        >
+          Compliance → Modifications
+        </Link>
+        .
+      </p>
       <Panel>
         {rows.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">

@@ -7,7 +7,10 @@ import type {
   CostApprovalStatus,
 } from "@/lib/supabase/types";
 import { COST_CATEGORIES } from "@/features/costs/config";
-import { hasAnyFlag } from "@/features/costs/flags";
+import {
+  belongsInFlagsQueue,
+  hasAnyFlag,
+} from "@/features/costs/flags";
 
 export type CostEntryRow = CostEntry & {
   event_name?: string;
@@ -57,6 +60,10 @@ function mapEntry(row: Record<string, unknown>): CostEntry {
       row.prior_committed_amount == null
         ? null
         : Number(row.prior_committed_amount),
+    flags_resolved_at: (row.flags_resolved_at as string | null) ?? null,
+    flags_resolved_by: (row.flags_resolved_by as string | null) ?? null,
+    flags_resolution_note:
+      (row.flags_resolution_note as string | null) ?? null,
     created_at: row.created_at as string,
   };
 }
@@ -299,7 +306,8 @@ export async function getCostDashboardStats() {
   const pendingApprovals = entries.filter(
     (e) => e.approval_status === "pending_approval",
   ).length;
-  const openFlags = entries.filter((e) => hasAnyFlag(e)).length;
+  // Exclude pending_approval (Approvals owns amount authority) and resolved.
+  const openFlags = entries.filter((e) => belongsInFlagsQueue(e)).length;
   return { totalActual, totalCommitted, pendingApprovals, openFlags, entries };
 }
 
@@ -322,9 +330,17 @@ export async function listCommittedCosts(): Promise<CostEntryRow[]> {
   return listCostEntries({ commitmentStatus: "committed" });
 }
 
-export async function listExceptionCosts(): Promise<CostEntryRow[]> {
+export async function listExceptionCosts(opts?: {
+  status?: "open" | "resolved";
+}): Promise<CostEntryRow[]> {
   const entries = await listCostEntries();
-  return entries.filter((e) => hasAnyFlag(e));
+  const status = opts?.status ?? "open";
+  if (status === "resolved") {
+    return entries.filter((e) => hasAnyFlag(e) && Boolean(e.flags_resolved_at));
+  }
+  // Open Flags queue: unresolved control exceptions only.
+  // pending_approval amount-queue items are excluded (Approvals owns those).
+  return entries.filter((e) => belongsInFlagsQueue(e));
 }
 
 export async function listCostHistory(

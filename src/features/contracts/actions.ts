@@ -21,7 +21,12 @@ function revalidateContracts(id?: string) {
   revalidatePath("/contracts/approvals");
   revalidatePath("/contracts/change-orders");
   revalidatePath("/contracts/closeout");
-  if (id) revalidatePath(`/contracts/${id}`);
+  revalidatePath("/work");
+  revalidatePath("/billing/deposits");
+  if (id) {
+    revalidatePath(`/contracts/${id}`);
+    revalidatePath(`/work/events/${id}`);
+  }
 }
 
 function num(v: unknown) {
@@ -449,6 +454,86 @@ export async function approveContract(input: {
     return {
       ok: false,
       error: e instanceof Error ? e.message : "Approval failed.",
+    };
+  }
+}
+
+/**
+ * After cash deposit is recorded, move deposit_pending → active when
+ * required deposit amount is satisfied so Work may start.
+ */
+export async function tryActivateContractAfterDeposit(
+  contractId: string,
+): Promise<ActionResult> {
+  try {
+    const supabase = createClient();
+    const { data: c, error } = await supabase
+      .from("contracts")
+      .select("*")
+      .eq("id", contractId)
+      .single();
+    if (error) throw error;
+
+    if (c.status !== "deposit_pending" && c.status !== "approved") {
+      return { ok: true, id: contractId };
+    }
+
+    const { data: deps } = await supabase
+      .from("deposits")
+      .select("amount, status")
+      .eq("contract_id", contractId)
+      .in("status", ["unearned", "applied"]);
+    const received = (deps ?? []).reduce((s, d) => s + num(d.amount), 0);
+
+    const slice = {
+      status: c.status as string,
+      deposit_required: Boolean(c.deposit_required),
+      deposit_percent: num(c.deposit_percent),
+      original_contract_value: num(
+        c.original_contract_value ?? c.contract_value,
+      ),
+      contract_value: num(c.contract_value),
+      minimum_deposit_amount: c.minimum_deposit_amount as number | null,
+      requires_deposit_before_work: c.requires_deposit_before_work as
+        | boolean
+        | null,
+    };
+
+    if (!isDepositSatisfied(slice, received)) {
+      return { ok: true, id: contractId };
+    }
+
+    const next = statusAfterDepositSatisfied();
+    const now = new Date().toISOString();
+    const { error: uErr } = await supabase
+      .from("contracts")
+      .update({
+        status: next,
+        activated_at: now,
+      })
+      .eq("id", contractId)
+      .in("status", ["deposit_pending", "approved"]);
+    if (uErr) throw uErr;
+
+    await supabase.from("contract_approvals").insert({
+      contract_id: contractId,
+      action: "activate_after_deposit",
+      from_status: c.status,
+      to_status: next,
+      actor_label: "System — deposit received",
+      actor_role: "system",
+      comments: `Deposit satisfied ($${received.toLocaleString()} of $${requiredDepositAmount(slice).toLocaleString()} required). Work may start.`,
+    });
+
+    revalidateContracts(contractId);
+    return { ok: true, id: contractId };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "Failed to activate contract after deposit.",
     };
   }
 }

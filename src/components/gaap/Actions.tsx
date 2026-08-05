@@ -426,6 +426,41 @@ export function AuditExportButton({
 }: {
   packJson: string;
 }) {
+  type LedgerRow = {
+    created_at: string;
+    entry_type: string;
+    invoice_number: string | null;
+    debit: number;
+    credit: number;
+    memo: string | null;
+  };
+
+  /** Map ledger entry types → QuickBooks-style account pairs for import. */
+  function qboAccounts(entryType: string): {
+    account: string;
+    offsetAccount: string;
+  } {
+    switch (entryType) {
+      case "deposit_receive":
+        return { account: "Undeposited Funds", offsetAccount: "Unearned Revenue" };
+      case "deposit_apply":
+        return { account: "Unearned Revenue", offsetAccount: "Accounts Receivable" };
+      case "invoice":
+      case "invoice_issue":
+        return { account: "Accounts Receivable", offsetAccount: "Contract Revenue" };
+      case "payment":
+      case "payment_apply":
+        return { account: "Undeposited Funds", offsetAccount: "Accounts Receivable" };
+      case "recognition":
+      case "revenue_recognize":
+        return { account: "Contract Liability", offsetAccount: "Contract Revenue" };
+      case "contract_modification":
+        return { account: "Accounts Receivable", offsetAccount: "Contract Revenue" };
+      default:
+        return { account: "Accounts Receivable", offsetAccount: "Contract Revenue" };
+    }
+  }
+
   return (
     <div className="flex flex-wrap gap-2">
       <button
@@ -447,17 +482,9 @@ export function AuditExportButton({
         type="button"
         className="rounded-md border border-[var(--line)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--ink)]"
         onClick={() => {
-          const pack = JSON.parse(packJson) as {
-            ledger: {
-              created_at: string;
-              entry_type: string;
-              invoice_number: string | null;
-              debit: number;
-              credit: number;
-              memo: string | null;
-            }[];
-          };
-          const header = "created_at,entry_type,invoice_number,debit,credit,memo\n";
+          const pack = JSON.parse(packJson) as { ledger: LedgerRow[] };
+          const header =
+            "created_at,entry_type,invoice_number,debit,credit,memo\n";
           const rows = pack.ledger
             .map((l) =>
               [
@@ -480,6 +507,64 @@ export function AuditExportButton({
         }}
       >
         Export ledger CSV
+      </button>
+      <button
+        type="button"
+        className="rounded-md border border-[var(--line)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--ink)]"
+        title="Journal CSV mapped to common QuickBooks Online accounts for manual import"
+        onClick={() => {
+          const pack = JSON.parse(packJson) as { ledger: LedgerRow[] };
+          const header =
+            "JournalNo,JournalDate,Account,Debit,Credit,Description,Name,Currency\n";
+          const rows: string[] = [];
+          pack.ledger.forEach((l, i) => {
+            const jn = `ME-${String(i + 1).padStart(4, "0")}`;
+            const date = (l.created_at ?? "").slice(0, 10);
+            const amt = Math.max(Number(l.debit) || 0, Number(l.credit) || 0);
+            if (amt <= 0 && l.entry_type !== "contract_modification") return;
+            const { account, offsetAccount } = qboAccounts(l.entry_type);
+            const memo = `"${(l.memo ?? l.entry_type).replace(/"/g, '""')}"`;
+            const name = l.invoice_number ? `"${l.invoice_number}"` : '""';
+            const debitSide = Number(l.debit) >= Number(l.credit);
+            const primaryDebit = debitSide ? amt || Number(l.debit) : 0;
+            const primaryCredit = debitSide ? 0 : amt || Number(l.credit);
+            rows.push(
+              [
+                jn,
+                date,
+                `"${account}"`,
+                primaryDebit,
+                primaryCredit,
+                memo,
+                name,
+                "USD",
+              ].join(","),
+            );
+            rows.push(
+              [
+                jn,
+                date,
+                `"${offsetAccount}"`,
+                primaryCredit,
+                primaryDebit,
+                memo,
+                name,
+                "USD",
+              ].join(","),
+            );
+          });
+          const blob = new Blob([header + rows.join("\n")], {
+            type: "text/csv",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `qbo-journal-import-${new Date().toISOString().slice(0, 10)}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }}
+      >
+        Export QuickBooks journal CSV
       </button>
     </div>
   );

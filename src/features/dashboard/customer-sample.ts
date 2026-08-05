@@ -244,7 +244,8 @@ export const SAMPLE_INVOICES: CustomerInvoice[] = [
     balance: 0,
     status: "paid",
     lineItems: [
-      { label: "Production deposit (25%)", amount: 12500 },
+      { label: "Production package deposit (25% of $50,000)", amount: 10000 },
+      { label: "Venue hold / planning retainer", amount: 2500 },
     ],
   },
   {
@@ -259,8 +260,9 @@ export const SAMPLE_INVOICES: CustomerInvoice[] = [
     balance: 0,
     status: "paid",
     lineItems: [
-      { label: "AV & staging progress billing", amount: 18000 },
-      { label: "Labor commitment", amount: 7000 },
+      { label: "LED wall & staging progress", amount: 12000 },
+      { label: "Wireless mics & recording package", amount: 6000 },
+      { label: "Crew labor commitment (show call)", amount: 7000 },
     ],
   },
   {
@@ -275,8 +277,26 @@ export const SAMPLE_INVOICES: CustomerInvoice[] = [
     balance: 12500,
     status: "unpaid",
     lineItems: [
-      { label: "Final production balance", amount: 10000 },
-      { label: "On-site contingency", amount: 2500 },
+      { label: "Final production balance", amount: 8000 },
+      { label: "Registration & badge printing", amount: 2000 },
+      { label: "On-site contingency (unused refundable)", amount: 2500 },
+    ],
+  },
+  {
+    id: "inv-201",
+    invoiceNumber: "INV-201",
+    eventId: "evt-delta-holiday",
+    description: "Holiday reception deposit",
+    issueDate: "2026-08-01",
+    dueDate: "2026-08-15",
+    amount: 8000,
+    amountPaid: 4000,
+    balance: 4000,
+    status: "partially_paid",
+    lineItems: [
+      { label: "Room layout & décor package", amount: 3500 },
+      { label: "House sound & lighting", amount: 2500 },
+      { label: "Photo backdrop & event-night staffing", amount: 2000 },
     ],
   },
 ];
@@ -382,6 +402,20 @@ export function financialFromInvoices(invoices: CustomerInvoice[]) {
   const amountPaid = invoices.reduce((s, i) => s + i.amountPaid, 0);
   const outstandingBalance = invoices.reduce((s, i) => s + i.balance, 0);
   const nextOpen = invoices.find((i) => i.balance > 0);
+
+  const depositInvoices = invoices.filter((i) =>
+    i.lineItems.some((l) => /deposit/i.test(l.label)) ||
+    /deposit/i.test(i.description),
+  );
+  const progressInvoices = invoices.filter((i) => !depositInvoices.includes(i));
+
+  const depositBilled = depositInvoices.reduce((s, i) => s + i.amount, 0);
+  const depositPaid = depositInvoices.reduce((s, i) => s + i.amountPaid, 0);
+  const depositRemaining = depositInvoices.reduce((s, i) => s + i.balance, 0);
+  const progressBilled = progressInvoices.reduce((s, i) => s + i.amount, 0);
+  const progressPaid = progressInvoices.reduce((s, i) => s + i.amountPaid, 0);
+  const progressRemaining = progressInvoices.reduce((s, i) => s + i.balance, 0);
+
   return {
     contractTotal,
     amountPaid,
@@ -389,5 +423,19 @@ export function financialFromInvoices(invoices: CustomerInvoice[]) {
     nextPaymentDue: nextOpen?.dueDate ?? null,
     nextPaymentAmount: nextOpen?.balance ?? 0,
     nextInvoiceId: nextOpen?.id ?? null,
+    depositBilled,
+    depositPaid,
+    depositRemaining,
+    depositStatus:
+      depositBilled <= 0
+        ? ("none" as const)
+        : depositRemaining <= 0.01
+          ? ("satisfied" as const)
+          : depositPaid > 0
+            ? ("partial" as const)
+            : ("due" as const),
+    progressBilled,
+    progressPaid,
+    progressRemaining,
   };
 }

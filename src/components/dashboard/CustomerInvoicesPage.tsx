@@ -145,6 +145,20 @@ export function CustomerInvoicesPage() {
             </strong>{" "}
             toward {paying.description}.
           </p>
+          <ul className="mt-3 space-y-1.5 border-t border-[var(--line)] pt-3 text-sm">
+            {paying.lineItems.map((li) => (
+              <li key={li.label} className="flex justify-between gap-2">
+                <span className="text-[var(--muted)]">{li.label}</span>
+                <span className="tabular-nums">
+                  <Money amount={li.amount} />
+                </span>
+              </li>
+            ))}
+            <li className="flex justify-between gap-2 border-t border-[var(--line)] pt-2 font-semibold">
+              <span>Balance due</span>
+              <Money amount={paying.balance} />
+            </li>
+          </ul>
           <div className="mt-4">
             <PayMethodPicker method={method} setMethod={setMethod} />
           </div>

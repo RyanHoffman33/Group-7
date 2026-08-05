@@ -8,6 +8,7 @@ import {
   createExpenseEntry,
   createTimeEntryAction,
   rejectCostEntry,
+  resolveCostFlags,
   updateCostEntry,
 } from "@/features/costs/actions";
 import {
@@ -38,7 +39,7 @@ export function TimeEntryForm({
     <form action={formAction} className="mx-auto max-w-md space-y-4">
       <p className="rounded-md bg-[var(--accent-soft)] px-3 py-2 text-xs text-[var(--accent)]">
         Fast venue entry — amounts ≥ ${APPROVAL_THRESHOLD.toLocaleString()} go
-        to the approval queue. Costs are recorded when incurred, not when paid.
+        to the Approval Queue. Costs are recorded when incurred, not when paid.
       </p>
 
       <label className="block space-y-1.5">
@@ -411,6 +412,60 @@ export function ActualizeCostButton({
         <p className="w-full text-xs text-[var(--danger)]">{error}</p>
       ) : null}
     </div>
+  );
+}
+
+export function ResolveFlagsForm({
+  entryId,
+  compact = false,
+}: {
+  entryId: string;
+  compact?: boolean;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+
+  return (
+    <form
+      className={compact ? "space-y-2" : "space-y-3"}
+      onSubmit={(e) => {
+        e.preventDefault();
+        setError(null);
+        start(async () => {
+          const r = await resolveCostFlags(entryId, {
+            note: note.trim() || undefined,
+          });
+          if (!r.ok) setError(r.error ?? "Failed");
+          else {
+            setNote("");
+            router.refresh();
+          }
+        });
+      }}
+    >
+      <label className="block space-y-1">
+        <span className={labelClass}>Resolution note (optional)</span>
+        <textarea
+          rows={compact ? 2 : 3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className={fieldClass}
+          placeholder="What was corrected or why this is OK…"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+      >
+        {pending ? "Saving…" : "Mark flags resolved"}
+      </button>
+      {error ? (
+        <p className="text-xs text-[var(--danger)]">{error}</p>
+      ) : null}
+    </form>
   );
 }
 

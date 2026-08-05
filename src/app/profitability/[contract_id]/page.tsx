@@ -6,7 +6,8 @@ import {
   listExceptions,
 } from "@/features/profitability/queries";
 import { exceptionMeta, exceptionTitle, statusTone } from "@/features/profitability/labels";
-import { Money, PageHeader, Panel, StatusPill } from "@/components/billing/ui";
+import { formatCurrency } from "@/features/billing/aging";
+import { Money, PageHeader, Panel, StatCard, StatusPill } from "@/components/billing/ui";
 import { Waterfall } from "@/components/profitability/Waterfall";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,12 @@ export default async function EventProfitPage({
     listExceptions(contract_id),
   ]);
   if (!event) notFound();
+
+  /** Contract value left after actuals + open commitments — margin still at risk. */
+  const projectedCost = event.actual_cost_total + event.committed_cost_open;
+  const marginAtRisk = event.contract_value - projectedCost;
+  const forecastMarginPct =
+    event.contract_value > 0 ? marginAtRisk / event.contract_value : null;
 
   return (
     <div>
@@ -42,11 +49,56 @@ export default async function EventProfitPage({
               href="/profitability"
               className="text-sm text-[var(--accent)] hover:underline"
             >
-              ← All events
+              ← Profitability
+            </Link>
+            <Link
+              href="/analytics"
+              className="text-sm text-[var(--muted)] hover:underline"
+            >
+              Analytics Center
             </Link>
           </div>
         }
       />
+
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Contract value"
+          value={formatCurrency(event.contract_value)}
+          hint="Incl. applied change orders"
+        />
+        <StatCard
+          label="Actual + committed cost"
+          value={formatCurrency(projectedCost)}
+          hint={`Actual ${formatCurrency(event.actual_cost_total)} · Open ${formatCurrency(event.committed_cost_open)}`}
+          tone="warn"
+        />
+        <StatCard
+          label="Margin at risk"
+          value={formatCurrency(marginAtRisk)}
+          hint={
+            forecastMarginPct == null
+              ? "Contract − (actual + open commitments)"
+              : `${(forecastMarginPct * 100).toFixed(1)}% of contract if commitments convert`
+          }
+          tone={
+            marginAtRisk < 0
+              ? "danger"
+              : marginAtRisk < event.contract_value * 0.15
+                ? "warn"
+                : "accent"
+          }
+        />
+        <StatCard
+          label="Recognized gross margin"
+          value={formatCurrency(event.gross_margin)}
+          hint={
+            event.gross_margin_pct == null
+              ? "No recognized revenue yet"
+              : `${event.gross_margin_pct.toFixed(1)}% of recognized revenue`
+          }
+        />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <Panel title="The money story">

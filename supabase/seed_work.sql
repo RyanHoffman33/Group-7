@@ -16,13 +16,13 @@ INSERT INTO public.work_parties (id, display_name, party_type, vendor_org, email
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb06', 'Alex Rivera', 'crew', NULL, 'alex@mainevent.example'),
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb07', 'Northstar AP Contact', 'client', 'Northstar Financial Group', 'ap@northstar.example');
 
--- Year-End Gala (2222…202)
+-- Year-End Gala (2222…202) — aligned to contract event_start 2026-12-12
 INSERT INTO public.contract_deliverables (id, contract_id, code, title, description, phase, location, scheduled_start, scheduled_end, status, sort_order) VALUES
-  ('cccccccc-cccc-cccc-cccc-cccccccccc01', '22222222-2222-2222-2222-222222222202', 'YEG-PLAN-SITE', 'Site walkthrough & floor plan', 'Confirm ballroom layout vs contract rider', 'planning', 'Grand Ballroom', '2026-08-10 14:00:00+00', '2026-08-10 17:00:00+00', 'completed', 1),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc02', '22222222-2222-2222-2222-222222222202', 'YEG-PLAN-AV', 'AV package confirm', 'Confirm screens, mics, and recording per SOW', 'planning', 'Grand Ballroom', '2026-08-12 10:00:00+00', '2026-08-12 12:00:00+00', 'scheduled', 2),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc03', '22222222-2222-2222-2222-222222222202', 'YEG-EXEC-LOAD', 'Load-in & stage build', 'Crew load-in; stage + lighting hung before doors', 'execution', 'Loading dock / Ballroom', '2026-08-08 08:00:00+00', '2026-08-08 14:00:00+00', 'scheduled', 3),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc04', '22222222-2222-2222-2222-222222222202', 'YEG-EXEC-SHOW', 'Show-call run of show', 'Live cue sheet execution through last speech', 'execution', 'Grand Ballroom', '2026-08-08 16:00:00+00', '2026-08-08 23:00:00+00', 'promised', 4),
-  ('cccccccc-cccc-cccc-cccc-cccccccccc05', '22222222-2222-2222-2222-222222222202', 'YEG-WRAP-STRIKE', 'Strike & inventory return', 'Strike, inventory check-in, venue walk', 'wrapup', 'Grand Ballroom', '2026-08-09 00:30:00+00', '2026-08-09 04:00:00+00', 'promised', 5);
+  ('cccccccc-cccc-cccc-cccc-cccccccccc01', '22222222-2222-2222-2222-222222222202', 'YEG-PLAN-SITE', 'Site walkthrough & floor plan', 'Confirm ballroom layout vs contract rider', 'planning', 'Grand Ballroom', '2026-12-08 14:00:00+00', '2026-12-08 17:00:00+00', 'completed', 1),
+  ('cccccccc-cccc-cccc-cccc-cccccccccc02', '22222222-2222-2222-2222-222222222202', 'YEG-PLAN-AV', 'AV package confirm', 'Confirm screens, mics, and recording per SOW', 'planning', 'Grand Ballroom', '2026-12-09 10:00:00+00', '2026-12-09 12:00:00+00', 'scheduled', 2),
+  ('cccccccc-cccc-cccc-cccc-cccccccccc03', '22222222-2222-2222-2222-222222222202', 'YEG-EXEC-LOAD', 'Load-in & stage build', 'Crew load-in; stage + lighting hung before doors', 'execution', 'Loading dock / Ballroom', '2026-12-11 08:00:00+00', '2026-12-11 14:00:00+00', 'scheduled', 3),
+  ('cccccccc-cccc-cccc-cccc-cccccccccc04', '22222222-2222-2222-2222-222222222202', 'YEG-EXEC-SHOW', 'Show-call run of show', 'Live cue sheet execution through last speech', 'execution', 'Grand Ballroom', '2026-12-12 16:00:00+00', '2026-12-12 23:00:00+00', 'promised', 4),
+  ('cccccccc-cccc-cccc-cccc-cccccccccc05', '22222222-2222-2222-2222-222222222202', 'YEG-WRAP-STRIKE', 'Strike & inventory return', 'Strike, inventory check-in, venue walk', 'wrapup', 'Grand Ballroom', '2026-12-13 00:30:00+00', '2026-12-13 04:00:00+00', 'promised', 5);
 
 -- Product Launch Experience (2222…204)
 INSERT INTO public.contract_deliverables (id, contract_id, code, title, description, phase, location, scheduled_start, scheduled_end, status, sort_order) VALUES
@@ -50,9 +50,9 @@ INSERT INTO public.contract_deliverables (id, contract_id, code, title, descript
     'promised', 4);
 
 INSERT INTO public.work_assignments (id, contract_id, deliverable_id, assignee_party_id, title, instructions, location, scheduled_start, scheduled_end, status) VALUES
-  ('dddddddd-dddd-dddd-dddd-dddddddddd01', '22222222-2222-2222-2222-222222222202', 'cccccccc-cccc-cccc-cccc-cccccccccc01', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02', 'Complete site walkthrough', 'Photograph power drops and mark cable paths', 'Grand Ballroom', '2026-08-10 14:00:00+00', '2026-08-10 17:00:00+00', 'completed'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddd02', '22222222-2222-2222-2222-222222222202', 'cccccccc-cccc-cccc-cccc-cccccccccc02', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb04', 'Confirm AV package on site', 'Verify 2x LED walls + 6 wireless mics against SOW', 'Grand Ballroom', '2026-08-12 10:00:00+00', '2026-08-12 12:00:00+00', 'scheduled'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddd03', '22222222-2222-2222-2222-222222222202', 'cccccccc-cccc-cccc-cccc-cccccccccc03', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb03', 'Lead load-in crew', 'Check in at dock; radio channel 3', 'Loading dock', '2026-08-08 08:00:00+00', '2026-08-08 14:00:00+00', 'scheduled'),
+  ('dddddddd-dddd-dddd-dddd-dddddddddd01', '22222222-2222-2222-2222-222222222202', 'cccccccc-cccc-cccc-cccc-cccccccccc01', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02', 'Complete site walkthrough', 'Photograph power drops and mark cable paths', 'Grand Ballroom', '2026-12-08 14:00:00+00', '2026-12-08 17:00:00+00', 'completed'),
+  ('dddddddd-dddd-dddd-dddd-dddddddddd02', '22222222-2222-2222-2222-222222222202', 'cccccccc-cccc-cccc-cccc-cccccccccc02', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb04', 'Confirm AV package on site', 'Verify 2x LED walls + 6 wireless mics against SOW', 'Grand Ballroom', '2026-12-09 10:00:00+00', '2026-12-09 12:00:00+00', 'checked_in'),
+  ('dddddddd-dddd-dddd-dddd-dddddddddd03', '22222222-2222-2222-2222-222222222202', 'cccccccc-cccc-cccc-cccc-cccccccccc03', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb03', 'Lead load-in crew', 'Check in at dock; radio channel 3', 'Loading dock', '2026-12-11 08:00:00+00', '2026-12-11 14:00:00+00', 'scheduled'),
   ('dddddddd-dddd-dddd-dddd-dddddddddd04', '22222222-2222-2222-2222-222222222204', 'cccccccc-cccc-cccc-cccc-cccccccccc12', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb06', 'Staff demo station A', 'Demo tablet + headset; escalate outages to Maya', 'Summit Lab Floor', '2026-08-20 12:00:00+00', '2026-08-20 20:00:00+00', 'checked_in'),
   ('dddddddd-dddd-dddd-dddd-dddddddddd05', '22222222-2222-2222-2222-222222222206', 'cccccccc-cccc-cccc-cccc-cccccccccc23', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb05', 'Install centerpieces', '24 tables + stage piece; photo each completed table', 'Pavilion ballroom',
     ((CURRENT_DATE + 3)::text || ' 10:00:00+00')::timestamptz,
@@ -64,8 +64,9 @@ INSERT INTO public.work_assignments (id, contract_id, deliverable_id, assignee_p
     'scheduled');
 
 INSERT INTO public.work_completions (id, assignment_id, performed_by_party_id, checked_in_at, completed_at, work_notes, completed_before_approval) VALUES
-  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01', 'dddddddd-dddd-dddd-dddd-dddddddddd01', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02', '2026-08-10 14:05:00+00', '2026-08-10 16:40:00+00', 'Floor plan signed; two additional power drops needed near stage left.', false),
-  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02', 'dddddddd-dddd-dddd-dddd-dddddddddd04', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb06', '2026-08-20 11:55:00+00', NULL, 'Checked in early; awaiting manager sign-off on overtime coverage.', true);
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01', 'dddddddd-dddd-dddd-dddd-dddddddddd01', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02', '2026-12-08 14:05:00+00', '2026-12-08 16:40:00+00', 'Floor plan signed; two additional power drops needed near stage left.', false),
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02', 'dddddddd-dddd-dddd-dddd-dddddddddd04', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb06', '2026-08-20 11:55:00+00', NULL, 'Checked in early; awaiting manager sign-off on overtime coverage.', true),
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee10', 'dddddddd-dddd-dddd-dddd-dddddddddd02', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb04', '2026-12-09 10:05:00+00', NULL, 'AV package confirmed on site; invoice BS-YEG-INV-01 submitted to MainEvent AP.', false);
 
 INSERT INTO public.work_time_materials (id, assignment_id, entry_type, description, quantity, unit_label, unit_cost, hours, notes, recorded_by_party_id) VALUES
   ('ffffffff-ffff-ffff-ffff-ffffffffff01', 'dddddddd-dddd-dddd-dddd-dddddddddd01', 'time', 'Site walk labor', 1, 'hours', 65, 2.5, NULL, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02'),

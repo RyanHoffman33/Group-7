@@ -1,4 +1,4 @@
-import type { CostEntry } from "@/lib/supabase/types";
+import type { CostApprovalStatus, CostEntry } from "@/lib/supabase/types";
 import { exceedsCommitmentVariance } from "@/features/costs/config";
 
 export type CostFlagKey =
@@ -31,6 +31,9 @@ export type FlagReasonInput = Pick<
   | "flag_no_commitment"
 >;
 
+export type FlagQueueInput = FlagReasonInput &
+  Pick<CostEntry, "flags_resolved_at" | "approval_status">;
+
 export function activeFlags(entry: FlagReasonInput): CostFlagKey[] {
   const keys: CostFlagKey[] = [];
   if (entry.flag_late_entry) keys.push("flag_late_entry");
@@ -45,6 +48,22 @@ export function activeFlags(entry: FlagReasonInput): CostFlagKey[] {
 
 export function hasAnyFlag(entry: FlagReasonInput): boolean {
   return activeFlags(entry).length > 0;
+}
+
+/** Flags exist and have not been marked resolved (audit booleans stay true). */
+export function hasUnresolvedFlags(entry: FlagQueueInput): boolean {
+  return hasAnyFlag(entry) && !entry.flags_resolved_at;
+}
+
+/**
+ * Open Flags queue membership: unresolved control exceptions only.
+ * Amount authority (pending_approval) lives solely under Approvals.
+ */
+export function belongsInFlagsQueue(entry: FlagQueueInput): boolean {
+  return (
+    hasUnresolvedFlags(entry) &&
+    entry.approval_status !== ("pending_approval" satisfies CostApprovalStatus)
+  );
 }
 
 /**

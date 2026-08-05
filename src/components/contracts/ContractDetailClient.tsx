@@ -255,7 +255,7 @@ export function ContractDetailClient({
                 href="/contracts/approvals"
                 className="block text-sm font-medium text-[var(--accent)]"
               >
-                Open approval queue
+                Open Approval Queue
               </Link>
               <Link
                 href="/billing/invoices"
