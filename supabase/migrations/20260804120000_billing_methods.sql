@@ -1,0 +1,3 @@
+-- Billing methods, expanded statuses, billable inputs, schedules, drafts
+-- Applied remotely as billing_methods_and_statuses + billing_extra_method_contracts
+-- See src/features/billing/determine.ts for calculation rules.
