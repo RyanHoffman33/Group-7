@@ -2,7 +2,8 @@
 
 GAAP-oriented Billing & A/R and ASC 606 Compliance modules for the ACCY 628 Event Production Company project (MainEvent).
 
-**Branch:** `GAAP-Compliance` (built on Billing & A/R)  
+**Branch:** `GAAP-Compliance` (Billing **plus** Compliance UI)  
+**Billing-only branch:** `Billing-and-Accounts-Receivable`  
 **Stack:** Next.js (App Router) + TypeScript + Tailwind + Supabase  
 **Supabase project:** `ACCY628-FINAL-PROJECT` (`eslwjydxevrdgeiqkwtq`)
 
