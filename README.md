@@ -1,11 +1,63 @@
+<<<<<<< HEAD
 # Contract-to-Cash — Billing & A/R + GAAP Compliance + Work & Performance
+=======
+# Contract-to-Cash — Users & Roles (+ Billing / Compliance template)
+
+**Branch:** `Users-and-Roles/Brandon`  
+**Forked from:** `GAAP-Compliance` (Billing **plus** Compliance UI kept as working template)  
+**Owner:** Brandon — Users & Roles  
+**Stack:** Next.js (App Router) + TypeScript + Tailwind + Supabase (Auth/RLS later)
+
+## Why this branch exists
+
+Brandon is building **Users & Roles** before every teammate module is ready. This branch copies the Compliance app shell so navigation, Billing, and GAAP pages remain available for reference, while Users & Roles runs on **local seed data** (no dependency on Contracts, Costs, etc.).
+
+See [`docs/proposed-users-roles-schema.md`](docs/proposed-users-roles-schema.md) before creating shared Users tables.  
+See [`docs/proposed-event-operations-schema.md`](docs/proposed-event-operations-schema.md) before creating event-ops tables.
+
+## Event operations (seed-backed)
+
+| Route | Purpose |
+|-------|---------|
+| `/events` | Event list + registration summary |
+| `/events/[id]` | Event overview + funnel |
+| `/events/[id]/registration` | Registration & attendance analytics |
+| `/events/[id]/attendees` | Roster |
+| `/events/[id]/qr` | QR manage + check-in (working demo actions) |
+| `/events/[id]/emails` | Campaigns + **simulated** send |
+| `/events/[id]/speakers` | Speakers (public vs staff fields) |
+| `/events/[id]/agenda` | Sessions |
+| `/attendee` | Attendee portal (QR pass, agenda, schedule) |
+
+Feature code: [`src/features/events/`](src/features/events/)
+
+## Users & Roles routes
+
+| Route | Purpose |
+|-------|---------|
+| `/users` | Module overview + directory preview |
+| `/users/directory` | User directory (seed) |
+| `/users/roles` | Role templates + permission chips |
+| `/users/permissions` | Permission catalog by module |
+| `/users/assignments` | Role assignment register |
+| `/users/audit` | Access audit placeholder |
+
+Feature code: [`src/features/users/`](src/features/users/) — swap [`adapters/directory.ts`](src/features/users/adapters/directory.ts) when Auth lands.
+
+---
+
+# Billing & A/R + GAAP Compliance (template retained)
+>>>>>>> origin/Users-and-Roles/Brandon
 
 GAAP-oriented Billing & A/R, ASC 606 Compliance, and Work & Performance Tracking modules for the ACCY 628 Event Production Company project (MainEvent).
 
+<<<<<<< HEAD
 **Branch:** `Work-and-Performance-Tracking` (Work UI on top of Billing + Compliance)  
 **Compliance base:** `GAAP-Compliance`  
+=======
+**Upstream branch:** `GAAP-Compliance`  
+>>>>>>> origin/Users-and-Roles/Brandon
 **Billing-only branch:** `Billing-and-Accounts-Receivable`  
-**Stack:** Next.js (App Router) + TypeScript + Tailwind + Supabase  
 **Supabase project:** `ACCY628-FINAL-PROJECT` (`eslwjydxevrdgeiqkwtq`)
 
 ## Why this is isolated
@@ -37,7 +89,29 @@ npm install
 npm run dev
 ```
 
+<<<<<<< HEAD
 3. Open [http://localhost:3000/billing](http://localhost:3000/billing), [http://localhost:3000/compliance](http://localhost:3000/compliance), or [http://localhost:3000/work](http://localhost:3000/work)
+=======
+3. Open [http://localhost:3000/login](http://localhost:3000/login)
+
+### Demo role logins (Users & Roles)
+
+Password for every account: **`demo`**
+
+| Email | Dashboard |
+|-------|-----------|
+| `executive@gmail.com` | Executive |
+| `manager@gmail.com` | Project Manager |
+| `employee@gmail.com` | Event Coordinator |
+| `accounting@gmail.com` | Accounting |
+| `vendor@gmail.com` | Vendor |
+| `customer@gmail.com` | Customer |
+| `deptmanager@gmail.com` | Department Manager |
+| `attendee@gmail.com` | Attendee portal |
+| `admin@gmail.com` | System Admin |
+
+The signed-in account **automatically** loads that role’s dashboard and limited nav (Cvent-style). Billing/Compliance remain available as template modules for roles that need them. Event ops (registration, QR, emails, speakers) are seed-backed until the proposed schema is approved.
+>>>>>>> origin/Users-and-Roles/Brandon
 
 Schema + seed are already applied on the shared Supabase project. SQL copies live under `supabase/` for teammates / disaster recovery. Work seed: [`supabase/seed_work.sql`](supabase/seed_work.sql).
 

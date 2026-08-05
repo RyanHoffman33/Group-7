@@ -1,4 +1,6 @@
 import { ASSISTANT_SYSTEM, buildCompanySnapshot } from "@/features/assistant/snapshot";
+import { getSessionUser } from "@/features/users/session";
+import { roleHasAnyPermission } from "@/features/access/matrix";
 
 export const runtime = "nodejs";
 
@@ -162,6 +164,27 @@ function answerFromSnapshot(snapshot: string, question: string): string {
 
 export async function POST(req: Request) {
   try {
+    const session = await getSessionUser();
+    if (!session) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (
+      !roleHasAnyPermission(session.roleKey, [
+        "billing.read",
+        "compliance.read",
+        "ar.read",
+        "dashboards.executive",
+      ])
+    ) {
+      return Response.json(
+        {
+          error:
+            "Access denied — financial assistant requires billing or compliance read permission.",
+        },
+        { status: 403 },
+      );
+    }
+
     const body = (await req.json()) as {
       message?: string;
       history?: ChatMessage[];

@@ -27,19 +27,47 @@ function revalidateGaap() {
 }
 
 /**
- * Carson / Brandon hook — stub until Users & Roles.
- * Always allows in demo; leave approved_by / actor for audit trail.
+ * Brandon hook — wired to Users & Roles permission matrix.
  */
 export async function assertCanRecognizeRevenue(
   _actor = "billing-user",
 ): Promise<{ allowed: boolean; reason?: string }> {
-  return { allowed: true };
+  try {
+    const { requirePermission } = await import("@/features/access/enforce");
+    const { denyAdminAccountingByDefault, denyCoordinatorFinancialAccess } =
+      await import("@/features/access/sod");
+    const session = await requirePermission("compliance.recognize");
+    const coord = denyCoordinatorFinancialAccess(session.roleKey);
+    if (!coord.allowed) return { allowed: false, reason: coord.reason };
+    const admin = denyAdminAccountingByDefault(session.roleKey);
+    if (!admin.allowed) return { allowed: false, reason: admin.reason };
+    void _actor;
+    return { allowed: true };
+  } catch (e) {
+    return {
+      allowed: false,
+      reason: e instanceof Error ? e.message : "Not permitted to recognize revenue.",
+    };
+  }
 }
 
 export async function assertCanApplyModification(
   _actor = "billing-user",
 ): Promise<{ allowed: boolean; reason?: string }> {
-  return { allowed: true };
+  try {
+    const { requirePermission } = await import("@/features/access/enforce");
+    const { denyAdminAccountingByDefault } = await import("@/features/access/sod");
+    const session = await requirePermission("compliance.modify");
+    const admin = denyAdminAccountingByDefault(session.roleKey);
+    if (!admin.allowed) return { allowed: false, reason: admin.reason };
+    void _actor;
+    return { allowed: true };
+  } catch (e) {
+    return {
+      allowed: false,
+      reason: e instanceof Error ? e.message : "Not permitted to apply modifications.",
+    };
+  }
 }
 
 export async function addRecognitionEvidence(input: {
