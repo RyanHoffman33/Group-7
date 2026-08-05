@@ -1,0 +1,143 @@
+import type { BillingMethod } from "@/lib/supabase/types";
+import type { ContractStatus } from "./status";
+
+/** Engagement contract row after Contracts foundation migration. */
+export type EngagementContract = {
+  id: string;
+  customer_id: string;
+  contract_number: string;
+  event_name: string;
+  event_type: string | null;
+  event_start: string | null;
+  event_end: string | null;
+  venue_name: string | null;
+  venue_city: string | null;
+  guest_count: number | null;
+  project_manager_label: string;
+  project_manager_party_id: string | null;
+  contract_value: number;
+  original_contract_value: number;
+  change_order_value_total: number;
+  deposit_required: boolean;
+  deposit_percent: number;
+  minimum_deposit_amount: number | null;
+  requires_deposit_before_work: boolean;
+  discount_amount: number;
+  discount_percent: number;
+  discount_requires_approval: boolean;
+  discount_approved: boolean;
+  status: ContractStatus | string;
+  performance_complete: boolean;
+  billing_method: BillingMethod;
+  hourly_rate: number;
+  markup_percent: number;
+  retainer_amount: number;
+  recurring_amount: number;
+  placement_fee_percent: number;
+  progress_percent: number;
+  per_service_rate: number;
+  currency: string;
+  cancellation_policy_text: string | null;
+  cancellation_fee_percent: number;
+  canceled_at: string | null;
+  cancel_reason: string | null;
+  canceled_by: string | null;
+  submitted_at: string | null;
+  submitted_by: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  activated_at: string | null;
+  completed_at: string | null;
+  closed_at: string | null;
+  terms_locked_at: string | null;
+  version: number;
+  notes: string | null;
+  internal_memo: string | null;
+  closeout_notes: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export type ContractLineItem = {
+  id: string;
+  contract_id: string;
+  line_number: number;
+  line_type: string;
+  description: string;
+  quantity: number;
+  unit_rate: number;
+  amount: number;
+  is_optional: boolean;
+  is_included: boolean;
+  performance_obligation_ref: string | null;
+  deliverable_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ContractApproval = {
+  id: string;
+  contract_id: string;
+  action: string;
+  from_status: string | null;
+  to_status: string | null;
+  actor_label: string;
+  actor_role: string | null;
+  comments: string | null;
+  acted_at: string;
+  created_at: string;
+};
+
+export type ContractDocument = {
+  id: string;
+  contract_id: string;
+  doc_type: string;
+  title: string;
+  storage_path: string | null;
+  external_url: string | null;
+  mime_type: string | null;
+  uploaded_by: string;
+  modification_id: string | null;
+  created_at: string;
+};
+
+export type ContractAuditEvent = {
+  id: string;
+  contract_id: string;
+  event_type: string;
+  summary: string;
+  actor_label: string;
+  from_status: string | null;
+  to_status: string | null;
+  payload: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type ContractCommercialPosition = {
+  contract_id: string;
+  contract_number: string;
+  customer_id: string;
+  customer_name: string;
+  event_name: string;
+  event_type: string | null;
+  event_start: string | null;
+  event_end: string | null;
+  status: string;
+  project_manager_label: string;
+  billing_method: string | null;
+  original_contract_value: number;
+  change_order_value_total: number;
+  current_contract_value: number;
+  deposit_required: boolean;
+  deposit_percent: number;
+  minimum_deposit_amount: number | null;
+  requires_deposit_before_work: boolean;
+  performance_complete: boolean;
+  approved_at: string | null;
+  approved_by: string | null;
+  unearned_deposits: number;
+  deposits_received_total: number;
+  milestone_count: number;
+  milestones_billed_count: number;
+};
