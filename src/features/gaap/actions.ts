@@ -209,7 +209,7 @@ export async function upsertCostClassification(input: {
       .from("cost_classifications")
       .insert({
         cost_ref_id: input.cost_ref_id,
-        cost_source: input.cost_source ?? "billable_costs",
+        cost_source: input.cost_source ?? "cost_entries",
         contract_id: input.contract_id,
         classification: input.classification,
         period: input.period,

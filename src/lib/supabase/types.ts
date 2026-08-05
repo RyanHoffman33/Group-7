@@ -327,3 +327,88 @@ export type ProfitabilityInput = {
   reimbursable_passthrough: number;
   period_expenses: number;
 };
+
+/** Walker — Cost & Resource Tracking (ACCY 5.4) */
+export type CostCategory =
+  | "labor"
+  | "payroll"
+  | "contractor"
+  | "materials"
+  | "equipment"
+  | "vendor"
+  | "advertising"
+  | "travel"
+  | "reimbursable"
+  | "replacement_parts"
+  | "allocated"
+  | "other";
+
+export type CostEntryType = "labor" | "vendor_expense";
+export type CostCommitmentStatus = "committed" | "actual";
+export type CostApprovalStatus =
+  | "not_required"
+  | "pending_approval"
+  | "approved"
+  | "rejected";
+
+export type Vendor = {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
+};
+
+export type CostBudget = {
+  id: string;
+  contract_id: string;
+  category: CostCategory;
+  budgeted_amount: number;
+  created_at: string;
+};
+
+export type CostEntry = {
+  id: string;
+  contract_id: string;
+  entry_type: CostEntryType;
+  category: CostCategory;
+  amount: number;
+  hours: number | null;
+  rate: number | null;
+  worker_label: string | null;
+  vendor_id: string | null;
+  vendor_name: string | null;
+  invoice_ref: string | null;
+  commitment_status: CostCommitmentStatus;
+  approval_status: CostApprovalStatus;
+  is_reimbursable: boolean;
+  notes: string | null;
+  entered_by: string;
+  entered_at: string;
+  incurred_date: string;
+  flag_late_entry: boolean;
+  flag_duplicate_invoice: boolean;
+  flag_over_committed: boolean;
+  flag_after_billing: boolean;
+  flag_actual_exceeds_committed: boolean;
+  flag_no_commitment: boolean;
+  prior_committed_amount: number | null;
+  created_at: string;
+};
+
+export type CostHistoryAction =
+  | "created"
+  | "updated"
+  | "approved"
+  | "rejected"
+  | "actualized";
+
+export type CostEntryHistory = {
+  id: string;
+  cost_entry_id: string;
+  action: CostHistoryAction;
+  actor: string;
+  detail: string | null;
+  before_snapshot: Record<string, unknown> | null;
+  after_snapshot: Record<string, unknown> | null;
+  created_at: string;
+};

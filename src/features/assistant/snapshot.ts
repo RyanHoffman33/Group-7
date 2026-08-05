@@ -5,6 +5,21 @@ import {
   listAlerts,
 } from "@/features/billing/queries";
 import {
+  APPROVAL_THRESHOLD,
+  COMMITMENT_VARIANCE_DOLLAR_CAP,
+  COMMITMENT_VARIANCE_PCT,
+  categoryLabel,
+} from "@/features/costs/config";
+import { flagReasons } from "@/features/costs/flags";
+import {
+  getAverageCostPerProjectByCategory,
+  getCategoryBreakdown,
+  getCostDashboardStats,
+  listCommittedCosts,
+  listExceptionCosts,
+  listPendingApprovals,
+} from "@/features/costs/queries";
+import {
   getPositionTotals,
   listContractModifications,
   listContractPositions,
@@ -29,6 +44,12 @@ export async function buildCompanySnapshot(): Promise<string> {
     costs,
     profitability,
     policies,
+    costStats,
+    costBreakdown,
+    avgCostByCategory,
+    costFlags,
+    costCommitments,
+    costApprovals,
   ] = await Promise.all([
     getDashboardMetrics(),
     listContractPositions(),
@@ -39,6 +60,12 @@ export async function buildCompanySnapshot(): Promise<string> {
     listCostClassifications(),
     listProfitabilityInputs(),
     listGaapPolicies(),
+    getCostDashboardStats(),
+    getCategoryBreakdown(),
+    getAverageCostPerProjectByCategory(),
+    listExceptionCosts(),
+    listCommittedCosts(),
+    listPendingApprovals(),
   ]);
 
   const totals = await getPositionTotals(positions);
@@ -92,6 +119,43 @@ export async function buildCompanySnapshot(): Promise<string> {
     )
     .join("\n");
 
+  const costCategoryLines = costBreakdown
+    .slice(0, 12)
+    .map((r) => `- ${categoryLabel(r.category)}: ${formatCurrency(r.amount)}`)
+    .join("\n");
+
+  const avgCostLines = avgCostByCategory
+    .slice(0, 10)
+    .map(
+      (r) =>
+        `- ${categoryLabel(r.category)}: avg ${formatCurrency(r.average)} across ${r.projectCount} project(s) (total ${formatCurrency(r.total)})`,
+    )
+    .join("\n");
+
+  const commitmentLines = costCommitments
+    .slice(0, 8)
+    .map(
+      (e) =>
+        `- ${e.event_name ?? "Event"} | ${categoryLabel(e.category)} | ${formatCurrency(e.amount)} | ${e.vendor_name ?? e.worker_label ?? "—"}`,
+    )
+    .join("\n");
+
+  const approvalLines = costApprovals
+    .slice(0, 8)
+    .map(
+      (e) =>
+        `- ${e.event_name ?? "Event"} | ${categoryLabel(e.category)} | ${formatCurrency(e.amount)} | awaiting approval (≥ $${APPROVAL_THRESHOLD.toLocaleString()})`,
+    )
+    .join("\n");
+
+  const flagLines = costFlags
+    .slice(0, 10)
+    .map((e) => {
+      const reasons = flagReasons(e).join("; ") || "flagged";
+      return `- ${e.event_name ?? "Event"} | ${categoryLabel(e.category)} | ${formatCurrency(e.amount)} | ${reasons}`;
+    })
+    .join("\n");
+
   return `
 COMPANY: MainEvent — event production (ACCY 628 Contract-to-Cash demo).
 AS OF: ${new Date().toISOString().slice(0, 10)}
@@ -122,7 +186,32 @@ ${topAging || "(none)"}
 PROFITABILITY INPUTS (recognized rev − direct COGS; passthrough excluded from margin)
 ${profitLines || "(none with activity)"}
 
-COST CLASSIFICATIONS (sample)
+COST & RESOURCE TRACKING (operational cost_entries — commitments vs actuals)
+- Total actual costs: ${formatCurrency(costStats.totalActual)}
+- Open commitments: ${formatCurrency(costStats.totalCommitted)}
+- Pending cost approvals: ${costStats.pendingApprovals}
+- Open cost control flags: ${costStats.openFlags}
+- Approval threshold: any single cost ≥ $${APPROVAL_THRESHOLD.toLocaleString()} requires manager approval (Approvals queue only — not duplicated as a flag)
+- Commitment variance flag: actual exceeds committed by more than min(${(COMMITMENT_VARIANCE_PCT * 100).toFixed(0)}% of committed, $${COMMITMENT_VARIANCE_DOLLAR_CAP})
+- No-commitment flag: actual cost entered with no prior committed amount on file
+- Costs ≠ revenue; paid ≠ incurred. Track by contract / customer / event.
+
+COSTS BY CATEGORY
+${costCategoryLines || "(none)"}
+
+AVERAGE COST PER PROJECT (by category)
+${avgCostLines || "(none)"}
+
+OPEN COST COMMITMENTS (sample)
+${commitmentLines || "(none)"}
+
+PENDING COST APPROVALS (sample)
+${approvalLines || "(none)"}
+
+COST FLAGS & EXCEPTIONS (sample; excludes pending approval)
+${flagLines || "(none)"}
+
+GAAP COST CLASSIFICATIONS (compliance board sample — separate from Cost & Resources tracking)
 ${costLines || "(none)"}
 
 CONTRACT MODIFICATIONS
@@ -135,13 +224,15 @@ KEY MAINEVENT GAAP POLICIES
 ${policyLines || "(none)"}
 
 RULES FOR ANSWERS
-- Use ONLY the numbers above. Do not invent invoices, customers, or dollar amounts.
+- Use ONLY the numbers above. Do not invent invoices, customers, costs, or dollar amounts.
 - If something is not in the snapshot, say you do not have that detail in the live data.
 - Prefer plain business language; mention ASC 606 / liability / asset when relevant.
+- For costs: distinguish commitments vs actuals, approvals vs control flags, and Cost & Resources tracking vs GAAP cost classification.
 - Keep answers concise (2–6 short paragraphs or bullets).
 `.trim();
 }
 
 export const ASSISTANT_SYSTEM = `You are MainEvent's internal finance assistant for an event-production Contract-to-Cash system.
-You help students and teammates understand Billing & A/R and ASC 606 Compliance using a live data snapshot.
-Be accurate, concise, and educational. Never invent financial figures.`;
+You help students and teammates understand Billing & A/R, ASC 606 Compliance, and Cost & Resource Tracking using a live data snapshot.
+Be accurate, concise, and educational. Never invent financial figures.
+When asked about costs, use the COST & RESOURCE TRACKING section (actuals, commitments, approvals, flags by category) — not only GAAP cost classifications.`;
