@@ -1,8 +1,9 @@
-# Contract-to-Cash — Billing & A/R + GAAP Compliance
+# Contract-to-Cash — Billing & A/R + GAAP Compliance + Work & Performance
 
-GAAP-oriented Billing & A/R and ASC 606 Compliance modules for the ACCY 628 Event Production Company project (MainEvent).
+GAAP-oriented Billing & A/R, ASC 606 Compliance, and Work & Performance Tracking modules for the ACCY 628 Event Production Company project (MainEvent).
 
-**Branch:** `GAAP-Compliance` (Billing **plus** Compliance UI)  
+**Branch:** `Work-and-Performance-Tracking` (Work UI on top of Billing + Compliance)  
+**Compliance base:** `GAAP-Compliance`  
 **Billing-only branch:** `Billing-and-Accounts-Receivable`  
 **Stack:** Next.js (App Router) + TypeScript + Tailwind + Supabase  
 **Supabase project:** `ACCY628-FINAL-PROJECT` (`eslwjydxevrdgeiqkwtq`)
@@ -36,9 +37,9 @@ npm install
 npm run dev
 ```
 
-3. Open [http://localhost:3000/billing](http://localhost:3000/billing) or [http://localhost:3000/compliance](http://localhost:3000/compliance)
+3. Open [http://localhost:3000/billing](http://localhost:3000/billing), [http://localhost:3000/compliance](http://localhost:3000/compliance), or [http://localhost:3000/work](http://localhost:3000/work)
 
-Schema + seed are already applied on the shared Supabase project. SQL copies live under `supabase/` for teammates / disaster recovery.
+Schema + seed are already applied on the shared Supabase project. SQL copies live under `supabase/` for teammates / disaster recovery. Work seed: [`supabase/seed_work.sql`](supabase/seed_work.sql).
 
 ## Module map
 
@@ -67,6 +68,25 @@ Schema + seed are already applied on the shared Supabase project. SQL copies liv
 | `/compliance/costs` | Cost classification + `v_profitability_inputs` |
 | `/compliance/audit` | Ledger browser + evidence pack export (JSON/CSV) |
 | `/compliance/policies` | ASC-aligned MainEvent policy cards |
+
+### Work & Performance
+
+| Route | Purpose |
+|-------|---------|
+| `/work` | Event risk board: promised / scheduled / completed / outstanding (clickable filters) |
+| `/work/events/[contractId]` | Lifecycle view + contract entry + numbered performance obligations |
+| `/work/assignments/[id]` | Check-in, complete, time/materials, attachments, raise exceptions |
+| `/work/exceptions` | Approve/reject exceptions (`billable_eligible` for Billing handoff) |
+
+**Contract entry:** AI paste/scan or guided manual questions → `work_performance_obligations` + `work_obligation_resources`.  
+**ASC 606 story:** Work tracks distinct POs and satisfaction evidence; exceptions sit at the end of the sequence; revenue recognition stays in GAAP Compliance.
+
+**Cross-module handoff views (for Cost / Accounting / Billing):**
+- `v_work_obligation_handoff`
+- `v_work_resource_handoff`
+
+Schema: `supabase/migrations/20260805120000_work_performance.sql` through `20260805180000_unify_as_performance_obligations.sql` · seed: `supabase/seed_work.sql`.  
+Assignees live in stub `work_parties` (not auth). Approved exceptions set `billable_eligible=true` but do **not** create invoices.
 
 ## GAAP behavior
 

@@ -5,6 +5,15 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AssistantChat } from "@/components/assistant/AssistantChat";
 
+const contractsLinks = [
+  { href: "/contracts", label: "Contracts Dashboard" },
+  { href: "/contracts/list", label: "All Contracts" },
+  { href: "/contracts/new", label: "Create Contract" },
+  { href: "/contracts/approvals", label: "Approvals" },
+  { href: "/contracts/change-orders", label: "Change Orders" },
+  { href: "/contracts/closeout", label: "Contract Closeout" },
+];
+
 const billingLinks = [
   { href: "/billing", label: "A/R Dashboard" },
   { href: "/billing/determine", label: "Determine charges" },
@@ -26,44 +35,63 @@ const complianceLinks = [
   { href: "/compliance/policies", label: "Policies" },
 ];
 
-const contractsLinks = [
-  { href: "/contracts", label: "Contracts Dashboard" },
-  { href: "/contracts/list", label: "All Contracts" },
-  { href: "/contracts/new", label: "Create Contract" },
-  { href: "/contracts/approvals", label: "Approvals" },
-  { href: "/contracts/change-orders", label: "Change Orders" },
-  { href: "/contracts/closeout", label: "Contract Closeout" },
+const workLinks = [
+  { href: "/work", label: "Event board" },
+  { href: "/work/exceptions", label: "Exception inbox" },
+];
+
+const costsLinks = [
+  { href: "/costs", label: "Cost dashboard" },
+  { href: "/costs/time", label: "Time entry" },
+  { href: "/costs/expenses", label: "Vendor & expenses" },
+  { href: "/costs/commitments", label: "Commitments" },
+  { href: "/costs/approvals", label: "Approval queue" },
+  { href: "/costs/flags", label: "Flags & exceptions" },
+  { href: "/costs/reports", label: "Reports / export" },
+];
+
+const profitabilityLinks = [
+  { href: "/profitability", label: "Portfolio overview" },
+  { href: "/profitability/exceptions", label: "Exceptions" },
+];
+
+const dashboardLinks = [
+  { href: "/dashboard", label: "Manager Dashboard" },
+  { href: "/dashboard/employee", label: "Employee Dashboard" },
+  { href: "/dashboard/accounting", label: "Accounting Dashboard" },
+  { href: "/dashboard/customer", label: "Customer Dashboard" },
+];
+
+const usersLinks = [
+  { href: "/users", label: "Overview" },
+  { href: "/users/directory", label: "Directory" },
+  { href: "/users/roles", label: "Roles" },
+  { href: "/users/permissions", label: "Permissions" },
+  { href: "/users/assignments", label: "Assignments" },
+  { href: "/users/audit", label: "Access audit" },
 ];
 
 const teamModules = [
-  { label: "Users & Roles", owner: "Brandon" },
-  { label: "Work & Performance", owner: "Jacob" },
-  { label: "Cost & Resources", owner: "Walker" },
-  { label: "Profitability", owner: "Joseph" },
-  { label: "Dashboards", owner: "Grayson" },
   { label: "Controls", owner: "Carson" },
 ];
 
-function isBillingRoute(pathname: string) {
-  return pathname === "/billing" || pathname.startsWith("/billing/");
-}
+const ROOT_HREFS = new Set([
+  "/billing",
+  "/compliance",
+  "/contracts",
+  "/work",
+  "/costs",
+  "/profitability",
+  "/dashboard",
+  "/users",
+]);
 
-function isComplianceRoute(pathname: string) {
-  return pathname === "/compliance" || pathname.startsWith("/compliance/");
-}
-
-function isContractsRoute(pathname: string) {
-  return pathname === "/contracts" || pathname.startsWith("/contracts/");
+function routeActive(pathname: string, root: string) {
+  return pathname === root || pathname.startsWith(`${root}/`);
 }
 
 function isLinkActive(pathname: string, href: string) {
-  if (
-    href === "/billing" ||
-    href === "/compliance" ||
-    href === "/contracts"
-  ) {
-    return pathname === href;
-  }
+  if (ROOT_HREFS.has(href)) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -169,19 +197,26 @@ export function AppShell({
   alertCount?: number;
 }) {
   const pathname = usePathname();
-  const billingActive = isBillingRoute(pathname);
-  const complianceActive = isComplianceRoute(pathname);
-  const contractsActive = isContractsRoute(pathname);
+  const contractsActive = routeActive(pathname, "/contracts");
+  const billingActive = routeActive(pathname, "/billing");
+  const complianceActive = routeActive(pathname, "/compliance");
+  const workActive = routeActive(pathname, "/work");
+  const costsActive = routeActive(pathname, "/costs");
+  const profitabilityActive = routeActive(pathname, "/profitability");
+  const dashboardActive = routeActive(pathname, "/dashboard");
+  const usersActive = routeActive(pathname, "/users");
+
+  const [contractsPinned, setContractsPinned] = useState(false);
   const [billingPinned, setBillingPinned] = useState(false);
   const [compliancePinned, setCompliancePinned] = useState(false);
-  const [contractsPinned, setContractsPinned] = useState(false);
-
-  const billingOpen = billingActive || billingPinned;
-  const complianceOpen = complianceActive || compliancePinned;
-  const contractsOpen = contractsActive || contractsPinned;
+  const [workPinned, setWorkPinned] = useState(false);
+  const [costsPinned, setCostsPinned] = useState(false);
+  const [profitabilityPinned, setProfitabilityPinned] = useState(false);
+  const [dashboardPinned, setDashboardPinned] = useState(false);
+  const [usersPinned, setUsersPinned] = useState(false);
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[280px_1fr]">
       <aside className="border-b border-[var(--line)] bg-[var(--ink)] text-white lg:border-b-0 lg:border-r lg:border-white/10">
         <div className="px-5 pb-4 pt-7">
           <Link
@@ -202,15 +237,15 @@ export function AppShell({
             </span>
           </Link>
           <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-white/40">
-            Contract to Cash
+            Contract to Cash · Integration
           </p>
         </div>
 
-        <nav className="px-3 pb-4" aria-label="Primary">
+        <nav className="max-h-[calc(100vh-10rem)] overflow-y-auto px-3 pb-4" aria-label="Primary">
           <ul className="space-y-1">
             <NavAccordion
               title="Contracts & Engagements"
-              open={contractsOpen}
+              open={contractsActive || contractsPinned}
               onToggle={() => {
                 if (contractsActive) return;
                 setContractsPinned((p) => !p);
@@ -222,7 +257,7 @@ export function AppShell({
             />
             <NavAccordion
               title="Billing & A/R"
-              open={billingOpen}
+              open={billingActive || billingPinned}
               onToggle={() => {
                 if (billingActive) return;
                 setBillingPinned((p) => !p);
@@ -235,7 +270,7 @@ export function AppShell({
             />
             <NavAccordion
               title="GAAP Compliance"
-              open={complianceOpen}
+              open={complianceActive || compliancePinned}
               onToggle={() => {
                 if (complianceActive) return;
                 setCompliancePinned((p) => !p);
@@ -245,12 +280,72 @@ export function AppShell({
               links={complianceLinks}
               pathname={pathname}
             />
+            <NavAccordion
+              title="Work & Performance"
+              open={workActive || workPinned}
+              onToggle={() => {
+                if (workActive) return;
+                setWorkPinned((p) => !p);
+              }}
+              active={workActive}
+              controlsId="work-nav-submenu"
+              links={workLinks}
+              pathname={pathname}
+            />
+            <NavAccordion
+              title="Cost & Resources"
+              open={costsActive || costsPinned}
+              onToggle={() => {
+                if (costsActive) return;
+                setCostsPinned((p) => !p);
+              }}
+              active={costsActive}
+              controlsId="costs-nav-submenu"
+              links={costsLinks}
+              pathname={pathname}
+            />
+            <NavAccordion
+              title="Profitability"
+              open={profitabilityActive || profitabilityPinned}
+              onToggle={() => {
+                if (profitabilityActive) return;
+                setProfitabilityPinned((p) => !p);
+              }}
+              active={profitabilityActive}
+              controlsId="profitability-nav-submenu"
+              links={profitabilityLinks}
+              pathname={pathname}
+            />
+            <NavAccordion
+              title="Dashboards"
+              open={dashboardActive || dashboardPinned}
+              onToggle={() => {
+                if (dashboardActive) return;
+                setDashboardPinned((p) => !p);
+              }}
+              active={dashboardActive}
+              controlsId="dashboard-nav-submenu"
+              links={dashboardLinks}
+              pathname={pathname}
+            />
+            <NavAccordion
+              title="Users & Roles"
+              open={usersActive || usersPinned}
+              onToggle={() => {
+                if (usersActive) return;
+                setUsersPinned((p) => !p);
+              }}
+              active={usersActive}
+              controlsId="users-nav-submenu"
+              links={usersLinks}
+              pathname={pathname}
+            />
           </ul>
         </nav>
 
         <div className="mt-2 border-t border-white/10 px-3 py-4">
           <p className="px-2 pb-2 text-[11px] uppercase tracking-wider text-white/40">
-            Team modules (pending)
+            Still pending
           </p>
           <ul className="space-y-1">
             {teamModules.map((m) => (
@@ -271,10 +366,10 @@ export function AppShell({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-                GAAP · Contract-to-Cash
+                MainEvent · Integrated build
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Deposits as liabilities · Revenue on performance · Auditable A/R
+                Contracts · Billing · Compliance · Work · Costs · Profitability · Dashboards · Users
               </p>
             </div>
           </div>
