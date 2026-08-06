@@ -88,7 +88,8 @@ export default async function VendorRfqsPage() {
       <Panel title="Incoming RFQs">
         {rfqs.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">
-            No RFQs assigned to your vendor account yet.
+            No RFQs assigned yet. When MainEvent sends an RFQ, it appears here
+            for you to quote.
           </p>
         ) : (
           <VendorRfqList rfqs={rfqs} myQuotes={myQuotes} />

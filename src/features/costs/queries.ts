@@ -357,8 +357,13 @@ export async function getAverageCostPerProjectByCategory(opts?: {
   }).filter((r) => r.projectCount > 0);
 }
 
-export async function getCostDashboardStats() {
-  const entries = await listCostEntries();
+export async function getCostDashboardStats(opts?: { year?: number }) {
+  let entries = await listCostEntries();
+  if (opts?.year != null) {
+    const contracts = await listContractsForCosts({ year: opts.year });
+    const ids = new Set(contracts.map((c) => c.id));
+    entries = entries.filter((e) => ids.has(e.contract_id));
+  }
   const totalActual = entries
     .filter((e) => e.commitment_status === "actual")
     .reduce((s, e) => s + e.amount, 0);

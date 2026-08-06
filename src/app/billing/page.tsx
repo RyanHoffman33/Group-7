@@ -15,7 +15,7 @@ export default async function BillingDashboardPage() {
     <div>
       <PageHeader
         title="A/R Dashboard"
-        description="Outstanding receivables, unearned deposits (liabilities), and collection-weighted expectations."
+        description="Outstanding receivables, unearned deposits (liabilities), and what we expect to collect based on payment history."
         actions={
           <Link
             href="/billing/invoices"

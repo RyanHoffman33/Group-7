@@ -9,6 +9,16 @@ import {
 import { formatCurrency } from "@/features/billing/aging";
 import { Panel, StatusPill } from "@/components/billing/ui";
 import type { CustomerFacingContract } from "@/features/involvement/types";
+import {
+  STATUS_LABELS,
+  type ContractStatus,
+} from "@/features/contracts/status";
+
+function proposalStatusLabel(status: string) {
+  return (
+    STATUS_LABELS[status as ContractStatus] ?? status.replace(/_/g, " ")
+  );
+}
 
 export function CustomerContractProposalsPanel({
   proposals,
@@ -22,17 +32,19 @@ export function CustomerContractProposalsPanel({
 
   if (!proposals.length) {
     return (
-      <Panel title="Contract proposals">
+      <Panel title="Contracts to accept">
         <p className="py-3 text-sm text-[var(--muted)]">
-          No open proposals. When MainEvent sends a contract for Demo Customer,
-          it appears here to accept (sign + PO #1 deposit) or reject.
+          No contracts waiting for you. When MainEvent sends a proposal, it
+          appears here to sign and pay the deposit. Start an inquiry under{" "}
+          <span className="font-medium text-[var(--ink)]">Your inquiry</span>{" "}
+          if you need a new event quote.
         </p>
       </Panel>
     );
   }
 
   return (
-    <Panel title="Contract proposals">
+    <Panel title="Contracts to accept">
       {error ? (
         <p className="mb-2 text-sm text-[var(--danger)]" role="alert">
           {error}
@@ -50,12 +62,12 @@ export function CustomerContractProposalsPanel({
                 </p>
               </div>
               <StatusPill compact tone="accent">
-                {p.status.replace(/_/g, " ")}
+                {proposalStatusLabel(p.status)}
               </StatusPill>
             </div>
             <p className="mt-2 text-xs text-[var(--muted)]">
-              Accept requires typed signature and authorization of the deposit
-              (PO #1 / first installment).
+              Accept with your typed signature and authorize the first deposit /
+              installment.
             </p>
             <label className="mt-2 block text-sm">
               <span className="mb-1 block text-xs text-[var(--muted)]">

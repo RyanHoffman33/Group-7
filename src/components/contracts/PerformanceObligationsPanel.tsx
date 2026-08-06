@@ -9,7 +9,7 @@ import {
   saveContractPerformanceObligations,
 } from "@/features/performance-obligations/actions";
 import {
-  PO_STATUS_LABELS,
+  PO_STATUS_LABELS_STAFF,
   allocationReconciles,
   statusTone,
   type ContractPerformanceObligation,
@@ -337,7 +337,7 @@ export function PerformanceObligationsPanel({
                     <div className="flex flex-col items-end gap-2">
                       <Money amount={po.amount} />
                       <StatusPill compact tone={statusTone(po.status)}>
-                        {PO_STATUS_LABELS[po.status]}
+                        {PO_STATUS_LABELS_STAFF[po.status]}
                       </StatusPill>
                       {po.recognized_amount != null ? (
                         <span className="text-xs text-[#1b6b3a]">

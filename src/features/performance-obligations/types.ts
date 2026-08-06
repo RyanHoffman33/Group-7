@@ -72,8 +72,14 @@ export const PO_STATUS_LABELS: Record<PoStatus, string> = {
   draft: "Draft",
   active: "Active",
   awaiting_approval: "Awaiting customer approval",
-  completed: "Completed & recognized",
+  completed: "Completed",
   cancelled: "Cancelled",
+};
+
+/** Staff / GAAP surfaces — keep recognition wording. */
+export const PO_STATUS_LABELS_STAFF: Record<PoStatus, string> = {
+  ...PO_STATUS_LABELS,
+  completed: "Completed & recognized",
 };
 
 export function isPoStatus(v: string): v is PoStatus {

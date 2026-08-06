@@ -11,10 +11,10 @@ import {
 
 const NAV = [
   { href: "/dashboard/customer", label: "Overview", exact: true },
-  { href: "/dashboard/customer/engagement", label: "Inquiry & Quotes" },
-  { href: "/dashboard/customer/actions", label: "Proposals & Actions" },
-  { href: "/dashboard/customer/event", label: "Event Details" },
-  { href: "/dashboard/customer/obligations", label: "Performance Obligations" },
+  { href: "/dashboard/customer/engagement", label: "Your inquiry" },
+  { href: "/dashboard/customer/actions", label: "Contracts & approvals" },
+  { href: "/dashboard/customer/event", label: "Event details" },
+  { href: "/dashboard/customer/obligations", label: "Deliverables" },
   { href: "/dashboard/customer/invoices", label: "Invoices" },
   { href: "/dashboard/customer/payments", label: "Payments" },
   { href: "/dashboard/customer/documents", label: "Documents" },
@@ -105,11 +105,6 @@ export function CustomerPortalShell({ children }: { children: React.ReactNode })
                   {item.href.endsWith("/actions") && pendingCount > 0 ? (
                     <span className="ml-1.5 rounded-full bg-[#d97706] px-1.5 py-0.5 text-[10px] font-semibold text-white">
                       {pendingCount}
-                    </span>
-                  ) : null}
-                  {item.href.endsWith("/obligations") ? (
-                    <span className="ml-1.5 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                      ASC 606
                     </span>
                   ) : null}
                   {item.href.endsWith("/invoices") &&

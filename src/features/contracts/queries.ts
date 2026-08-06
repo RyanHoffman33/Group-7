@@ -811,7 +811,7 @@ export async function getCloseoutChecks(
   ]);
 
   const invs = invoices ?? [];
-  const openStatuses = ["issued", "unpaid", "partially_paid", "disputed", "draft"];
+  const openStatuses = ["issued", "unpaid", "partially_paid", "disputed"];
   const openAr = invs.filter((i) => openStatuses.includes(i.status as string));
   const disputed = invs.filter((i) => i.status === "disputed");
   const hasFinalish = invs.some(

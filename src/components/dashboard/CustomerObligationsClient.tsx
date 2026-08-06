@@ -37,22 +37,17 @@ export function CustomerObligationsClient({
 
   return (
     <div className="flex flex-col gap-3">
-      <Panel title="Performance obligations (ASC 606)" bodyClassName="px-3 py-3">
+      <Panel title="Your deliverables" bodyClassName="px-3 py-3">
         <p className="mb-3 text-sm text-[var(--muted)]">
-          Each obligation is a distinct promise in your contract. When work on a
-          PO is complete, you approve it here.{" "}
-          <strong className="font-semibold text-[var(--ink)]">
-            Approving a non-final PO requires paying the installment for the next
-            PO
-          </strong>{" "}
-          (held as unearned revenue until that next PO is completed). The final
-          PO needs no additional payment — prior installments already cover the
-          contract.
+          Approve each phase when the work is done. Approving a phase (except the
+          last) may ask you to pay the next installment. The final phase needs no
+          extra payment — earlier installments already cover the contract.
         </p>
 
         {visible.length === 0 ? (
           <p className="py-4 text-sm text-[var(--muted)]">
-            No performance obligations are linked to this event yet.
+            No deliverables for this event yet. They appear here after MainEvent
+            finalizes your contract phases.
           </p>
         ) : (
           <ul>

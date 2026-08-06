@@ -12,17 +12,18 @@ export function CustomerQuotesPanel({ quotes }: { quotes: EventRequest[] }) {
 
   if (!quotes.length) {
     return (
-      <Panel title="Quotes & estimates">
+      <Panel title="Package quotes">
         <p className="py-3 text-sm text-[var(--muted)]">
-          No quotes returned yet. After your event request is reviewed, package
-          estimates appear here for accept / sign.
+          No package quotes yet. Submit an inquiry under{" "}
+          <span className="font-medium text-[var(--ink)]">Your inquiry</span>,
+          then estimates appear here after MainEvent reviews your request.
         </p>
       </Panel>
     );
   }
 
   return (
-    <Panel title="Quotes & estimates">
+    <Panel title="Package quotes">
       <ul className="divide-y divide-[var(--line)]">
         {quotes.map((q) => (
           <li key={q.id} className="py-3">
@@ -32,9 +33,6 @@ export function CustomerQuotesPanel({ quotes }: { quotes: EventRequest[] }) {
                 <p className="mt-0.5 text-xs text-[var(--muted)]">
                   {q.quote?.packageLabel} · $
                   {q.quote?.amount.toLocaleString() ?? "—"}
-                  {q.linkedCustomerId
-                    ? ` · linked account ${q.linkedCustomerId.slice(0, 8)}…`
-                    : ""}
                 </p>
                 {q.quote?.notes ? (
                   <p className="mt-2 text-sm text-[var(--muted)]">
@@ -52,7 +50,13 @@ export function CustomerQuotesPanel({ quotes }: { quotes: EventRequest[] }) {
                       : "accent"
                 }
               >
-                {q.status.replace(/_/g, " ")}
+                {q.status === "quoted"
+                  ? "Quote ready"
+                  : q.status === "accepted"
+                    ? "Accepted"
+                    : q.status === "changes_requested"
+                      ? "Changes requested"
+                      : q.status.replace(/_/g, " ")}
               </StatusPill>
             </div>
             {q.status === "quoted" ? (
@@ -71,7 +75,7 @@ export function CustomerQuotesPanel({ quotes }: { quotes: EventRequest[] }) {
                     });
                   }}
                 >
-                  Accept & sign (link customer account)
+                  Accept & sign
                 </button>
                 <button
                   type="button"

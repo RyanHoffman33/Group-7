@@ -21,7 +21,7 @@ export function YearFilter({ years }: { years: number[] }) {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <label className="space-y-1 text-xs text-[var(--muted)]">
-        <span className="block">Year</span>
+        <span className="block">Filter by event year</span>
         <select
           className={selectClass}
           value={params.get("year") ?? "all"}

@@ -55,8 +55,8 @@ export default async function WorkDashboardPage({
   return (
     <div>
       <PageHeader
-        title="Work & Performance"
-        description="Track promised, scheduled, completed, and outstanding deliverables for each engagement. Completion here supports billing readiness; recognition stays in Compliance."
+        title="Event delivery board"
+        description="Track what’s promised versus done for each engagement. Billing readiness lives here; revenue posting is under GAAP Compliance."
         actions={
           <Link
             href="/work/exceptions"

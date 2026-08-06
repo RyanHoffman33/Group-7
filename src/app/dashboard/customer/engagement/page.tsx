@@ -44,8 +44,8 @@ export default async function CustomerEngagementPage() {
     <div className="space-y-4">
       <PageHeader
         compact
-        title="Engagement workflow"
-        description="Submit an inquiry, review company quotes (sign + deposit), and decide on vendor packages."
+        title="Your event inquiry"
+        description="Start a new request, then review MainEvent’s quote when it arrives. Sign and pay the deposit to lock in the event."
       />
 
       {notifications.length ? (
@@ -70,7 +70,9 @@ export default async function CustomerEngagementPage() {
 
       <Panel title="Your inquiries">
         {inquiries.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No inquiries yet.</p>
+          <p className="text-sm text-[var(--muted)]">
+            No inquiries yet — use the form above to start one.
+          </p>
         ) : (
           <ul className="space-y-2">
             {inquiries.map((i) => (

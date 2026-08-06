@@ -327,12 +327,18 @@ export function ContractDetailClient({
                 <dt className="text-[var(--muted)]">Deposit received</dt>
                 <dd>
                   <Money amount={Number(contract.deposits_received_total)} />
+                  <span className="mt-0.5 block text-[11px] font-normal text-[var(--muted)]">
+                    Unearned / held — not added to invoice collections
+                  </span>
                 </dd>
               </div>
               <div className="flex justify-between gap-2 border-b border-[var(--line)] pb-2">
                 <dt className="text-[var(--muted)]">Invoice collections</dt>
                 <dd>
                   <Money amount={Number(contract.paid_to_date)} />
+                  <span className="mt-0.5 block text-[11px] font-normal text-[var(--muted)]">
+                    From payment applications on invoices
+                  </span>
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
@@ -674,17 +680,19 @@ export function ContractDetailClient({
               <dt className="text-[var(--muted)]">Deposit required</dt>
               <dd>
                 {contract.deposit_required
-                  ? `${contract.deposit_percent}% of original`
+                  ? contract.minimum_deposit_amount
+                    ? `$${Number(contract.minimum_deposit_amount).toLocaleString()} (fixed / PO #1)`
+                    : `${contract.deposit_percent}% of contract value`
                   : "No"}
-                {contract.minimum_deposit_amount
-                  ? ` (min $${Number(contract.minimum_deposit_amount).toLocaleString()})`
-                  : ""}
               </dd>
             </div>
             <div>
               <dt className="text-[var(--muted)]">Deposit received</dt>
               <dd>
                 <Money amount={Number(contract.deposits_received_total)} />
+                <span className="mt-0.5 block text-[11px] font-normal text-[var(--muted)]">
+                  Separate from invoice collections below
+                </span>
               </dd>
             </div>
             <div>
@@ -717,7 +725,7 @@ export function ContractDetailClient({
                 revenue and the contract is terminated. Default fee equals the
                 initial deposit / PO #1
                 {contract.cancellation_fee_percent
-                  ? ` (${contract.cancellation_fee_percent}% of contract value).`
+                  ? ` (${Number(contract.cancellation_fee_percent).toFixed(2)}% ≈ fee amount on contract value).`
                   : "."}
               </p>
             </div>

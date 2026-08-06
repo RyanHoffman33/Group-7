@@ -32,7 +32,7 @@ export default async function ApprovalsPage() {
         description="Independent review of expenses, discounts, write-offs, and change orders. Self-approval is blocked."
       />
       <div className="mb-4">
-        <Panel title="Configurable demo thresholds">
+        <Panel title="Demo approval thresholds (not live policy)">
           <ul className="space-y-1 text-xs text-[var(--muted)]">
             {APPROVAL_THRESHOLDS.slice(0, 6).map((t) => (
               <li key={t.id}>

@@ -39,7 +39,7 @@ export default async function CostsHubPage({
   const year = parseYearParam(sp.year);
 
   const [stats, breakdown, contracts, avgByCategory, years] = await Promise.all([
-    getCostDashboardStats(),
+    getCostDashboardStats({ year }),
     getCategoryBreakdown({ year }),
     listContractsForCosts({ year }),
     getAverageCostPerProjectByCategory({ year }),

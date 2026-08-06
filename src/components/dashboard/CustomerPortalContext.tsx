@@ -18,9 +18,7 @@ import type {
 } from "@/features/involvement/types";
 import {
   SAMPLE_DOCUMENTS,
-  SAMPLE_INVOICES,
   SAMPLE_MILESTONES,
-  SAMPLE_PAYMENTS,
   daysUntil,
   financialFromInvoices,
   planningProgressFromMilestones,
@@ -77,8 +75,9 @@ export function CustomerPortalProvider({
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(contracts[0]?.id ?? "");
   const [approvals, setApprovals] = useState(initialApprovals);
-  const [invoices, setInvoices] = useState(SAMPLE_INVOICES);
-  const [payments, setPayments] = useState(SAMPLE_PAYMENTS);
+  // Live Demo Customer contracts have no invoices yet — do not show unrelated SAMPLE totals.
+  const [invoices, setInvoices] = useState<CustomerInvoice[]>([]);
+  const [payments, setPayments] = useState<CustomerPayment[]>([]);
   const [milestones, setMilestones] = useState(SAMPLE_MILESTONES);
   const [flash, setFlash] = useState<string | null>(null);
   const [deciding, startDecide] = useTransition();
@@ -108,7 +107,10 @@ export function CustomerPortalProvider({
   const eventMilestones = milestones;
   const progress = planningProgressFromMilestones(eventMilestones, today);
   const eventInvoices = invoices;
-  const financial = financialFromInvoices(eventInvoices);
+  const financial = financialFromInvoices(
+    eventInvoices,
+    contract?.contract_value ?? 0,
+  );
   const eventDocs = SAMPLE_DOCUMENTS;
 
   const showFlash = useCallback((msg: string) => {

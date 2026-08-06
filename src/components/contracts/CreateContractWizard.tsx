@@ -79,17 +79,17 @@ const STEPS: StepDef[] = [
   },
   {
     title: "Pricing",
-    purpose: "Set contract value and discounts. Deposit equals PO #1 after obligations.",
+    purpose: "Set contract value and discounts. First payment = deposit (tied to PO #1).",
   },
   {
     title: "Performance Obligations",
     purpose:
-      "Group services into ASC 606 obligations. Every service must be covered before you continue.",
+      "Group services into deliverable phases that unlock billing. Every service must be covered before you continue.",
   },
   {
     title: "Payment Schedule",
     purpose:
-      "Milestone installments follow POs (amounts locked). Deposit and cancel fee equal PO #1.",
+      "Milestone installments follow deliverable phases (amounts locked). Deposit and cancel fee equal PO #1.",
   },
   {
     title: "Approvals & Involvement",
@@ -276,6 +276,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
   const [discountPercentInput, setDiscountPercentInput] = useState("");
   const [discountFixedInput, setDiscountFixedInput] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const [milestones, setMilestones] = useState<MilestoneDraft[]>([]);
 
@@ -610,6 +611,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         if (Array.isArray(d.customCheckpoints)) {
           setCustomCheckpoints(d.customCheckpoints as string[]);
         }
+        setDraftRestored(true);
       }
     } catch {
       /* ignore corrupt draft */
@@ -955,6 +957,33 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
           </span>
         </p>
       </div>
+
+      {draftRestored ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--line)] bg-[#f7f9fb] px-3 py-2 text-sm"
+          role="status"
+        >
+          <p className="text-[var(--ink)]">
+            Resumed unfinished draft from this browser.
+          </p>
+          <button
+            type="button"
+            className="rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--ink)]"
+            onClick={() => {
+              try {
+                sessionStorage.removeItem(STORAGE_KEY);
+                sessionStorage.removeItem("mainevent-create-contract-draft-v3");
+                sessionStorage.removeItem("mainevent-create-contract-draft-v2");
+              } catch {
+                /* ignore */
+              }
+              window.location.reload();
+            }}
+          >
+            Start over
+          </button>
+        </div>
+      ) : null}
 
       <ol className="flex flex-wrap gap-2">
         {STEPS.map((s, i) => {
@@ -1860,13 +1889,20 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
               <FieldError message={err("createdBy")} />
             </label>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={submitNow}
-                onChange={(e) => setSubmitNow(e.target.checked)}
-              />
-              {submitCheckboxLabel}
+            <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+              <span className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={submitNow}
+                  onChange={(e) => setSubmitNow(e.target.checked)}
+                />
+                {submitCheckboxLabel}
+              </span>
+              <span className="pl-6 text-xs text-[var(--muted)]">
+                {submitToCustomer
+                  ? "Checked: sends to the customer portal for accept & deposit. Unchecked: saves as draft only."
+                  : "Checked: submits for PM review now. Unchecked: saves as draft only."}
+              </span>
             </label>
 
             <fieldset className="sm:col-span-2">

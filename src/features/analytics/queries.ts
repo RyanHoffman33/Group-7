@@ -30,13 +30,15 @@ function fromProfitMonths(
   months: Awaited<ReturnType<typeof listMonthlyProfits>>,
   arByMonthFallback: number,
 ): AnalyticsMonth[] {
-  return months.map((m) => ({
+  const lastIdx = months.length - 1;
+  return months.map((m, i) => ({
     month: m.month.length === 7 ? `${m.month}-01` : m.month.slice(0, 10),
     revenue: m.recognized_revenue,
     cogs: m.direct_cogs,
     margin: m.net_margin,
     events: 0,
-    arOutstanding: arByMonthFallback,
+    // Point-in-time AR only on the latest month — avoid stamping current AR on history.
+    arOutstanding: i === lastIdx ? arByMonthFallback : 0,
   }));
 }
 

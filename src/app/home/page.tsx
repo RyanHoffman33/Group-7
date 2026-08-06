@@ -78,9 +78,9 @@ function shortcutsForRole(
 
   if (sections.includes("intake")) {
     items.push({
-      href: "/engagement/approvals",
+      href: "/contracts/requests",
       label: "Sales & Intake",
-      hint: "Inquiries, quotes & vendor sourcing",
+      hint: "Quote requests, inquiries & sourcing",
     });
   }
   if (sections.includes("contracts")) {

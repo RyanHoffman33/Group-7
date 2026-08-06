@@ -80,7 +80,7 @@ export type CustomerDocument = {
 export const SAMPLE_CUSTOMER_EVENTS: CustomerEvent[] = [
   {
     id: "evt-delta-leadership",
-    eventName: "Delta Leadership Conference",
+    eventName: "Demo Customer Leadership Conference",
     eventDate: "2026-09-18",
     venue: "The Jefferson Hotel",
     venueAddress: "101 W Franklin St, Richmond, VA 23220",
@@ -111,7 +111,7 @@ export const SAMPLE_CUSTOMER_EVENTS: CustomerEvent[] = [
   },
   {
     id: "evt-delta-holiday",
-    eventName: "Delta Holiday Reception",
+    eventName: "Demo Customer Holiday Reception",
     eventDate: "2026-12-12",
     venue: "Grand Ballroom",
     venueAddress: "101 W Franklin St, Richmond, VA 23220",
@@ -199,7 +199,7 @@ export const SAMPLE_ACTION_ITEMS: CustomerActionItem[] = [
     id: "act-1",
     title: "Approve catering selection",
     eventId: "evt-delta-leadership",
-    eventName: "Delta Leadership Conference",
+    eventName: "Demo Customer Leadership Conference",
     dueDate: "2026-08-08",
     explanation: "Review the proposed menu package and confirm dietary accommodations.",
     detail:
@@ -216,7 +216,7 @@ export const SAMPLE_ACTION_ITEMS: CustomerActionItem[] = [
     id: "act-2",
     title: "Approve updated floor plan",
     eventId: "evt-delta-leadership",
-    eventName: "Delta Leadership Conference",
+    eventName: "Demo Customer Leadership Conference",
     dueDate: "2026-08-09",
     explanation: "Confirm seating layout and stage orientation for the general session.",
     detail:
@@ -331,8 +331,8 @@ export const SAMPLE_DOCUMENTS: CustomerDocument[] = [
     summary: "Master services agreement and event statement of work.",
     body: `MAINEVENT — EVENT SERVICES AGREEMENT
 
-Client: Delta Consulting
-Event: Delta Leadership Conference
+Client: Demo Customer
+Event: Demo Customer Leadership Conference
 Date: September 18, 2026
 Venue: The Jefferson Hotel, Richmond, VA
 
@@ -397,10 +397,18 @@ export function daysUntil(dateStr: string, asOf: Date = new Date()): number {
   return Math.ceil((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function financialFromInvoices(invoices: CustomerInvoice[]) {
-  const contractTotal = invoices.reduce((s, i) => s + i.amount, 0);
+export function financialFromInvoices(
+  invoices: CustomerInvoice[],
+  contractValueFallback = 0,
+) {
+  const invoiceTotal = invoices.reduce((s, i) => s + i.amount, 0);
+  const contractTotal =
+    contractValueFallback > 0 ? contractValueFallback : invoiceTotal;
   const amountPaid = invoices.reduce((s, i) => s + i.amountPaid, 0);
-  const outstandingBalance = invoices.reduce((s, i) => s + i.balance, 0);
+  const outstandingBalance =
+    invoices.length > 0
+      ? invoices.reduce((s, i) => s + i.balance, 0)
+      : Math.max(0, contractTotal - amountPaid);
   const nextOpen = invoices.find((i) => i.balance > 0);
 
   const depositInvoices = invoices.filter((i) =>

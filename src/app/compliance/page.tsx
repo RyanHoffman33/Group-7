@@ -40,7 +40,7 @@ export default async function ComplianceDashboardPage() {
         <StatCard
           label="Recognized (billed)"
           value={formatCurrency(totals.recognizedBilled)}
-          hint="Invoices with recognition_status = recognized"
+          hint="Invoices marked recognized"
         />
       </div>
 

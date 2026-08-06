@@ -22,7 +22,7 @@ export default async function EventsIndexPage() {
     <div>
       <PageHeader
         title="Events"
-        description="Operational event workspace for planning, registration, QR, emails, and speakers. Linked to contracts via contract_id in the proposed schema."
+        description="Operational workspace for planning, registration, check-in, emails, and speakers."
       />
       <div className="mb-4 grid gap-4 sm:grid-cols-3">
         <StatCard label="Active / upcoming" value={String(events.length)} tone="accent" />

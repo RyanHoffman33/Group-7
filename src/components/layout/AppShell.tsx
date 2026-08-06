@@ -53,18 +53,18 @@ const eventsLinks = [
 const vendorLinks = [
   { href: "/vendor", label: "Portal Home" },
   { href: "/vendor/rfqs", label: "RFQs & Quotes" },
-  { href: "/vendor/layouts/lay-1", label: "Theater Layout" },
-  { href: "/vendor/layouts/lay-2", label: "Banquet Layout" },
+  { href: "/vendor/layouts/lay-1", label: "Room layout · Theater" },
+  { href: "/vendor/layouts/lay-2", label: "Room layout · Banquet" },
 ];
 
 const attendeeLinks = [{ href: "/attendee/survey", label: "Event Survey" }];
 
 const customerLinks = [
   { href: "/dashboard/customer", label: "Overview" },
-  { href: "/dashboard/customer/engagement", label: "Inquiry & Quotes" },
-  { href: "/dashboard/customer/event", label: "Event Details" },
-  { href: "/dashboard/customer/actions", label: "Action Items" },
-  { href: "/dashboard/customer/obligations", label: "Performance Obligations" },
+  { href: "/dashboard/customer/engagement", label: "Your inquiry" },
+  { href: "/dashboard/customer/event", label: "Event details" },
+  { href: "/dashboard/customer/actions", label: "Contracts & approvals" },
+  { href: "/dashboard/customer/obligations", label: "Deliverables" },
   { href: "/dashboard/customer/invoices", label: "Invoices" },
   { href: "/dashboard/customer/payments", label: "Payments" },
   { href: "/dashboard/customer/documents", label: "Documents" },
@@ -98,7 +98,7 @@ const costsLinksFull = [
   { href: "/costs/time", label: "Time Entry" },
   { href: "/costs/expenses", label: "Vendor & Expenses" },
   { href: "/costs/commitments", label: "Commitments" },
-  { href: "/costs/approvals", label: "Approval Queue" },
+  { href: "/costs/approvals", label: "Expense approvals" },
   { href: "/costs/flags", label: "Flags & Exceptions" },
   { href: "/costs/reports", label: "Reports / Export" },
 ];
@@ -521,7 +521,7 @@ export function AppShell({
             ) : null}
             {showEvents ? (
               <NavAccordion
-                title="Event Operations"
+                title="Event production"
                 open={openSection === "events"}
                 onToggle={() => toggleSection("events")}
                 active={eventsActive}
@@ -543,7 +543,7 @@ export function AppShell({
             ) : null}
             {showWork ? (
               <NavAccordion
-                title="Event Work"
+                title="Delivery & work"
                 open={openSection === "work"}
                 onToggle={() => toggleSection("work")}
                 active={workActive}
@@ -584,7 +584,7 @@ export function AppShell({
                       : "text-white/70 hover:bg-white/8 hover:text-white"
                   }`}
                 >
-                  Approvals & Exceptions
+                  Exception approvals
                 </Link>
               </li>
             ) : null}
