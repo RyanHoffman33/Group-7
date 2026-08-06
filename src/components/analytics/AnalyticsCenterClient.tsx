@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { formatPercent } from "@/features/billing/aging";
 import type { AnalyticsBundle } from "@/features/analytics/queries";
@@ -20,7 +20,45 @@ import { AnalyticsFilters } from "@/components/analytics/AnalyticsFilters";
 import { ChartLegend } from "@/components/analytics/ChartLegend";
 import { HistoryCharts } from "@/components/analytics/HistoryCharts";
 import { InsightCards } from "@/components/analytics/InsightCards";
-import { TopNBarChart } from "@/components/analytics/TopNBarChart";
+import {
+  SEGMENT_PALETTES,
+  TopNBarChart,
+  type SegmentPaletteKey,
+} from "@/components/analytics/TopNBarChart";
+
+function SegmentCard({
+  title,
+  subtitle,
+  accent,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  accent: SegmentPaletteKey;
+  children: ReactNode;
+}) {
+  const colors = SEGMENT_PALETTES[accent];
+  return (
+    <div className="rounded-md border border-[var(--line)] bg-[var(--bg)]/60 p-4">
+      <div className="mb-3 flex items-start gap-2.5">
+        <span
+          className="mt-0.5 h-8 w-1 shrink-0 rounded-full"
+          style={{ background: colors.mark }}
+          aria-hidden
+        />
+        <div className="min-w-0">
+          <p className="font-[family-name:var(--font-display)] text-[15px] font-semibold tracking-tight text-[var(--ink)]">
+            {title}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">
+            {subtitle}
+          </p>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 function filterLabel(f: AnalyticsPeriodFilter): string {
   const parts: string[] = [];
@@ -186,55 +224,47 @@ export function AnalyticsCenterClient({
       </div>
 
       <div className="mt-4">
-        <Panel title="Recent history — revenues vs costs">
-          <HistoryCharts months={chartHistory} showLegend={false} />
+        <Panel title="Most profitable segments">
+          <p className="mb-5 text-xs leading-relaxed text-[var(--muted)]">
+            Ranked by gross margin $ · top 5 · respects Year / Quarter / Month
+            filters
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SegmentCard
+              title="Vendors used"
+              subtitle="By allocated event gross margin $"
+              accent="vendors"
+            >
+              <TopNBarChart items={rankings.vendors} palette="vendors" />
+            </SegmentCard>
+            <SegmentCard
+              title="Event by group"
+              subtitle="By gross margin $ (event type)"
+              accent="eventGroups"
+            >
+              <TopNBarChart items={rankings.eventGroups} palette="eventGroups" />
+            </SegmentCard>
+            <SegmentCard
+              title="Customers"
+              subtitle="By gross margin $"
+              accent="customers"
+            >
+              <TopNBarChart items={rankings.customers} palette="customers" />
+            </SegmentCard>
+            <SegmentCard
+              title="Venues"
+              subtitle="By gross margin $"
+              accent="venues"
+            >
+              <TopNBarChart items={rankings.venues} palette="venues" />
+            </SegmentCard>
+          </div>
         </Panel>
       </div>
 
       <div className="mt-4">
-        <Panel title="Most profitable segments">
-          <p className="mb-4 text-xs text-[var(--muted)]">
-            Ranked by gross margin $ · top 5 · respects Year / Quarter / Month
-            filters
-          </p>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Vendors used
-              </p>
-              <p className="mb-3 text-[11px] text-[var(--muted)]">
-                By allocated event gross margin $
-              </p>
-              <TopNBarChart items={rankings.vendors} />
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Event by group
-              </p>
-              <p className="mb-3 text-[11px] text-[var(--muted)]">
-                By gross margin $ (event type)
-              </p>
-              <TopNBarChart items={rankings.eventGroups} />
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Customers
-              </p>
-              <p className="mb-3 text-[11px] text-[var(--muted)]">
-                By gross margin $
-              </p>
-              <TopNBarChart items={rankings.customers} />
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Venues
-              </p>
-              <p className="mb-3 text-[11px] text-[var(--muted)]">
-                By gross margin $
-              </p>
-              <TopNBarChart items={rankings.venues} />
-            </div>
-          </div>
+        <Panel title="Recent history — revenues vs costs">
+          <HistoryCharts months={chartHistory} showLegend={false} />
         </Panel>
       </div>
 
