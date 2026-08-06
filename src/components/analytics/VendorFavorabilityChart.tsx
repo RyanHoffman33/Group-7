@@ -86,45 +86,41 @@ export function VendorFavorabilityChart({
   }
 
   return (
-    <ol className="grid gap-3 sm:grid-cols-1">
+    <ol className="mx-auto grid w-full max-w-xl gap-3">
       {items.map((item, index) => {
         const stars = scoreToStars(item.score);
         const chip = ratingLabel(stars);
         return (
           <li
             key={item.label}
-            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 shadow-[0_1px_2px_rgba(15,28,46,0.04)]"
+            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-center shadow-[0_1px_2px_rgba(15,28,46,0.04)]"
             style={{ background: `linear-gradient(135deg, var(--surface) 60%, ${STAR.soft} 100%)` }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-2.5">
+            <div className="flex flex-col items-center gap-2">
+              <span
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-semibold tabular-nums"
+                style={{
+                  background: STAR.chip,
+                  color: STAR.chipInk,
+                }}
+                aria-hidden
+              >
+                {index + 1}
+              </span>
+              <p className="max-w-full truncate px-2 text-[13px] font-semibold leading-tight text-[var(--ink)] sm:text-sm">
+                {item.label}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1">
+                <StarRow stars={stars} />
                 <span
-                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold tabular-nums"
-                  style={{
-                    background: STAR.chip,
-                    color: STAR.chipInk,
-                  }}
-                  aria-hidden
+                  className="text-[12px] font-semibold tabular-nums"
+                  style={{ color: STAR.chipInk }}
                 >
-                  {index + 1}
+                  {stars.toFixed(1)} / 5
                 </span>
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)] sm:text-sm">
-                    {item.label}
-                  </p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                    <StarRow stars={stars} />
-                    <span
-                      className="text-[12px] font-semibold tabular-nums"
-                      style={{ color: STAR.chipInk }}
-                    >
-                      {stars.toFixed(1)} / 5
-                    </span>
-                  </div>
-                </div>
               </div>
               <span
-                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{
                   background: STAR.chip,
                   color: STAR.chipInk,
@@ -132,12 +128,12 @@ export function VendorFavorabilityChart({
               >
                 {chip}
               </span>
+              <p className="text-[11px] leading-snug text-[var(--muted)]">
+                {item.events} event{item.events === 1 ? "" : "s"} · margin{" "}
+                <Money amount={item.margin} /> ·{" "}
+                {(item.cleanPct * 100).toFixed(0)}% clean
+              </p>
             </div>
-            <p className="mt-2 pl-[2.125rem] text-[11px] leading-snug text-[var(--muted)]">
-              {item.events} event{item.events === 1 ? "" : "s"} · margin{" "}
-              <Money amount={item.margin} /> ·{" "}
-              {(item.cleanPct * 100).toFixed(0)}% clean
-            </p>
           </li>
         );
       })}
