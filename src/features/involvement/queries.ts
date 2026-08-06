@@ -17,8 +17,8 @@ import type {
 /** Demo customer account organization → customers.name (portal login customer@). */
 export const DEMO_CUSTOMER_ORG = "Demo Customer";
 
-/** Stable id from supabase/migrations/20260806210000_demo_customer_portal.sql */
-export const DEMO_CUSTOMER_ID = "22222222-2222-2222-2222-222222222201";
+/** Portal Demo Customer (renamed from Delta Consulting; same id keeps FKs). */
+export const DEMO_CUSTOMER_ID = "11111111-1111-1111-1111-111111111108";
 
 const CUSTOMER_SAFE_CONTRACT_SELECT =
   "id, contract_number, event_name, event_type, event_start, event_end, venue_name, venue_city, guest_count, status, project_manager_label, involvement_model, contract_value, notes, customer_id";

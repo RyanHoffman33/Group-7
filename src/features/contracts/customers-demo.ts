@@ -111,5 +111,9 @@ export async function listCustomersMerged(): Promise<DemoCustomer[]> {
   } catch {
     /* memory only */
   }
-  return merged.sort((a, b) => a.name.localeCompare(b.name));
+  return merged.sort((a, b) => {
+    if (a.name === "Demo Customer") return -1;
+    if (b.name === "Demo Customer") return 1;
+    return a.name.localeCompare(b.name);
+  });
 }

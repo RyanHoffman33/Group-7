@@ -226,7 +226,7 @@ export async function createContract(
       const custName = String(custRow?.name ?? "").trim().toLowerCase();
       customerIsDemoPortal =
         custName === DEMO_CUSTOMER_ORG.toLowerCase() ||
-        input.customer_id === "22222222-2222-2222-2222-222222222201";
+        input.customer_id === "11111111-1111-1111-1111-111111111108";
     }
 
     const status = input.submit_for_approval

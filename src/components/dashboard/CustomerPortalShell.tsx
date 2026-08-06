@@ -12,8 +12,8 @@ import {
 const NAV = [
   { href: "/dashboard/customer", label: "Overview", exact: true },
   { href: "/dashboard/customer/engagement", label: "Inquiry & Quotes" },
+  { href: "/dashboard/customer/actions", label: "Proposals & Actions" },
   { href: "/dashboard/customer/event", label: "Event Details" },
-  { href: "/dashboard/customer/actions", label: "Action Items" },
   { href: "/dashboard/customer/obligations", label: "Performance Obligations" },
   { href: "/dashboard/customer/invoices", label: "Invoices" },
   { href: "/dashboard/customer/payments", label: "Payments" },
