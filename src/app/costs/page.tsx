@@ -34,6 +34,8 @@ export default async function CostsHubPage() {
     (s, r) => s + r.projectCount,
     0,
   );
+  const overallAvgPerProject =
+    categoryProjectSum > 0 ? categoryTotalSum / categoryProjectSum : 0;
 
   return (
     <div>
@@ -132,7 +134,7 @@ export default async function CostsHubPage() {
                       Total
                     </td>
                     <td className="py-3 font-semibold tabular-nums text-[var(--ink)]">
-                      —
+                      <Money amount={overallAvgPerProject} />
                     </td>
                     <td className="py-3 font-semibold tabular-nums text-[var(--ink)]">
                       {categoryProjectSum}
