@@ -7,11 +7,25 @@ import {
   listMonthlyProfits,
 } from "@/features/profitability/queries";
 import { formatPct } from "@/features/profitability/labels";
+import type { AnalyticsMonth } from "@/features/analytics/seed";
 import { PageHeader, Panel, StatCard } from "@/components/billing/ui";
+import { HistoryCharts } from "@/components/analytics/HistoryCharts";
 import { MarginTable } from "@/components/profitability/MarginTable";
-import { TrendBars } from "@/components/profitability/TrendBars";
 
 export const dynamic = "force-dynamic";
+
+function toHistoryMonths(
+  months: Awaited<ReturnType<typeof listMonthlyProfits>>,
+): AnalyticsMonth[] {
+  return months.map((m) => ({
+    month: m.month.length === 7 ? `${m.month}-01` : m.month.slice(0, 10),
+    revenue: m.recognized_revenue,
+    cogs: m.direct_cogs,
+    margin: m.net_margin,
+    events: 0,
+    arOutstanding: 0,
+  }));
+}
 
 export default async function ProfitabilityPage() {
   const [events, exceptions, months] = await Promise.all([
@@ -20,6 +34,7 @@ export default async function ProfitabilityPage() {
     listMonthlyProfits(),
   ]);
   const totals = await getPortfolioTotals(events, exceptions);
+  const historyMonths = toHistoryMonths(months);
 
   return (
     <div>
@@ -69,30 +84,42 @@ export default async function ProfitabilityPage() {
         />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <Panel
-          title="Margin by event"
-          action={
+      <div className="mt-4">
+        <Panel title="Recent history — revenues and costs">
+          <HistoryCharts months={historyMonths} />
+        </Panel>
+      </div>
+
+      <details className="group mt-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] open:shadow-[0_1px_2px_rgba(15,28,46,0.04)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <p className="font-[family-name:var(--font-display)] text-sm font-semibold tracking-tight text-[var(--ink)]">
+              Margin by event
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">
+              {events.length} event{events.length === 1 ? "" : "s"} · collapsed
+              by default
+            </p>
+          </div>
+          <span className="shrink-0 text-xs font-medium text-[var(--accent)] group-open:hidden">
+            Show table
+          </span>
+          <span className="hidden shrink-0 text-xs font-medium text-[var(--accent)] group-open:inline">
+            Hide table
+          </span>
+        </summary>
+        <div className="border-t border-[var(--line)] p-4">
+          <div className="mb-3 flex justify-end">
             <Link
               href="/profitability/exceptions"
               className="text-sm text-[var(--accent)] hover:underline"
             >
               Exceptions inbox →
             </Link>
-          }
-        >
+          </div>
           <MarginTable rows={events} />
-        </Panel>
-
-        <Panel title="Monthly P&L trend">
-          <TrendBars months={months} />
-          <p className="mt-4 text-xs text-[var(--muted)]">
-            Revenue dated by recognition evidence (event date), costs by
-            incurred date. Source:{" "}
-            <code className="text-[11px]">v_profit_monthly</code>.
-          </p>
-        </Panel>
-      </div>
+        </div>
+      </details>
     </div>
   );
 }

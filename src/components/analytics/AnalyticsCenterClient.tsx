@@ -17,8 +17,6 @@ import {
 } from "@/features/analytics/rankings";
 import { PageHeader, Panel, StatCard } from "@/components/billing/ui";
 import { AnalyticsFilters } from "@/components/analytics/AnalyticsFilters";
-import { ChartLegend } from "@/components/analytics/ChartLegend";
-import { HistoryCharts } from "@/components/analytics/HistoryCharts";
 import { InsightCards } from "@/components/analytics/InsightCards";
 import {
   SEGMENT_PALETTES,
@@ -183,10 +181,6 @@ export function AnalyticsCenterClient({
         <AnalyticsFilters years={years} value={filter} onChange={setFilter} />
       </div>
 
-      <div className="mb-3">
-        <ChartLegend variant="history" />
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Year-over-year revenue growth"
@@ -259,12 +253,6 @@ export function AnalyticsCenterClient({
               <TopNBarChart items={rankings.venues} palette="venues" />
             </SegmentCard>
           </div>
-        </Panel>
-      </div>
-
-      <div className="mt-4">
-        <Panel title="Recent history — revenues vs costs">
-          <HistoryCharts months={chartHistory} showLegend={false} />
         </Panel>
       </div>
 

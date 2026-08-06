@@ -1,3 +1,5 @@
+"use client";
+
 import type { AnalyticsMonth } from "@/features/analytics/seed";
 import { Money } from "@/components/billing/ui";
 import { ANALYTICS_COLORS, ChartLegend } from "@/components/analytics/ChartLegend";
