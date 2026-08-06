@@ -23,6 +23,8 @@ import {
   TopNBarChart,
   type SegmentPaletteKey,
 } from "@/components/analytics/TopNBarChart";
+import { VendorFavorabilityChart } from "@/components/analytics/VendorFavorabilityChart";
+import { vendorFavorabilityFromData } from "@/features/analytics/favorability";
 
 function SegmentCard({
   title,
@@ -118,6 +120,16 @@ export function AnalyticsCenterClient({
   const rankings = useMemo(
     () => rankingsFromSlices(bundle.eventSlices, filter),
     [bundle.eventSlices, filter],
+  );
+
+  const vendorFavorability = useMemo(
+    () =>
+      vendorFavorabilityFromData(
+        bundle.eventSlices,
+        bundle.vendorHealth,
+        filter,
+      ),
+    [bundle.eventSlices, bundle.vendorHealth, filter],
   );
 
   const overviewKpis = useMemo(
@@ -252,6 +264,19 @@ export function AnalyticsCenterClient({
             >
               <TopNBarChart items={rankings.venues} palette="venues" />
             </SegmentCard>
+          </div>
+        </Panel>
+      </div>
+
+      <div className="mt-4">
+        <Panel title="Vendor favorability">
+          <p className="mb-5 text-xs leading-relaxed text-[var(--muted)]">
+            Favorability score (demo) · top 5 · blends margin contribution,
+            cost-entry cleanliness, and event volume · respects Year / Quarter /
+            Month filters
+          </p>
+          <div className="max-w-xl">
+            <VendorFavorabilityChart items={vendorFavorability} />
           </div>
         </Panel>
       </div>

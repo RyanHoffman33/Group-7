@@ -5,6 +5,10 @@ import { ANALYTICS_SEED_MONTHS, type AnalyticsMonth } from "./seed";
 import { forecastSeries, type ForecastResult } from "./forecast";
 import type { AnalyticsEventSlice } from "./rankings";
 import { rankingsFromSlices } from "./rankings";
+import {
+  seedVendorHealth,
+  type VendorCostHealth,
+} from "./favorability";
 
 export type AnalyticsBundle = {
   history: AnalyticsMonth[];
@@ -12,6 +16,8 @@ export type AnalyticsBundle = {
   source: "live" | "seed";
   /** Event-level slices for overview quadrants (filterable client-side). */
   eventSlices: AnalyticsEventSlice[];
+  /** Cost-entry cleanliness / spend by vendor for favorability scoring. */
+  vendorHealth: VendorCostHealth[];
   kpis: {
     trailingRevenue: number;
     trailingMargin: number;
@@ -112,6 +118,62 @@ function eventMonthKey(iso: string | null): string | null {
   return `${iso.slice(0, 7)}-01`;
 }
 
+async function loadVendorHealth(): Promise<VendorCostHealth[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("cost_entries")
+    .select(
+      "amount, vendor_name, vendor_id, vendors(name), approval_status, flag_late_entry, flag_duplicate_invoice, flag_over_committed, flag_after_billing, entry_type",
+    )
+    .eq("entry_type", "vendor_expense");
+  if (error) throw error;
+
+  const byName = new Map<
+    string,
+    { entries: number; flagged: number; rejected: number; spend: number }
+  >();
+
+  for (const row of data ?? []) {
+    const joined = row.vendors as
+      | { name?: string }
+      | { name?: string }[]
+      | null;
+    const vendorFromJoin = Array.isArray(joined)
+      ? joined[0]?.name
+      : joined?.name;
+    const name =
+      (row.vendor_name as string | null)?.trim() ||
+      vendorFromJoin?.trim() ||
+      null;
+    if (!name) continue;
+
+    const flagged =
+      row.flag_late_entry === true ||
+      row.flag_duplicate_invoice === true ||
+      row.flag_over_committed === true ||
+      row.flag_after_billing === true;
+    const cur = byName.get(name) ?? {
+      entries: 0,
+      flagged: 0,
+      rejected: 0,
+      spend: 0,
+    };
+    cur.entries += 1;
+    if (flagged) cur.flagged += 1;
+    if (row.approval_status === "rejected") cur.rejected += 1;
+    cur.spend += Number(row.amount) || 0;
+    byName.set(name, cur);
+  }
+
+  return [...byName.entries()].map(([name, v]) => ({
+    name,
+    entries: v.entries,
+    flagged: v.flagged,
+    rejected: v.rejected,
+    spend: v.spend,
+  }));
+}
+
 async function loadEventSlices(): Promise<AnalyticsEventSlice[]> {
   const events = await listEventProfits();
   if (!events.length) return [];
@@ -194,12 +256,14 @@ function seedEventSlices(): AnalyticsEventSlice[] {
 async function loadLiveHistory(): Promise<{
   history: AnalyticsMonth[];
   slices: AnalyticsEventSlice[];
+  vendorHealth: VendorCostHealth[];
 }> {
-  const [months, events, metrics, slices] = await Promise.all([
+  const [months, events, metrics, slices, vendorHealth] = await Promise.all([
     listMonthlyProfits(),
     listEventProfits(),
     getDashboardMetrics().catch(() => null),
     loadEventSlices(),
+    loadVendorHealth().catch(() => [] as VendorCostHealth[]),
   ]);
 
   const arOut = metrics?.totalOutstanding ?? 0;
@@ -226,22 +290,27 @@ async function loadLiveHistory(): Promise<{
   return {
     history: history.sort((a, b) => a.month.localeCompare(b.month)),
     slices,
+    vendorHealth,
   };
 }
 
 export async function getAnalyticsBundle(): Promise<AnalyticsBundle> {
   let history: AnalyticsMonth[];
   let eventSlices: AnalyticsEventSlice[];
+  let vendorHealth: VendorCostHealth[];
   let source: "live" | "seed" = "seed";
 
   try {
     const live = await withTimeout(loadLiveHistory(), 4500);
     history = live.history;
     eventSlices = live.slices;
+    vendorHealth =
+      live.vendorHealth.length > 0 ? live.vendorHealth : seedVendorHealth();
     source = "live";
   } catch {
     history = ANALYTICS_SEED_MONTHS;
     eventSlices = seedEventSlices();
+    vendorHealth = seedVendorHealth();
     source = "seed";
   }
 
@@ -268,6 +337,7 @@ export async function getAnalyticsBundle(): Promise<AnalyticsBundle> {
     forecast,
     source,
     eventSlices,
+    vendorHealth,
     kpis: {
       trailingRevenue,
       trailingMargin,
