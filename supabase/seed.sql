@@ -1,8 +1,21 @@
 -- Demo seed for Billing & A/R (ACCY628-FINAL-PROJECT)
 -- Re-run after truncating dependent tables if you need a clean slate.
--- Year-span / integrity enrichment: also apply
---   supabase/migrations/20260805210000_seed_data_overhaul.sql
--- (safe upserts — does not truncate).
+--
+-- APPLY ORDER (local reset vs shared live DB)
+--   1) This file truncates billing/GAAP seed tables — LOCAL / disposable DBs only.
+--      Do NOT run the TRUNCATE block against the shared ACCY628 live project.
+--   2) Then apply additive enrichment (safe upserts, no truncate):
+--        supabase/migrations/20260805210000_seed_data_overhaul.sql
+--        supabase/migrations/20260805220000_seed_disputed_invoice.sql
+--        supabase/migrations/20260806093000_customer_involvement_model.sql
+--        supabase/migrations/20260806120000_comprehensive_seed_historical_ml.sql
+--      The comprehensive historical seed adds 36 months × 2 events for Analytics/ML
+--      (v_profit_monthly) plus cross-module demo coverage. Idempotent ON CONFLICT.
+--   3) Related module seeds (also additive / local): seed_costs.sql, seed_work.sql,
+--      seed_contracts_lifecycle.sql
+--
+-- Demo app logins (in-memory users, password `demo`) are defined in
+--   src/features/users/seed.ts — not in SQL.
 
 TRUNCATE public.billing_alerts, public.ar_bucket_state, public.ar_ledger_entries,
   public.payment_applications, public.payments, public.invoice_lines, public.deposits,

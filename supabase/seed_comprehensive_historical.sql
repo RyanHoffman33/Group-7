@@ -1,0 +1,17 @@
+-- Companion pointer for comprehensive historical seed (MainEvent / Group-7)
+--
+-- The full additive seed lives in:
+--   supabase/migrations/20260806120000_comprehensive_seed_historical_ml.sql
+--
+-- Shared live DB (ACCY628-FINAL-PROJECT): do NOT auto-apply.
+-- Paste/run that migration SQL only after explicit human approval.
+--
+-- Local disposable DB reset path:
+--   1) supabase/seed.sql          (TRUNCATE + base billing seed — local only)
+--   2) seed_costs / seed_work / seed_contracts_lifecycle as needed
+--   3) migrations 20260805210000, 20260805220000, 20260806093000
+--   4) this historical migration (36 months × 2 events + enrichment)
+--
+-- Validate after apply:
+--   SELECT month, recognized_revenue, direct_cogs, gross_margin
+--   FROM public.v_profit_monthly ORDER BY month;
