@@ -20,7 +20,7 @@ export default async function CostsPage() {
     <div>
       <PageHeader
         title="Cost classification"
-        description="Direct event COGS match to recognized revenue. Reimbursable passthroughs are excluded from margin. Overhead / selling are period expenses. Stub rows until Walker’s expense module."
+        description="Post ASC 606 cost classifications used by the compliance board. Operational cost_entries live under Costs & Resources / Profitability — most demo costs are tracked there and are not yet mirrored into this classification table."
       />
 
       <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
@@ -81,7 +81,7 @@ export default async function CostsPage() {
       </div>
 
       <div className="mt-4">
-        <Panel title="Profitability inputs (v_profitability_inputs)">
+        <Panel title="Classified profitability inputs (v_profitability_inputs)">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wider text-[var(--muted)]">
@@ -125,8 +125,12 @@ export default async function CostsPage() {
             </table>
           </div>
           <p className="mt-3 text-xs text-[var(--muted)]">
-            Joseph / Grayson should consume this view only — do not recompute
-            recognized revenue in Profitability.
+            Direct COGS here count only rows in cost_classifications. For
+            operational margins (cost_entries + classifications), use{" "}
+            <a href="/profitability" className="text-[var(--accent)] hover:underline">
+              Profitability
+            </a>{" "}
+            (v_profit_event).
           </p>
         </Panel>
       </div>

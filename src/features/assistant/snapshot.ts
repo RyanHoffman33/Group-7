@@ -25,9 +25,9 @@ import {
   listContractPositions,
   listCostClassifications,
   listGaapPolicies,
-  listProfitabilityInputs,
   listRecognitionEvidence,
 } from "@/features/gaap/queries";
+import { listEventProfits } from "@/features/profitability/queries";
 import { createClient } from "@/lib/supabase/server";
 
 /** id (UUID) → human contract_number (ME-…) for assistant lookups. */
@@ -88,7 +88,7 @@ export async function buildCompanySnapshot(): Promise<string> {
     listRecognitionEvidence(),
     listContractModifications(),
     listCostClassifications(),
-    listProfitabilityInputs(),
+    listEventProfits(),
     listGaapPolicies(),
     getCostDashboardStats(),
     getCategoryBreakdown(),
@@ -121,12 +121,12 @@ export async function buildCompanySnapshot(): Promise<string> {
     .filter(
       (p) =>
         p.recognized_revenue > 0 ||
-        p.direct_event_cogs > 0 ||
+        p.direct_cogs > 0 ||
         p.reimbursable_passthrough > 0,
     )
     .map((p) => {
       const label = contractLabel(p.contract_id, p.event_name, contractNumbers);
-      return `- ${label}: recognized rev ${formatCurrency(p.recognized_revenue)}, direct COGS ${formatCurrency(p.direct_event_cogs)}, passthrough ${formatCurrency(p.reimbursable_passthrough)}, implied margin ${formatCurrency(p.recognized_revenue - p.direct_event_cogs)}`;
+      return `- ${label}: recognized rev ${formatCurrency(p.recognized_revenue)}, direct COGS ${formatCurrency(p.direct_cogs)}, passthrough ${formatCurrency(p.reimbursable_passthrough)}, implied margin ${formatCurrency(p.gross_margin)}`;
     })
     .join("\n");
 
@@ -218,7 +218,7 @@ ${positionLines || "(none)"}
 TOP OPEN INVOICES BY OUTSTANDING
 ${topAging || "(none)"}
 
-PROFITABILITY INPUTS (recognized rev − direct COGS; passthrough excluded from margin)
+PROFITABILITY BY EVENT (v_profit_event — includes cost_entries actuals + classifications)
 ${profitLines || "(none with activity)"}
 
 COST & RESOURCE TRACKING (operational cost_entries — commitments vs actuals)
@@ -261,7 +261,7 @@ ${policyLines || "(none)"}
 RULES FOR ANSWERS
 - Use ONLY the numbers above. Do not invent invoices, customers, costs, or dollar amounts.
 - If something is not in the snapshot, say you do not have that detail in the live data.
-- Contract keys: lines are labeled with human contract_number (ME-YYYY-…) then event name. When the user cites ME-…, match that contract_number — it is NOT a UUID primary key. Prefer PER-CONTRACT POSITION "recognized" and PROFITABILITY INPUTS "recognized rev" for recognition questions.
+- Contract keys: lines are labeled with human contract_number (ME-YYYY-…) then event name. When the user cites ME-…, match that contract_number — it is NOT a UUID primary key. Prefer PER-CONTRACT POSITION "recognized" and PROFITABILITY BY EVENT "recognized rev" for recognition questions.
 - Prefer plain business language; mention ASC 606 / liability / asset when relevant.
 - For costs: distinguish commitments vs actuals, approvals vs control flags, and Cost & Resources tracking vs GAAP cost classification.
 - Keep answers concise (2–6 short paragraphs or bullets).

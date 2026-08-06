@@ -6,12 +6,13 @@ import {
   type AgingRow,
   type DashboardMetrics,
 } from "@/features/billing/queries";
+import { listContractModifications } from "@/features/gaap/queries";
 import {
-  listContractModifications,
-  listProfitabilityInputs,
-} from "@/features/gaap/queries";
+  listEventProfits,
+  type EventProfit,
+} from "@/features/profitability/queries";
 import { daysPastDue, formatLabel } from "@/features/billing/aging";
-import type { BillingMethod, ProfitabilityInput } from "@/lib/supabase/types";
+import type { BillingMethod } from "@/lib/supabase/types";
 
 /** Flag budget attention when actual spend reaches this share of budget. */
 export const APPROACHING_BUDGET_THRESHOLD = 0.9;
@@ -139,13 +140,22 @@ function addDays(d: Date, days: number): Date {
   return new Date(d.getTime() + days * MS_DAY);
 }
 
+/** In-flight engagements (not draft / closed / canceled / completed). */
+const ACTIVE_EVENT_STATUSES = new Set([
+  "active",
+  "approved",
+  "deposit_pending",
+  "pending_approval",
+]);
+
 function isActiveEvent(row: {
   contract_status?: string;
   status?: string;
   performance_complete: boolean;
 }): boolean {
   const status = row.contract_status ?? row.status ?? "";
-  return status === "approved" && !row.performance_complete;
+  if (row.performance_complete) return false;
+  return ACTIVE_EVENT_STATUSES.has(status);
 }
 
 async function listWorkEventStatus(): Promise<WorkEventStatus[]> {
@@ -262,7 +272,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
     workEvents,
     aging,
     metrics,
-    profitabilityInputs,
+    eventProfits,
     mods,
     deposits,
     budgets,
@@ -280,7 +290,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
     listWorkEventStatus(),
     buildAgingReport(),
     getDashboardMetrics(),
-    listProfitabilityInputs(),
+    listEventProfits(),
     listContractModifications(),
     listDeposits(),
     supabase.from("cost_budgets").select("contract_id, category, budgeted_amount"),
@@ -393,14 +403,10 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
     }).length;
   }
 
-  const profitRows = buildProfitabilityRows(profitabilityInputs);
-  const marginValues = profitRows
-    .filter((p) => p.recognizedRevenue > 0 && p.margin != null)
-    .map((p) => p.margin as number);
-  const averageProfitMargin =
-    marginValues.length > 0
-      ? marginValues.reduce((s, m) => s + m, 0) / marginValues.length
-      : portfolioMargin(profitabilityInputs);
+  const profitRows = buildProfitabilityRows(eventProfits).filter(
+    (p) => p.recognizedRevenue > 0,
+  );
+  const averageProfitMargin = portfolioMargin(eventProfits);
 
   const actualByContract = new Map<string, number>();
   for (const e of costs) {
@@ -654,18 +660,18 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
   };
 }
 
-function portfolioMargin(rows: ProfitabilityInput[]): number | null {
+function portfolioMargin(rows: EventProfit[]): number | null {
   const rev = rows.reduce((s, r) => s + Number(r.recognized_revenue), 0);
-  const cogs = rows.reduce((s, r) => s + Number(r.direct_event_cogs), 0);
+  const cogs = rows.reduce((s, r) => s + Number(r.direct_cogs), 0);
   if (rev <= 0) return null;
   return (rev - cogs) / rev;
 }
 
-function buildProfitabilityRows(rows: ProfitabilityInput[]): ProfitabilityRow[] {
+function buildProfitabilityRows(rows: EventProfit[]): ProfitabilityRow[] {
   return rows
     .map((p) => {
       const recognizedRevenue = Number(p.recognized_revenue);
-      const directEventCogs = Number(p.direct_event_cogs);
+      const directEventCogs = Number(p.direct_cogs);
       const profit = recognizedRevenue - directEventCogs;
       const margin =
         recognizedRevenue > 0 ? profit / recognizedRevenue : null;
@@ -686,9 +692,13 @@ function buildProfitabilityRows(rows: ProfitabilityInput[]): ProfitabilityRow[] 
       };
     })
     .sort((a, b) => {
-      const am = a.margin ?? -999;
-      const bm = b.margin ?? -999;
-      return am - bm;
+      // Worst margins first; events with no recognized revenue sort last.
+      if (a.margin == null && b.margin == null) {
+        return a.eventName.localeCompare(b.eventName);
+      }
+      if (a.margin == null) return 1;
+      if (b.margin == null) return -1;
+      return a.margin - b.margin;
     });
 }
 
@@ -728,7 +738,7 @@ function buildUpcomingEvents(
         progressPercent:
           c.progress_percent != null ? Number(c.progress_percent) : null,
         deliverableProgress,
-        href: "/contracts",
+        href: `/contracts/${c.id}`,
       };
     })
     .filter((r) => r.eventStart != null)

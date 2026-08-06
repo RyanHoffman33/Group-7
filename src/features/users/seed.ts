@@ -74,7 +74,7 @@ export const roles: RoleDefinition[] = [
   { id: "role-dept", key: "department_manager", name: "Department Manager", description: "Independent approver — not routine data entry", permissionKeys: ROLE_PERMISSIONS.department_manager, homePath: "/dashboard" },
   { id: "role-attendee", key: "attendee", name: "Attendee", description: "Own registration and attendee-facing info only", permissionKeys: ROLE_PERMISSIONS.attendee, homePath: "/attendee" },
 ];
-/** Demo logins â€” password for all: `demo` */
+/** Demo logins — password for all: `demo` */
 export const users: AppUser[] = [
   {
     id: "usr-exec",
@@ -200,7 +200,7 @@ export const accessAudit: AccessAuditEntry[] = [
     actor: "System",
     action: "login.demo",
     target: "executive@gmail.com",
-    detail: "Demo session â€” role resolved from account",
+    detail: "Demo session — role resolved from account",
   },
 ];
 
@@ -245,7 +245,7 @@ export const eventHealth: EventHealthItem[] = [
       { label: "Tasks 41% Complete", ok: false },
     ],
     whyNot100: [
-      "Missing required deposit â€” cannot mark Ready",
+      "Missing required deposit — cannot mark Ready",
       "Budget exceeded",
       "Lighting vendor not confirmed",
     ],

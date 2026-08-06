@@ -121,11 +121,13 @@ export async function getDepositInfo(contract: {
   return { required, received, status: "pending" };
 }
 
-async function depositTotalsByContract(): Promise<Map<string, number>> {
+async function depositTotalsByContract(
+  contractIds?: string[],
+): Promise<Map<string, number>> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("deposits")
-    .select("contract_id, amount, status");
+  let q = supabase.from("deposits").select("contract_id, amount, status");
+  if (contractIds?.length) q = q.in("contract_id", contractIds);
+  const { data, error } = await q;
   if (error) throw error;
   const map = new Map<string, number>();
   for (const d of data ?? []) {
@@ -137,11 +139,13 @@ async function depositTotalsByContract(): Promise<Map<string, number>> {
 
 type CashPosition = { billed: number; paid: number; open_ar: number };
 
-async function billingCashByContract(): Promise<Map<string, CashPosition>> {
+async function billingCashByContract(
+  contractIds?: string[],
+): Promise<Map<string, CashPosition>> {
   const supabase = createClient();
-  const { data: invoices, error } = await supabase
-    .from("invoices")
-    .select("id, contract_id, total, status");
+  let invQ = supabase.from("invoices").select("id, contract_id, total, status");
+  if (contractIds?.length) invQ = invQ.in("contract_id", contractIds);
+  const { data: invoices, error } = await invQ;
   if (error) throw error;
 
   const active = (invoices ?? []).filter(
@@ -207,16 +211,23 @@ export async function listCustomersForContracts() {
   return data ?? [];
 }
 
-export async function listContractsDetailed(): Promise<ContractListRow[]> {
+export async function listContractsDetailed(options?: {
+  contractIds?: string[];
+}): Promise<ContractListRow[]> {
   const supabase = createClient();
+  const filterIds = options?.contractIds?.filter(Boolean);
+  let contractsQuery = supabase
+    .from("contracts")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (filterIds?.length) contractsQuery = contractsQuery.in("id", filterIds);
+
   const [{ data: contracts, error }, { data: customers }, deposits, cash] =
     await Promise.all([
-      supabase.from("contracts").select("*").order("created_at", {
-        ascending: false,
-      }),
+      contractsQuery,
       supabase.from("customers").select("id, name"),
-      depositTotalsByContract(),
-      billingCashByContract(),
+      depositTotalsByContract(filterIds),
+      billingCashByContract(filterIds),
     ]);
   if (error) throw error;
 
@@ -297,13 +308,26 @@ export async function listContractsDetailed(): Promise<ContractListRow[]> {
 export async function getContract(
   idOrNumber: string,
 ): Promise<ContractListRow | null> {
-  const rows = await listContractsDetailed();
   const key = idOrNumber.trim();
-  return (
-    rows.find((r) => r.id === key) ??
-    rows.find((r) => r.contract_number === key) ??
-    null
-  );
+  if (!key) return null;
+  const supabase = createClient();
+  const byId = await supabase
+    .from("contracts")
+    .select("id")
+    .eq("id", key)
+    .maybeSingle();
+  let contractId = byId.data?.id as string | undefined;
+  if (!contractId) {
+    const byNumber = await supabase
+      .from("contracts")
+      .select("id")
+      .eq("contract_number", key)
+      .maybeSingle();
+    contractId = byNumber.data?.id as string | undefined;
+  }
+  if (!contractId) return null;
+  const rows = await listContractsDetailed({ contractIds: [contractId] });
+  return rows[0] ?? null;
 }
 
 export async function listMilestones(contractId: string) {

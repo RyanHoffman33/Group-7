@@ -258,6 +258,13 @@ export default async function ManagerDashboardPage() {
   const session = await getSessionUser();
   if (!session) redirect("/login");
 
+  const boardTitle =
+    session.roleKey === "executive" || session.roleKey === "system_admin"
+      ? "Executive Dashboard"
+      : session.roleKey === "department_manager"
+        ? "Department Dashboard"
+        : "Manager Dashboard";
+
   let data: ManagerDashboardData;
   try {
     data = await getManagerDashboardData();
@@ -266,7 +273,7 @@ export default async function ManagerDashboardPage() {
     return (
       <div className="space-y-4">
         <PageHeader
-          title="Manager Dashboard"
+          title={boardTitle}
           description="Portfolio overview for your role."
         />
         <Panel title="Could not load live data">
@@ -322,7 +329,7 @@ export default async function ManagerDashboardPage() {
   return (
     <div className="flex min-h-[calc(100dvh-4.25rem)] flex-col gap-2">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <PageHeader compact title="Manager Dashboard" description={greeting} />
+        <PageHeader compact title={boardTitle} description={greeting} />
         <div className="flex items-center gap-2 pt-1">
           <Link
             href={links.costs}
