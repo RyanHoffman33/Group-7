@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import {
   clearNeedsIntake,
   getSessionAppUser,
+  getSessionUser,
 } from "@/features/users/session";
+import { roleHasPermission } from "@/features/access/matrix";
+import { buildValuationRecommendation } from "@/features/valuation/recommend";
+import { QUOTE_PACKAGES, type QuotePackageId } from "@/features/valuation/types";
+import { ensureCustomerForOrganization } from "@/features/contracts/customers-demo";
 import { eventRequests } from "./seed";
 import type { EventRequest, ReferralSource } from "./types";
 
@@ -23,6 +28,32 @@ export type SurveyState =
 
 function requireCustomer() {
   return getSessionAppUser();
+}
+
+export async function listEventRequestsForStaff(): Promise<EventRequest[]> {
+  const session = await getSessionUser();
+  if (!session) return [];
+  if (!roleHasPermission(session.roleKey, "contracts.read")) return [];
+  return [...eventRequests].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function getEventRequestById(
+  id: string,
+): Promise<EventRequest | null> {
+  return eventRequests.find((r) => r.id === id) ?? null;
+}
+
+export async function listQuotesForCustomer(): Promise<EventRequest[]> {
+  const user = await requireCustomer();
+  if (!user || user.roleKey !== "customer") return [];
+  return eventRequests
+    .filter(
+      (r) =>
+        r.userId === user.id ||
+        r.contactEmail.toLowerCase() === user.email.toLowerCase(),
+    )
+    .filter((r) => r.quote && (r.status === "quoted" || r.status === "accepted" || r.status === "changes_requested"))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function submitEventRequestAction(
@@ -163,4 +194,107 @@ export async function getRequestForCurrentUser(requestId: string) {
     eventRequests.find((r) => r.id === requestId && r.userId === user.id) ??
     null
   );
+}
+
+export async function createQuoteForRequestAction(formData: FormData): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: "Sign in required." };
+  if (!roleHasPermission(session.roleKey, "contracts.write")) {
+    return { ok: false, error: "Only contract managers can create quotes." };
+  }
+
+  const requestId = String(formData.get("requestId") ?? "");
+  const packageId = String(formData.get("packageId") ?? "") as QuotePackageId;
+  const customAmountRaw = String(formData.get("customAmount") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  const request = eventRequests.find((r) => r.id === requestId);
+  if (!request) return { ok: false, error: "Request not found." };
+
+  const pkg = QUOTE_PACKAGES.find((p) => p.id === packageId);
+  if (!pkg) return { ok: false, error: "Select a quote package." };
+
+  const rec = buildValuationRecommendation({
+    eventType: request.eventType,
+    guests: request.estimatedGuests,
+  });
+
+  let amount = Math.round(rec.totalMid * pkg.midMultiplier);
+  if (packageId === "custom") {
+    amount = Number(customAmountRaw);
+    if (!Number.isFinite(amount) || amount < 1) {
+      return { ok: false, error: "Enter a valid custom quote amount." };
+    }
+  }
+
+  request.quote = {
+    packageId,
+    packageLabel: pkg.label,
+    amount,
+    notes,
+    createdAt: new Date().toISOString(),
+    createdBy: session.email,
+    returnedAt: null,
+  };
+  request.status = "under_review";
+  return { ok: true };
+}
+
+export async function returnQuoteToCustomerAction(formData: FormData): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: "Sign in required." };
+  if (!roleHasPermission(session.roleKey, "contracts.write")) {
+    return { ok: false, error: "Only contract managers can return quotes." };
+  }
+  const requestId = String(formData.get("requestId") ?? "");
+  const request = eventRequests.find((r) => r.id === requestId);
+  if (!request?.quote) {
+    return { ok: false, error: "Create a quote before returning it." };
+  }
+  request.quote.returnedAt = new Date().toISOString();
+  request.status = "quoted";
+  return { ok: true };
+}
+
+export async function customerRespondToQuoteAction(formData: FormData): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  const user = await requireCustomer();
+  if (!user || user.roleKey !== "customer") {
+    return { ok: false, error: "Customer sign-in required." };
+  }
+  const requestId = String(formData.get("requestId") ?? "");
+  const decision = String(formData.get("decision") ?? "");
+  const request = eventRequests.find(
+    (r) =>
+      r.id === requestId &&
+      (r.userId === user.id ||
+        r.contactEmail.toLowerCase() === user.email.toLowerCase()),
+  );
+  if (!request?.quote || request.status !== "quoted") {
+    return { ok: false, error: "No open quote found." };
+  }
+
+  if (decision === "accept") {
+    const linked = await ensureCustomerForOrganization({
+      name: request.organization,
+      billingEmail: request.contactEmail,
+      phone: request.contactPhone,
+    });
+    request.linkedCustomerId = linked.id;
+    request.status = "accepted";
+    return { ok: true };
+  }
+  if (decision === "changes") {
+    request.status = "changes_requested";
+    return { ok: true };
+  }
+  return { ok: false, error: "Unknown decision." };
 }

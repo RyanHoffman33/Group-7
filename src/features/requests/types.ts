@@ -1,3 +1,5 @@
+import type { QuotePackageId } from "@/features/valuation/types";
+
 export type ReferralSource =
   | "google_search"
   | "social_media"
@@ -6,7 +8,23 @@ export type ReferralSource =
   | "advertisement"
   | "other";
 
-export type EventRequestStatus = "submitted" | "under_review" | "contacted";
+export type EventRequestStatus =
+  | "submitted"
+  | "under_review"
+  | "quoted"
+  | "accepted"
+  | "changes_requested"
+  | "contacted";
+
+export interface EventRequestQuote {
+  packageId: QuotePackageId;
+  packageLabel: string;
+  amount: number;
+  notes: string;
+  createdAt: string;
+  createdBy: string;
+  returnedAt?: string | null;
+}
 
 export interface EventRequest {
   id: string;
@@ -28,6 +46,9 @@ export interface EventRequest {
   referralOtherText?: string | null;
   referralSubmittedAt?: string | null;
   referralSkipped?: boolean;
+  quote?: EventRequestQuote | null;
+  /** Linked billing customer id after accept/sign. */
+  linkedCustomerId?: string | null;
 }
 
 export const REFERRAL_OPTIONS: { value: ReferralSource; label: string }[] = [
@@ -38,15 +59,6 @@ export const REFERRAL_OPTIONS: { value: ReferralSource; label: string }[] = [
   { value: "advertisement", label: "Advertisement" },
   { value: "other", label: "Other" },
 ];
-
-export const EVENT_TYPE_OPTIONS = [
-  "Corporate conference",
-  "Wedding / celebration",
-  "Trade show / expo",
-  "Fundraiser / gala",
-  "Private party",
-  "Other",
-] as const;
 
 export const BUDGET_RANGE_OPTIONS = [
   "Under $10,000",

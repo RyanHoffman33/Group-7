@@ -1,21 +1,25 @@
-import { listCustomersForContracts } from "@/features/contracts/queries";
+import { listCustomersMerged } from "@/features/contracts/customers-demo";
 import { CreateContractWizard } from "@/components/contracts/CreateContractWizard";
 import { PageHeader } from "@/components/billing/ui";
+import { CreateCustomerForm } from "@/components/contracts/CreateCustomerForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewContractPage() {
-  const customers = await listCustomersForContracts();
+  const customers = await listCustomersMerged();
 
   return (
     <div>
       <PageHeader
         title="Create Contract"
-        description="Multi-step engagement setup. Reuses customer master records; one contract maps to one event."
+        description="Multi-step engagement setup. Reuses customer master records; one contract maps to one event. Project managers quote via Requests, then draft here with the valuation assistant."
       />
+      <div className="mb-6">
+        <CreateCustomerForm />
+      </div>
       {customers.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">
-          No customers in the system yet. Billing seed customers are required.
+          No customers yet. Create one above to start a contract.
         </p>
       ) : (
         <CreateContractWizard

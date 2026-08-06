@@ -80,8 +80,28 @@ function shortcutsForRole(
     items.push({
       href: "/contracts",
       label: "Contracts",
-      hint: "Engagements & change orders",
+      hint: "Engagements & contract changes",
     });
+    if (
+      roleKey === "executive" ||
+      roleKey === "project_manager" ||
+      roleKey === "accounting" ||
+      roleKey === "department_manager" ||
+      roleKey === "system_admin"
+    ) {
+      items.push({
+        href: "/valuation",
+        label: "Valuation",
+        hint: "Re-price estimates with industry ranges",
+      });
+    }
+    if (roleKey === "project_manager" || roleKey === "system_admin") {
+      items.push({
+        href: "/contracts/requests",
+        label: "Requests",
+        hint: "Intake quotes for customers",
+      });
+    }
   }
   if (sections.includes("billing")) {
     items.push({

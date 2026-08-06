@@ -59,7 +59,7 @@ const attendeeLinks = [{ href: "/attendee/survey", label: "Event Survey" }];
 const customerLinks = [
   { href: "/dashboard/customer", label: "Overview" },
   { href: "/dashboard/customer/event", label: "Event Details" },
-  { href: "/dashboard/customer/actions", label: "Action Items" },
+  { href: "/dashboard/customer/actions", label: "Action Items & Quotes" },
   { href: "/dashboard/customer/invoices", label: "Invoices" },
   { href: "/dashboard/customer/payments", label: "Payments" },
   { href: "/dashboard/customer/documents", label: "Documents" },
@@ -69,9 +69,13 @@ const contractsLinksAll = [
   { href: "/contracts", label: "Contracts Dashboard" },
   { href: "/contracts/list", label: "All Contracts" },
   { href: "/contracts/new", label: "Create Contract", needsWrite: true },
+  { href: "/contracts/requests", label: "Requests for Performance" },
   { href: "/contracts/approvals", label: "Approvals" },
-  { href: "/contracts/change-orders", label: "Change Orders" },
+  { href: "/contracts/changes", label: "Contract Changes" },
+  { href: "/valuation", label: "Valuation Tool" },
   { href: "/contracts/closeout", label: "Contract Closeout" },
+  { href: "/work", label: "Event Board (Progress)", needsWork: true },
+  { href: "/work/exceptions", label: "Ops Exception Inbox", needsWork: true },
 ];
 
 const workLinks = [
@@ -119,6 +123,9 @@ function navForRole(roleKey: AppRole) {
   const canAudit = roleHasPermission(roleKey, "audit.read");
   const canWriteContracts = roleHasPermission(roleKey, "contracts.write");
   const canWriteBilling = roleHasPermission(roleKey, "billing.write");
+  const canSeeWork =
+    roleHasPermission(roleKey, "events.operate") ||
+    roleHasPermission(roleKey, "ready_for_billing");
 
   return {
     users: usersLinksAll
@@ -130,7 +137,11 @@ function navForRole(roleKey: AppRole) {
       .map(({ href, label }) => ({ href, label })),
     events: eventsLinks,
     contracts: contractsLinksAll
-      .filter((l) => !("needsWrite" in l && l.needsWrite) || canWriteContracts)
+      .filter((l) => {
+        if ("needsWrite" in l && l.needsWrite) return canWriteContracts;
+        if ("needsWork" in l && l.needsWork) return canSeeWork;
+        return true;
+      })
       .map(({ href, label }) => ({ href, label })),
     billing: canWriteBilling ? billingLinksAll : billingLinksRead,
     costs:
@@ -374,7 +385,9 @@ export function AppShell({
   const [attendeeOpen, setAttendeeOpen] = useState(attendeeActive);
   const [vendorOpen, setVendorOpen] = useState(vendorActive);
   const [customerOpen, setCustomerOpen] = useState(showCustomer && myDashboardActive);
-  const [contractsOpen, setContractsOpen] = useState(contractsActive);
+  const [contractsOpen, setContractsOpen] = useState(
+    contractsActive || workActive,
+  );
   const [workOpen, setWorkOpen] = useState(workActive);
   const [costsOpen, setCostsOpen] = useState(costsActive);
   const [analyticsOpen, setAnalyticsOpen] = useState(analyticsCenterActive);
@@ -405,8 +418,8 @@ export function AppShell({
   }, [vendorActive]);
 
   useEffect(() => {
-    if (contractsActive) setContractsOpen(true);
-  }, [contractsActive]);
+    if (contractsActive || workActive) setContractsOpen(true);
+  }, [contractsActive, workActive]);
 
   useEffect(() => {
     if (workActive) setWorkOpen(true);
@@ -527,7 +540,7 @@ export function AppShell({
                 title="Contracts & Engagements"
                 open={contractsOpen}
                 onToggle={() => setContractsOpen((o) => !o)}
-                active={contractsActive}
+                active={contractsActive || (showWork && workActive)}
                 controlsId="contracts-nav-submenu"
                 links={roleNav.contracts}
                 pathname={pathname}
@@ -547,7 +560,7 @@ export function AppShell({
                 </Link>
               </li>
             ) : null}
-            {showWork ? (
+            {showWork && !showContracts ? (
               <NavAccordion
                 title="Progress Tracker"
                 open={workOpen}

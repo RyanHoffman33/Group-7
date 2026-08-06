@@ -26,6 +26,12 @@ export default async function AgendaPage({
         title="Agenda & sessions"
         description="Timeline by room. Speaker readiness shown for staff planning."
       />
+      {sorted.length === 0 ? (
+        <p className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-8 text-center text-sm text-[var(--muted)]">
+          No agenda sessions for this event yet.
+        </p>
+      ) : (
+        <>
       <div className="mb-4 overflow-x-auto">
         <div className="flex min-w-max gap-3">
           {sorted.map((s) => (
@@ -94,6 +100,8 @@ export default async function AgendaPage({
           </Panel>
         ))}
       </div>
+        </>
+      )}
     </EventShell>
   );
 }

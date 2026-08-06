@@ -18,6 +18,9 @@ import {
   INVOLVEMENT_MODEL_LABELS,
   type InvolvementModel,
 } from "@/features/involvement/checkpoints";
+import { listEventTypes, type EventTypeOption } from "@/features/contracts/event-types";
+import { addEventTypeAction } from "@/features/contracts/customer-actions";
+import { ValuationToolClient } from "@/components/valuation/ValuationToolClient";
 
 type Customer = { id: string; name: string };
 type DiscountType = "none" | "percent" | "fixed";
@@ -42,19 +45,6 @@ const BILLING_METHODS: { value: string; label: string }[] = [
   { value: "time_and_materials", label: "Time and materials" },
   { value: "cost_plus", label: "Cost plus" },
   { value: "progress", label: "Custom payment schedule" },
-];
-
-const EVENT_TYPES: { value: string; label: string }[] = [
-  { value: "corporate_conference", label: "Corporate conference" },
-  { value: "product_launch", label: "Product launch" },
-  { value: "wedding", label: "Wedding" },
-  { value: "gala", label: "Gala" },
-  { value: "fundraiser", label: "Fundraiser" },
-  { value: "holiday_party", label: "Holiday party" },
-  { value: "trade_show", label: "Trade show" },
-  { value: "concert", label: "Concert" },
-  { value: "celebration", label: "Celebration" },
-  { value: "corporate_event", label: "Corporate event" },
 ];
 
 const DELIVERABLE_PHASES: { value: string; label: string }[] = [
@@ -95,7 +85,11 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
 
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? "");
   const [eventName, setEventName] = useState("");
+  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(() =>
+    listEventTypes(),
+  );
   const [eventType, setEventType] = useState("corporate_conference");
+  const [newEventTypeLabel, setNewEventTypeLabel] = useState("");
   const [eventStart, setEventStart] = useState("");
   const [eventEnd, setEventEnd] = useState("");
   const [venueName, setVenueName] = useState("");
@@ -635,7 +629,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 ))}
               </select>
               <span className="mt-1 block text-xs text-[var(--muted)]">
-                Uses existing customer master — does not create duplicates.
+                Select an existing customer, or use Create new customer above.
               </span>
             </label>
             <label className="text-sm sm:col-span-2">
@@ -657,13 +651,48 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value)}
               >
-                {EVENT_TYPES.map((t) => (
+                {eventTypes.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
                 ))}
               </select>
             </label>
+            <div className="text-sm">
+              <FieldLabel>Add new event type</FieldLabel>
+              <div className="flex gap-2">
+                <input
+                  className={field}
+                  value={newEventTypeLabel}
+                  onChange={(e) => setNewEventTypeLabel(e.target.value)}
+                  placeholder="e.g. Hybrid summit"
+                />
+                <button
+                  type="button"
+                  className="shrink-0 rounded-md border border-[var(--line)] px-3 py-2 text-xs font-semibold"
+                  onClick={() => {
+                    const fd = new FormData();
+                    fd.set("label", newEventTypeLabel);
+                    start(async () => {
+                      const r = await addEventTypeAction(fd);
+                      if (!r.ok || !r.value || !r.label) {
+                        setError(r.error ?? "Could not add event type");
+                        return;
+                      }
+                      setEventTypes((prev) => {
+                        if (prev.some((p) => p.value === r.value)) return prev;
+                        return [...prev, { value: r.value!, label: r.label! }];
+                      });
+                      setEventType(r.value);
+                      setNewEventTypeLabel("");
+                      setError(null);
+                    });
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
             <label className="text-sm">
               <FieldLabel>Project manager *</FieldLabel>
               <input
@@ -881,6 +910,19 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
 
         {step === 2 && (
           <div className="space-y-6">
+            <ValuationToolClient
+              compact
+              initialEventType={eventType}
+              initialGuests={guestCount ? Number(guestCount) : 150}
+              initialEstimate={
+                grossOverride !== ""
+                  ? grossOverride
+                  : linesGross > 0
+                    ? String(linesGross)
+                    : ""
+              }
+              eventName={eventName}
+            />
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Section 1 */}
               <section className="space-y-3">

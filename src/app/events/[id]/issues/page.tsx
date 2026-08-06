@@ -19,7 +19,12 @@ export default async function EventIssuesPage({
         description="On-site blockers and escalations for the coordinator / PM."
       />
       <div className="space-y-3">
-        {issues.map((i) => (
+        {issues.length === 0 ? (
+          <p className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-8 text-center text-sm text-[var(--muted)]">
+            No open issues for this event.
+          </p>
+        ) : (
+          issues.map((i) => (
           <Panel
             key={i.id}
             title={i.title}
@@ -39,7 +44,8 @@ export default async function EventIssuesPage({
           >
             <p className="text-sm text-[var(--muted)]">Reported by {i.reportedBy}</p>
           </Panel>
-        ))}
+        ))
+        )}
       </div>
     </EventShell>
   );

@@ -103,6 +103,14 @@ export default async function ExceptionsPage() {
                       >
                         View engagement
                       </Link>
+                      {ex.exception_type === "scope_addition" ? (
+                        <Link
+                          href={`/contracts/${ex.contract_id}`}
+                          className="mt-1 block text-xs font-medium text-[var(--ink)] underline-offset-2 hover:underline"
+                        >
+                          Escalate to Contract Change →
+                        </Link>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <ApproveExceptionButton exceptionId={ex.id} />

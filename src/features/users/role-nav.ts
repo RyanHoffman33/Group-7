@@ -220,7 +220,7 @@ export function managerBoardLinks(roleKey: AppRole): {
     costs: hasCompliance ? "/compliance/costs" : "/costs",
     changeOrders: hasCompliance
       ? "/compliance/modifications"
-      : "/contracts/change-orders",
+      : "/contracts/changes",
     billing: "/billing",
     aging: "/billing/aging",
     alerts: "/billing/alerts",
@@ -257,7 +257,7 @@ export function allowedRoutePrefixes(roleKey: AppRole): string[] {
     roleHasPermission(roleKey, "contracts.read") &&
     !INTERNAL_FINANCE_BLOCKED.includes(roleKey)
   ) {
-    prefixes.push("/contracts");
+    prefixes.push("/contracts", "/valuation");
   }
   if (
     (roleHasPermission(roleKey, "billing.read") || roleHasPermission(roleKey, "ar.read")) &&

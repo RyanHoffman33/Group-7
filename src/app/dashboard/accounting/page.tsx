@@ -159,6 +159,18 @@ export default async function AccountingDashboardPage() {
         />
         <div className="flex items-center gap-3 pt-1">
           <Link
+            href="/valuation"
+            className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink)] hover:bg-[#f7f9fb]"
+          >
+            Valuation
+          </Link>
+          <Link
+            href="/contracts/changes"
+            className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink)] hover:bg-[#f7f9fb]"
+          >
+            Contract Changes
+          </Link>
+          <Link
             href="/billing/alerts"
             className="relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:bg-[#f7f9fb]"
             aria-label="Billing alerts"

@@ -11,6 +11,7 @@ import {
   belongsInFlagsQueue,
   hasAnyFlag,
 } from "@/features/costs/flags";
+import { getFlagResolutionOverlay } from "@/features/costs/flag-resolution-overlay";
 
 export type CostEntryRow = CostEntry & {
   event_name?: string;
@@ -31,7 +32,7 @@ export type CategoryBreakdownRow = {
 };
 
 function mapEntry(row: Record<string, unknown>): CostEntry {
-  return {
+  const entry: CostEntry = {
     id: row.id as string,
     contract_id: row.contract_id as string,
     entry_type: row.entry_type as CostEntry["entry_type"],
@@ -65,6 +66,19 @@ function mapEntry(row: Record<string, unknown>): CostEntry {
     flags_resolution_note:
       (row.flags_resolution_note as string | null) ?? null,
     created_at: row.created_at as string,
+  };
+  return applyFlagOverlay(entry);
+}
+
+function applyFlagOverlay(entry: CostEntry): CostEntry {
+  if (entry.flags_resolved_at) return entry;
+  const overlay = getFlagResolutionOverlay(entry.id);
+  if (!overlay) return entry;
+  return {
+    ...entry,
+    flags_resolved_at: overlay.flags_resolved_at,
+    flags_resolved_by: overlay.flags_resolved_by,
+    flags_resolution_note: overlay.flags_resolution_note,
   };
 }
 

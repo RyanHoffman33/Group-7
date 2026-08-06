@@ -33,7 +33,13 @@ export default async function SpeakersPage({
   return (
     <EventShell eventId={id} activeHref={`/events/${id}/speakers`}>
       <PageHeader title="Speakers" />
-      <SpeakersClient speakers={list} isStaff={isStaff} />
+      {list.length === 0 ? (
+        <p className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-8 text-center text-sm text-[var(--muted)]">
+          No speakers assigned to this event yet.
+        </p>
+      ) : (
+        <SpeakersClient speakers={list} isStaff={isStaff} />
+      )}
     </EventShell>
   );
 }

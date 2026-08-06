@@ -19,7 +19,12 @@ export default async function EventDocumentsPage({
         description="Public attendee files and internal/compliance packets. Upload is simulated."
       />
       <div className="space-y-3">
-        {docs.map((d) => (
+        {docs.length === 0 ? (
+          <p className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-8 text-center text-sm text-[var(--muted)]">
+            No documents for this event yet.
+          </p>
+        ) : (
+          docs.map((d) => (
           <Panel
             key={d.id}
             title={d.name}
@@ -33,7 +38,8 @@ export default async function EventDocumentsPage({
               {d.kind} · {d.publicToAttendee ? "Visible to attendees" : "Staff only"}
             </p>
           </Panel>
-        ))}
+        ))
+        )}
       </div>
     </EventShell>
   );

@@ -5,10 +5,8 @@ import {
   submitEventRequestAction,
   type RequestFormState,
 } from "@/features/requests/actions";
-import {
-  BUDGET_RANGE_OPTIONS,
-  EVENT_TYPE_OPTIONS,
-} from "@/features/requests/types";
+import { BUDGET_RANGE_OPTIONS } from "@/features/requests/types";
+import { listEventTypes } from "@/features/contracts/event-types";
 import { ReferralSurveyModal } from "@/components/request/ReferralSurveyModal";
 import { logoutAction } from "@/features/users/actions";
 
@@ -106,11 +104,12 @@ export default function RequestPage({
                 <option value="" disabled>
                   Select type…
                 </option>
-                {EVENT_TYPE_OPTIONS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {listEventTypes().map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
                   </option>
                 ))}
+                <option value="other">Other</option>
               </select>
               <FieldError message={state?.fieldErrors?.eventType} />
             </label>
