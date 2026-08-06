@@ -5,24 +5,78 @@ import {
   listDeferredInvoices,
   listRecognitionEvidence,
 } from "@/features/gaap/queries";
+import { listRecentPoApprovals } from "@/features/performance-obligations";
 import { EvidenceForm } from "@/components/gaap/Actions";
 import { Money, PageHeader, Panel, StatusPill } from "@/components/billing/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function RecognitionPage() {
-  const [evidence, deferred, contracts] = await Promise.all([
+  const [evidence, deferred, contracts, poApprovals] = await Promise.all([
     listRecognitionEvidence(),
     listDeferredInvoices(),
     listContractsForGaap(),
+    listRecentPoApprovals(15),
   ]);
 
   return (
     <div>
       <PageHeader
         title="Revenue recognition"
-        description="Revenue posts only when performance is satisfied and recognition evidence is on file. Cash alone is not earning."
+        description="Revenue posts only when performance is satisfied and recognition evidence is on file. Cash alone is not earning. ASC 606 commercial POs recognize on customer approval (with installment gates)."
       />
+
+      {poApprovals.length > 0 ? (
+        <div className="mb-4">
+          <Panel title="Performance obligation approvals (ASC 606)">
+            <p className="mb-3 text-sm text-[var(--muted)]">
+              Each approval recognizes that PO’s allocated amount. Non-final
+              approvals also record an unearned installment for the next PO.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="text-xs uppercase tracking-wider text-[var(--muted)]">
+                  <tr className="border-b border-[var(--line)]">
+                    <th className="pb-2 font-medium">When</th>
+                    <th className="pb-2 font-medium">Event / PO</th>
+                    <th className="pb-2 font-medium">Approved by</th>
+                    <th className="pb-2 font-medium">Recognized</th>
+                    <th className="pb-2 font-medium">Next installment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {poApprovals.map((a) => (
+                    <tr
+                      key={a.id}
+                      className="border-b border-[var(--line)] last:border-0"
+                    >
+                      <td className="py-3">{formatDate(a.approved_at)}</td>
+                      <td className="py-3">
+                        <div>{a.event_name ?? "—"}</div>
+                        <div className="text-xs text-[var(--muted)]">
+                          {a.po_title ?? a.performance_obligation_id.slice(0, 8)}
+                          {a.is_final_po ? " · final" : ""}
+                        </div>
+                      </td>
+                      <td className="py-3">{a.approved_by}</td>
+                      <td className="py-3">
+                        <Money amount={a.recognized_amount} />
+                      </td>
+                      <td className="py-3">
+                        {a.installment_amount > 0 ? (
+                          <Money amount={a.installment_amount} />
+                        ) : (
+                          <span className="text-[var(--muted)]">None (final)</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
         <Panel title="Evidence register">

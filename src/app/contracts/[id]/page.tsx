@@ -17,6 +17,11 @@ import {
   listApprovalItemsForContract,
 } from "@/features/involvement/queries";
 import { isCheckpointType } from "@/features/involvement/checkpoints";
+import {
+  getContractPoSummary,
+  listPerformanceObligations,
+  listPoApprovals,
+} from "@/features/performance-obligations";
 import { ContractDetailClient } from "@/components/contracts/ContractDetailClient";
 import { PageHeader } from "@/components/billing/ui";
 import Link from "next/link";
@@ -47,6 +52,9 @@ export default async function ContractDetailPage({
     deposits,
     involvement,
     customerApprovalItems,
+    performanceObligations,
+    poSummary,
+    poApprovals,
   ] = await Promise.all([
     listLineItems(contractId),
     listDeliverables(contractId),
@@ -60,6 +68,9 @@ export default async function ContractDetailPage({
     listContractDeposits(contractId),
     getContractInvolvement(contractId),
     listApprovalItemsForContract(contractId),
+    listPerformanceObligations(contractId),
+    getContractPoSummary(contractId),
+    listPoApprovals(contractId),
   ]);
 
   const customTypes = involvement.customCheckpoints
@@ -96,6 +107,9 @@ export default async function ContractDetailPage({
         involvementRequiredTypes={involvement.requiredTypes}
         involvementCustomTypes={customTypes}
         customerApprovalItems={customerApprovalItems}
+        performanceObligations={performanceObligations}
+        poSummary={poSummary}
+        poApprovals={poApprovals}
       />
     </div>
   );

@@ -26,16 +26,23 @@ import {
 } from "@/features/contracts/status";
 import { Money, Panel, StatusPill } from "@/components/billing/ui";
 import { InvolvementPanel } from "@/components/contracts/InvolvementPanel";
+import { PerformanceObligationsPanel } from "@/components/contracts/PerformanceObligationsPanel";
 import type { ApprovalItemWithMeta } from "@/features/involvement/types";
 import type { CheckpointType, InvolvementModel } from "@/features/involvement/checkpoints";
 import {
   INVOLVEMENT_MODEL_LABELS,
   isInvolvementModel,
 } from "@/features/involvement/checkpoints";
+import type {
+  ContractPerformanceObligation,
+  ContractPoSummary,
+  PoApproval,
+} from "@/features/performance-obligations";
 
 const TABS = [
   "Overview",
   "Scope and Services",
+  "Performance Obligations",
   "Financial Terms",
   "Payment Schedule",
   "Billing",
@@ -122,6 +129,9 @@ export function ContractDetailClient({
   involvementRequiredTypes = [],
   involvementCustomTypes = [],
   customerApprovalItems = [],
+  performanceObligations = [],
+  poSummary = null,
+  poApprovals = [],
 }: {
   contract: ContractListRow;
   lines: Record<string, unknown>[];
@@ -138,6 +148,9 @@ export function ContractDetailClient({
   involvementRequiredTypes?: CheckpointType[];
   involvementCustomTypes?: CheckpointType[];
   customerApprovalItems?: ApprovalItemWithMeta[];
+  performanceObligations?: ContractPerformanceObligation[];
+  poSummary?: ContractPoSummary | null;
+  poApprovals?: PoApproval[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("Overview");
@@ -569,6 +582,18 @@ export function ContractDetailClient({
             )}
           </Panel>
         </div>
+      )}
+
+      {tab === "Performance Obligations" && (
+        <PerformanceObligationsPanel
+          contractId={contract.id}
+          contractValue={Number(contract.contract_value)}
+          contractStatus={contract.status}
+          obligations={performanceObligations}
+          summary={poSummary}
+          approvals={poApprovals}
+          actorLabel={actor}
+        />
       )}
 
       {tab === "Financial Terms" && (

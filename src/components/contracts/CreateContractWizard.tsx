@@ -157,6 +157,27 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     "change_order",
     "cancellation",
   ]);
+  const [definePos, setDefinePos] = useState(true);
+  const [pos, setPos] = useState([
+    {
+      title: "Planning & design",
+      description: "",
+      completion_definition: "Customer approves planning package as complete.",
+      amount: "",
+    },
+    {
+      title: "Event production",
+      description: "",
+      completion_definition: "Customer confirms event-day delivery.",
+      amount: "",
+    },
+    {
+      title: "Wrap-up & closeout",
+      description: "",
+      completion_definition: "Customer accepts final wrap-up and closes engagement.",
+      amount: "",
+    },
+  ]);
 
   const [cancelPolicy, setCancelPolicy] = useState(
     "Deposit forfeited if canceled within 60 days of the event; sliding scale thereafter.",
@@ -505,6 +526,19 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     ]);
   }
 
+  function splitPosFromValue() {
+    const v = net;
+    if (v <= 0) return;
+    const a = moneyRound(v * 0.3);
+    const b = moneyRound(v * 0.5);
+    const c = moneyRound(v - a - b);
+    setPos((prev) => [
+      { ...prev[0], amount: String(a) },
+      { ...prev[1], amount: String(b) },
+      { ...prev[2], amount: String(c) },
+    ]);
+  }
+
   function submit() {
     const err =
       validateStep() ||
@@ -518,6 +552,29 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         `Payment schedule total (${scheduleSum}) must equal net contract value (${net}).`,
       );
       return;
+    }
+    const poPayload = definePos
+      ? pos
+          .filter((p) => p.title.trim())
+          .map((p) => ({
+            title: p.title,
+            description: p.description || undefined,
+            completion_definition: p.completion_definition,
+            amount: Number(p.amount) || 0,
+          }))
+      : undefined;
+    if (definePos && poPayload) {
+      const poSum = poPayload.reduce((s, p) => s + p.amount, 0);
+      if (Math.abs(poSum - net) > 0.01) {
+        setError(
+          `Performance obligation amounts (${poSum}) must equal net contract value (${net}).`,
+        );
+        return;
+      }
+      if (poPayload.some((p) => !p.completion_definition.trim() || p.amount <= 0)) {
+        setError("Each PO needs completion criteria and an amount > 0.");
+        return;
+      }
     }
     setError(null);
     start(async () => {
@@ -552,6 +609,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         involvement_model: involvementModel,
         custom_checkpoint_types:
           involvementModel === "custom" ? customCheckpoints : undefined,
+        performance_obligations: poPayload,
         line_items: lines
           .filter((l) => l.description.trim())
           .map((l) => ({
@@ -1339,6 +1397,88 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
             >
               + Add payment
             </button>
+
+            <div className="mt-6 border-t border-[var(--line)] pt-4">
+              <label className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={definePos}
+                  onChange={(e) => setDefinePos(e.target.checked)}
+                />
+                Define ASC 606 performance obligations now
+              </label>
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                Allocated amounts must equal net contract value. Approving a
+                non-final PO later requires paying the next PO’s installment.
+              </p>
+              {definePos ? (
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
+                    onClick={splitPosFromValue}
+                  >
+                    Split 30% / 50% / 20% from net value
+                  </button>
+                  {pos.map((p, i) => (
+                    <div
+                      key={i}
+                      className="grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-2"
+                    >
+                      <label className="text-sm sm:col-span-2">
+                        <FieldLabel>PO {i + 1} title</FieldLabel>
+                        <input
+                          className={field}
+                          value={p.title}
+                          onChange={(e) => {
+                            const next = [...pos];
+                            next[i] = { ...p, title: e.target.value };
+                            setPos(next);
+                          }}
+                        />
+                      </label>
+                      <label className="text-sm sm:col-span-2">
+                        <FieldLabel>Completion criteria</FieldLabel>
+                        <input
+                          className={field}
+                          value={p.completion_definition}
+                          onChange={(e) => {
+                            const next = [...pos];
+                            next[i] = {
+                              ...p,
+                              completion_definition: e.target.value,
+                            };
+                            setPos(next);
+                          }}
+                        />
+                      </label>
+                      <label className="text-sm">
+                        <FieldLabel>Allocated amount</FieldLabel>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className={field}
+                          value={p.amount}
+                          onChange={(e) => {
+                            const next = [...pos];
+                            next[i] = { ...p, amount: e.target.value };
+                            setPos(next);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  ))}
+                  <p className="text-xs text-[var(--muted)]">
+                    PO sum:{" "}
+                    {formatCurrency(
+                      pos.reduce((s, p) => s + (Number(p.amount) || 0), 0),
+                    )}{" "}
+                    · Net: {formatCurrency(net)}
+                  </p>
+                </div>
+              ) : null}
+            </div>
           </div>
         )}
 
