@@ -82,22 +82,52 @@ function applyFlagOverlay(entry: CostEntry): CostEntry {
   };
 }
 
-export async function listContractsForCosts(): Promise<
-  {
-    id: string;
-    event_name: string;
-    customer_id: string;
-    customer_name: string;
-    performance_complete: boolean;
-  }[]
-> {
+export type CostContractRow = {
+  id: string;
+  event_name: string;
+  customer_id: string;
+  customer_name: string;
+  performance_complete: boolean;
+  event_start: string | null;
+};
+
+/** Calendar year from an ISO date string (UTC date portion). */
+export function calendarYearFromDate(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const y = Number(iso.slice(0, 4));
+  return Number.isFinite(y) ? y : null;
+}
+
+/**
+ * Years available for the Costs hub year filter.
+ * Prefers distinct contract event_start years; always includes 2023..current+1
+ * so seed history and near-term planning stay selectable.
+ */
+export async function getCostDashboardYears(): Promise<number[]> {
+  const contracts = await listContractsForCosts();
+  const years = new Set<number>();
+  const now = new Date().getFullYear();
+  for (let y = 2023; y <= now + 1; y++) years.add(y);
+  for (const c of contracts) {
+    const y = calendarYearFromDate(c.event_start);
+    if (y != null) years.add(y);
+  }
+  return [...years].sort((a, b) => b - a);
+}
+
+export async function listContractsForCosts(opts?: {
+  /** Filter by contract event_start calendar year. */
+  year?: number;
+}): Promise<CostContractRow[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("contracts")
-    .select("id, event_name, customer_id, performance_complete, customers(name)")
+    .select(
+      "id, event_name, customer_id, performance_complete, event_start, customers(name)",
+    )
     .order("event_name");
   if (error) throw error;
-  return (data ?? []).map((row) => {
+  const rows = (data ?? []).map((row) => {
     const customer = row.customers as { name?: string } | { name?: string }[] | null;
     const customerName = Array.isArray(customer)
       ? customer[0]?.name
@@ -108,8 +138,13 @@ export async function listContractsForCosts(): Promise<
       customer_id: row.customer_id as string,
       customer_name: customerName ?? "Unknown customer",
       performance_complete: Boolean(row.performance_complete),
+      event_start: (row.event_start as string | null) ?? null,
     };
   });
+  if (opts?.year == null) return rows;
+  return rows.filter(
+    (c) => calendarYearFromDate(c.event_start) === opts.year,
+  );
 }
 
 export async function getContractForCosts(contractId: string) {
@@ -255,10 +290,17 @@ export async function getBudgetVsActual(
 
 export async function getCategoryBreakdown(opts?: {
   contractId?: string;
+  /** Limit to costs on contracts whose event_start falls in this year. */
+  year?: number;
 }): Promise<CategoryBreakdownRow[]> {
-  const entries = await listCostEntries(
+  let entries = await listCostEntries(
     opts?.contractId ? { contractId: opts.contractId } : undefined,
   );
+  if (opts?.year != null) {
+    const contracts = await listContractsForCosts({ year: opts.year });
+    const ids = new Set(contracts.map((c) => c.id));
+    entries = entries.filter((e) => ids.has(e.contract_id));
+  }
   const totals = new Map<CostCategory, number>();
   for (const cat of COST_CATEGORIES) totals.set(cat, 0);
   for (const e of entries) {
@@ -278,10 +320,16 @@ export type AvgCostPerProjectRow = {
 };
 
 /** Average spend per project for each cost category (projects that have that category). */
-export async function getAverageCostPerProjectByCategory(): Promise<
-  AvgCostPerProjectRow[]
-> {
-  const entries = await listCostEntries();
+export async function getAverageCostPerProjectByCategory(opts?: {
+  /** Limit to costs on contracts whose event_start falls in this year. */
+  year?: number;
+}): Promise<AvgCostPerProjectRow[]> {
+  let entries = await listCostEntries();
+  if (opts?.year != null) {
+    const contracts = await listContractsForCosts({ year: opts.year });
+    const ids = new Set(contracts.map((c) => c.id));
+    entries = entries.filter((e) => ids.has(e.contract_id));
+  }
   const byCategory = new Map<
     CostCategory,
     { total: number; projects: Set<string> }
