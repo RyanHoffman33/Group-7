@@ -11,6 +11,13 @@ import {
 import { createContract } from "@/features/contracts/actions";
 import { formatCurrency } from "@/features/billing/aging";
 import { Panel } from "@/components/billing/ui";
+import {
+  CHECKPOINT_TYPES,
+  CHECKPOINT_LABELS,
+  INVOLVEMENT_MODEL_DESCRIPTIONS,
+  INVOLVEMENT_MODEL_LABELS,
+  type InvolvementModel,
+} from "@/features/involvement/checkpoints";
 
 type Customer = { id: string; name: string };
 type DiscountType = "none" | "percent" | "fixed";
@@ -147,6 +154,15 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
 
   const [createdBy, setCreatedBy] = useState("Coordinator Lee");
   const [submitNow, setSubmitNow] = useState(false);
+  const [involvementModel, setInvolvementModel] = useState<
+    "collaborative" | "full_service" | "custom"
+  >("collaborative");
+  const [customCheckpoints, setCustomCheckpoints] = useState<string[]>([
+    "venue",
+    "budget",
+    "change_order",
+    "cancellation",
+  ]);
 
   const [cancelPolicy, setCancelPolicy] = useState(
     "Deposit forfeited if canceled within 60 days of the event; sliding scale thereafter.",
@@ -530,6 +546,9 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         notes: notes || undefined,
         created_by: createdBy,
         submit_for_approval: submitNow,
+        involvement_model: involvementModel,
+        custom_checkpoint_types:
+          involvementModel === "custom" ? customCheckpoints : undefined,
         line_items: lines
           .filter((l) => l.description.trim())
           .map((l) => ({
@@ -1230,9 +1249,66 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               />
               Submit for project manager approval immediately
             </label>
+            <fieldset className="sm:col-span-2">
+              <legend className="mb-2 text-xs font-medium text-[var(--muted)]">
+                Customer involvement model
+              </legend>
+              <div className="space-y-2">
+                {(
+                  ["collaborative", "full_service", "custom"] as InvolvementModel[]
+                ).map((m) => (
+                  <label
+                    key={m}
+                    className="flex cursor-pointer gap-2 rounded-md border border-[var(--line)] px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="radio"
+                      name="involvement"
+                      checked={involvementModel === m}
+                      onChange={() => setInvolvementModel(m)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="font-semibold">
+                        {INVOLVEMENT_MODEL_LABELS[m]}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                        {INVOLVEMENT_MODEL_DESCRIPTIONS[m]}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {involvementModel === "custom" ? (
+              <div className="sm:col-span-2">
+                <p className="mb-2 text-xs font-medium text-[var(--muted)]">
+                  Custom required checkpoints
+                </p>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {CHECKPOINT_TYPES.map((t) => (
+                    <label key={t} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={customCheckpoints.includes(t)}
+                        onChange={() =>
+                          setCustomCheckpoints((prev) =>
+                            prev.includes(t)
+                              ? prev.filter((x) => x !== t)
+                              : [...prev, t],
+                          )
+                        }
+                      />
+                      {CHECKPOINT_LABELS[t]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <p className="text-xs text-[var(--muted)] sm:col-span-2">
-              Approval does not recognize revenue. Roles will harden when Users
-              &amp; Roles ships (Brandon).
+              Internal contract approval does not recognize revenue. Customer
+              involvement controls which planning checkpoints the client must
+              approve in their portal.
             </p>
           </div>
         )}

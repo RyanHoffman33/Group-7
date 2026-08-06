@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SAMPLE_CUSTOMER_EVENTS } from "@/features/dashboard/customer-sample";
 import { PageHeader } from "@/components/billing/ui";
 import { useCustomerPortal } from "@/components/dashboard/CustomerPortalContext";
+import {
+  INVOLVEMENT_MODEL_LABELS,
+  isInvolvementModel,
+} from "@/features/involvement/checkpoints";
 
 const NAV = [
   { href: "/dashboard/customer", label: "Overview", exact: true },
@@ -20,6 +23,7 @@ export function CustomerPortalShell({ children }: { children: React.ReactNode })
   const {
     fullName,
     organization,
+    contracts,
     selectedId,
     setSelectedId,
     flash,
@@ -49,9 +53,9 @@ export function CustomerPortalShell({ children }: { children: React.ReactNode })
         </div>
       ) : null}
 
-      {SAMPLE_CUSTOMER_EVENTS.length > 1 ? (
+      {contracts.length > 1 ? (
         <div className="flex flex-wrap gap-1.5">
-          {SAMPLE_CUSTOMER_EVENTS.map((e) => (
+          {contracts.map((e) => (
             <button
               key={e.id}
               type="button"
@@ -62,9 +66,16 @@ export function CustomerPortalShell({ children }: { children: React.ReactNode })
                   : "border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] hover:bg-[#f7f9fb]"
               }`}
             >
-              {e.eventName}
+              {e.event_name}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {contracts.length === 0 ? (
+        <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-6 text-sm text-[var(--muted)]">
+          No events are linked to your customer account yet. Contact your
+          MainEvent project manager if you expected to see an engagement here.
         </div>
       ) : null}
 
@@ -94,7 +105,8 @@ export function CustomerPortalShell({ children }: { children: React.ReactNode })
                       {pendingCount}
                     </span>
                   ) : null}
-                  {item.href.endsWith("/invoices") && financial.outstandingBalance > 0 ? (
+                  {item.href.endsWith("/invoices") &&
+                  financial.outstandingBalance > 0 ? (
                     <span className="ml-1.5 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
                       Due
                     </span>
@@ -109,4 +121,9 @@ export function CustomerPortalShell({ children }: { children: React.ReactNode })
       {children}
     </div>
   );
+}
+
+export function involvementLabel(model: string | null | undefined) {
+  if (isInvolvementModel(model)) return INVOLVEMENT_MODEL_LABELS[model];
+  return "Collaborative";
 }

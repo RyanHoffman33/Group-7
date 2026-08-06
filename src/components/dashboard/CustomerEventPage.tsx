@@ -1,11 +1,40 @@
 "use client";
 
-import { formatDate } from "@/features/billing/aging";
-import { Panel } from "@/components/billing/ui";
+import { formatDate, formatLabel } from "@/features/billing/aging";
+import { Money, Panel } from "@/components/billing/ui";
 import { useCustomerPortal } from "@/components/dashboard/CustomerPortalContext";
+import { involvementLabel } from "@/components/dashboard/CustomerPortalShell";
+import {
+  INVOLVEMENT_MODEL_DESCRIPTIONS,
+  isInvolvementModel,
+} from "@/features/involvement/checkpoints";
+
+const HERO_BY_TYPE: Record<string, { src: string; alt: string }> = {
+  corporate_conference: {
+    src: "/brand/customer-conference-hero.png?v=2",
+    alt: "Conference session in a hotel ballroom",
+  },
+  holiday_party: {
+    src: "/brand/customer-holiday-reception-hero.png?v=1",
+    alt: "Holiday reception in a decorated event space",
+  },
+};
 
 export function CustomerEventPage() {
-  const { event } = useCustomerPortal();
+  const { contract } = useCustomerPortal();
+
+  if (!contract) {
+    return (
+      <p className="text-sm text-[var(--muted)]">No event linked to your account.</p>
+    );
+  }
+
+  const hero =
+    HERO_BY_TYPE[contract.event_type ?? ""] ??
+    HERO_BY_TYPE.corporate_conference;
+  const modelDesc = isInvolvementModel(contract.involvement_model)
+    ? INVOLVEMENT_MODEL_DESCRIPTIONS[contract.involvement_model]
+    : INVOLVEMENT_MODEL_DESCRIPTIONS.collaborative;
 
   return (
     <div className="flex flex-col gap-3">
@@ -13,75 +42,87 @@ export function CustomerEventPage() {
         <div className="relative h-48 w-full sm:h-56">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={event.heroImage}
-            alt={event.heroAlt}
+            src={hero.src}
+            alt={hero.alt}
             className="absolute inset-0 h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
           <div className="absolute bottom-4 left-4 right-4">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
-              {event.eventType} · {event.status}
+              {formatLabel(contract.event_type ?? "event")} ·{" "}
+              {formatLabel(contract.status)}
             </p>
             <h2 className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white sm:text-3xl">
-              {event.eventName}
+              {contract.event_name}
             </h2>
           </div>
         </div>
         <div className="p-4 sm:p-5">
-          <p className="text-sm text-[var(--muted)]">{event.summary}</p>
+          {contract.notes ? (
+            <p className="text-sm text-[var(--muted)]">{contract.notes}</p>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">
+              Your MainEvent engagement details for contract{" "}
+              {contract.contract_number}.
+            </p>
+          )}
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Date</dt>
-              <dd className="font-medium">{formatDate(event.eventDate)}</dd>
+              <dt className="text-[11px] uppercase tracking-wide text-[var(--muted)]">
+                Date
+              </dt>
+              <dd className="font-medium">{formatDate(contract.event_start)}</dd>
             </div>
             <div>
-              <dt className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Guests</dt>
-              <dd className="font-medium">{event.guestCount}</dd>
+              <dt className="text-[11px] uppercase tracking-wide text-[var(--muted)]">
+                Guests
+              </dt>
+              <dd className="font-medium">
+                {contract.guest_count != null ? contract.guest_count : "—"}
+              </dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Venue</dt>
-              <dd className="font-medium">{event.venue}</dd>
-              <dd className="text-[13px] text-[var(--muted)]">{event.venueAddress}</dd>
+              <dt className="text-[11px] uppercase tracking-wide text-[var(--muted)]">
+                Venue
+              </dt>
+              <dd className="font-medium">{contract.venue_name ?? "TBD"}</dd>
+              <dd className="text-[13px] text-[var(--muted)]">
+                {contract.venue_city ?? ""}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-wide text-[var(--muted)]">
+                Contract #
+              </dt>
+              <dd className="font-medium">{contract.contract_number}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-wide text-[var(--muted)]">
+                Contract value
+              </dt>
+              <dd className="font-medium">
+                <Money amount={contract.contract_value} />
+              </dd>
             </div>
           </dl>
         </div>
       </section>
 
-      <Panel title="Agenda" bodyClassName="px-4 py-3">
-        <ul className="space-y-2 text-sm">
-          {event.agenda.map((row) => (
-            <li key={row.time} className="flex gap-3">
-              <span className="w-20 shrink-0 font-medium tabular-nums text-[var(--muted)]">
-                {row.time}
-              </span>
-              <span>{row.item}</span>
-            </li>
-          ))}
-        </ul>
-      </Panel>
-
-      <Panel title="Included in your package" bodyClassName="px-4 py-3">
-        <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--muted)]">
-          {event.inclusions.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
+      <Panel title="Your involvement model" bodyClassName="px-4 py-3">
+        <p className="font-semibold">
+          {involvementLabel(contract.involvement_model)}
+        </p>
+        <p className="mt-1 text-sm text-[var(--muted)]">{modelDesc}</p>
       </Panel>
 
       <Panel title="Your event contact" bodyClassName="px-4 py-3">
-        <p className="font-semibold">{event.managerName}</p>
-        <p className="text-sm text-[var(--muted)]">{event.managerRole}</p>
+        <p className="font-semibold">{contract.project_manager_label}</p>
+        <p className="text-sm text-[var(--muted)]">Project Manager</p>
         <a
-          href={`mailto:${event.managerEmail}`}
+          href="mailto:emily.gray@mainevent.example"
           className="mt-2 block text-sm font-medium text-[var(--accent)] hover:underline"
         >
-          {event.managerEmail}
-        </a>
-        <a
-          href={`tel:${event.managerPhone.replace(/\D/g, "")}`}
-          className="mt-1 block text-sm text-[var(--muted)] hover:text-[var(--ink)]"
-        >
-          {event.managerPhone}
+          Contact via your MainEvent manager
         </a>
       </Panel>
     </div>

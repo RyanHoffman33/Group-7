@@ -102,6 +102,8 @@ export type CreateContractInput = {
     external_url?: string;
   };
   submit_for_approval?: boolean;
+  involvement_model?: string;
+  custom_checkpoint_types?: string[];
 };
 
 export async function createContract(
@@ -202,6 +204,12 @@ export async function createContract(
     const supabase = createClient();
     const contract_number = await nextContractNumber();
     const status = input.submit_for_approval ? "pending_approval" : "draft";
+    const involvementModel =
+      input.involvement_model === "full_service" ||
+      input.involvement_model === "custom" ||
+      input.involvement_model === "collaborative"
+        ? input.involvement_model
+        : "collaborative";
 
     const { data: contract, error } = await supabase
       .from("contracts")
@@ -231,6 +239,7 @@ export async function createContract(
         notes: input.notes || null,
         status,
         performance_complete: false,
+        involvement_model: involvementModel,
         submitted_at: input.submit_for_approval ? new Date().toISOString() : null,
         submitted_by: input.submit_for_approval ? input.created_by : null,
       })
@@ -238,6 +247,19 @@ export async function createContract(
       .single();
     if (error) throw error;
     const id = contract.id as string;
+
+    if (involvementModel === "custom" && input.custom_checkpoint_types?.length) {
+      const types = input.custom_checkpoint_types.filter(Boolean);
+      if (types.length) {
+        await supabase.from("contract_involvement_checkpoints").insert(
+          types.map((checkpoint_type) => ({
+            contract_id: id,
+            checkpoint_type,
+            required: true,
+          })),
+        );
+      }
+    }
 
     if (input.line_items?.length) {
       const { error: lErr } = await supabase.from("contract_line_items").insert(

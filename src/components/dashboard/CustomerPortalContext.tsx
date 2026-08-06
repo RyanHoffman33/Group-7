@@ -4,14 +4,19 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
+import { decideCustomerApproval } from "@/features/involvement/actions";
+import type {
+  ApprovalItemWithMeta,
+  CustomerFacingContract,
+} from "@/features/involvement/types";
 import {
-  SAMPLE_ACTION_ITEMS,
-  SAMPLE_ACTIVE_EVENT_ID,
-  SAMPLE_CUSTOMER_EVENTS,
   SAMPLE_DOCUMENTS,
   SAMPLE_INVOICES,
   SAMPLE_MILESTONES,
@@ -19,9 +24,7 @@ import {
   daysUntil,
   financialFromInvoices,
   planningProgressFromMilestones,
-  type CustomerActionItem,
   type CustomerDocument,
-  type CustomerEvent,
   type CustomerInvoice,
   type CustomerPayment,
 } from "@/features/dashboard/customer-sample";
@@ -29,10 +32,11 @@ import {
 type PortalContextValue = {
   fullName: string;
   organization?: string | null;
-  event: CustomerEvent;
+  contracts: CustomerFacingContract[];
+  contract: CustomerFacingContract | null;
   selectedId: string;
   setSelectedId: (id: string) => void;
-  actions: CustomerActionItem[];
+  approvals: ApprovalItemWithMeta[];
   invoices: CustomerInvoice[];
   payments: CustomerPayment[];
   milestones: typeof SAMPLE_MILESTONES;
@@ -43,13 +47,16 @@ type PortalContextValue = {
   progress: ReturnType<typeof planningProgressFromMilestones>;
   financial: ReturnType<typeof financialFromInvoices>;
   pendingCount: number;
-  eventActions: CustomerActionItem[];
+  eventApprovals: ApprovalItemWithMeta[];
   eventInvoices: CustomerInvoice[];
   eventDocs: CustomerDocument[];
   eventMilestones: typeof SAMPLE_MILESTONES;
+  /** @deprecated use eventApprovals — kept for overview page compatibility */
+  eventActions: ApprovalItemWithMeta[];
   approveAction: (id: string) => void;
-  requestChanges: (id: string, note: string) => boolean;
+  requestChanges: (id: string, note: string) => void;
   recordPayment: (invoiceId: string, method: "ACH" | "Wire" | "Card") => void;
+  deciding: boolean;
 };
 
 const CustomerPortalContext = createContext<PortalContextValue | null>(null);
@@ -57,40 +64,52 @@ const CustomerPortalContext = createContext<PortalContextValue | null>(null);
 export function CustomerPortalProvider({
   fullName,
   organization,
-  initialEventId,
+  contracts,
+  approvals: initialApprovals,
   children,
 }: {
   fullName: string;
   organization?: string | null;
-  initialEventId?: string;
+  contracts: CustomerFacingContract[];
+  approvals: ApprovalItemWithMeta[];
   children: ReactNode;
 }) {
-  const [selectedId, setSelectedId] = useState(
-    SAMPLE_CUSTOMER_EVENTS.find((e) => e.id === initialEventId)?.id ??
-      SAMPLE_ACTIVE_EVENT_ID,
-  );
-  const [actions, setActions] = useState(SAMPLE_ACTION_ITEMS);
+  const router = useRouter();
+  const [selectedId, setSelectedId] = useState(contracts[0]?.id ?? "");
+  const [approvals, setApprovals] = useState(initialApprovals);
   const [invoices, setInvoices] = useState(SAMPLE_INVOICES);
   const [payments, setPayments] = useState(SAMPLE_PAYMENTS);
   const [milestones, setMilestones] = useState(SAMPLE_MILESTONES);
   const [flash, setFlash] = useState<string | null>(null);
+  const [deciding, startDecide] = useTransition();
 
-  const event =
-    SAMPLE_CUSTOMER_EVENTS.find((e) => e.id === selectedId) ??
-    SAMPLE_CUSTOMER_EVENTS[0];
+  useEffect(() => {
+    setApprovals(initialApprovals);
+  }, [initialApprovals]);
+
+  useEffect(() => {
+    if (contracts.length && !contracts.some((c) => c.id === selectedId)) {
+      setSelectedId(contracts[0].id);
+    }
+  }, [contracts, selectedId]);
+
+  const contract =
+    contracts.find((c) => c.id === selectedId) ?? contracts[0] ?? null;
 
   const today = useMemo(() => new Date(), []);
-  const days = daysUntil(event.eventDate, today);
-  const eventMilestones = milestones.filter((m) => m.eventId === event.id);
-  const progress = planningProgressFromMilestones(
-    eventMilestones.length ? eventMilestones : milestones,
-    today,
+  const eventDate = contract?.event_start?.slice(0, 10) ?? "";
+  const days = eventDate ? daysUntil(eventDate, today) : 0;
+
+  const eventApprovals = approvals.filter(
+    (a) => !contract || a.contract_id === contract.id,
   );
-  const eventInvoices = invoices.filter((i) => i.eventId === event.id);
+  const pendingCount = eventApprovals.filter((a) => a.status === "pending").length;
+
+  const eventMilestones = milestones;
+  const progress = planningProgressFromMilestones(eventMilestones, today);
+  const eventInvoices = invoices;
   const financial = financialFromInvoices(eventInvoices);
-  const eventActions = actions.filter((a) => a.eventId === event.id);
-  const pendingCount = eventActions.filter((a) => a.status === "pending").length;
-  const eventDocs = SAMPLE_DOCUMENTS.filter((d) => d.eventId === event.id);
+  const eventDocs = SAMPLE_DOCUMENTS;
 
   const showFlash = useCallback((msg: string) => {
     setFlash(msg);
@@ -99,39 +118,53 @@ export function CustomerPortalProvider({
 
   const approveAction = useCallback(
     (id: string) => {
-      const item = actions.find((a) => a.id === id);
-      setActions((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: "approved" as const } : a)),
-      );
-      if (item?.title.toLowerCase().includes("catering")) {
-        setMilestones((prev) =>
-          prev.map((m) =>
-            m.id === "ms-4"
-              ? { ...m, status: "complete" as const, dateLabel: "Approved today" }
-              : m,
+      startDecide(async () => {
+        const res = await decideCustomerApproval({
+          approvalItemId: id,
+          decision: "approved",
+        });
+        if (!res.ok) {
+          showFlash(res.error);
+          return;
+        }
+        setApprovals((prev) =>
+          prev.map((a) =>
+            a.id === id ? { ...a, status: "approved" as const } : a,
           ),
         );
-      }
-      showFlash(`Approved: ${item?.title ?? "item"}`);
+        showFlash("Approved — decision recorded.");
+        router.refresh();
+      });
     },
-    [actions, showFlash],
+    [router, showFlash],
   );
 
   const requestChanges = useCallback(
     (id: string, note: string) => {
       if (!note.trim()) {
         showFlash("Add a short note so your manager knows what to revise.");
-        return false;
+        return;
       }
-      setActions((prev) =>
-        prev.map((a) =>
-          a.id === id ? { ...a, status: "changes_requested" as const } : a,
-        ),
-      );
-      showFlash("Change request sent to your event manager.");
-      return true;
+      startDecide(async () => {
+        const res = await decideCustomerApproval({
+          approvalItemId: id,
+          decision: "changes_requested",
+          comments: note,
+        });
+        if (!res.ok) {
+          showFlash(res.error);
+          return;
+        }
+        setApprovals((prev) =>
+          prev.map((a) =>
+            a.id === id ? { ...a, status: "changes_requested" as const } : a,
+          ),
+        );
+        showFlash("Change request sent to your event manager.");
+        router.refresh();
+      });
     },
-    [showFlash],
+    [router, showFlash],
   );
 
   const recordPayment = useCallback(
@@ -175,10 +208,11 @@ export function CustomerPortalProvider({
   const value: PortalContextValue = {
     fullName,
     organization,
-    event,
-    selectedId,
+    contracts,
+    contract,
+    selectedId: contract?.id ?? selectedId,
     setSelectedId,
-    actions,
+    approvals,
     invoices,
     payments,
     milestones,
@@ -189,13 +223,15 @@ export function CustomerPortalProvider({
     progress,
     financial,
     pendingCount,
-    eventActions,
+    eventApprovals,
+    eventActions: eventApprovals,
     eventInvoices,
     eventDocs,
-    eventMilestones: eventMilestones.length ? eventMilestones : milestones,
+    eventMilestones,
     approveAction,
     requestChanges,
     recordPayment,
+    deciding,
   };
 
   return (

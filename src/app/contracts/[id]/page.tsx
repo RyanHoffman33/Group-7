@@ -12,6 +12,11 @@ import {
   listLineItems,
   listMilestones,
 } from "@/features/contracts/queries";
+import {
+  getContractInvolvement,
+  listApprovalItemsForContract,
+} from "@/features/involvement/queries";
+import { isCheckpointType } from "@/features/involvement/checkpoints";
 import { ContractDetailClient } from "@/components/contracts/ContractDetailClient";
 import { PageHeader } from "@/components/billing/ui";
 import Link from "next/link";
@@ -40,6 +45,8 @@ export default async function ContractDetailPage({
     invoices,
     payments,
     deposits,
+    involvement,
+    customerApprovalItems,
   ] = await Promise.all([
     listLineItems(contractId),
     listDeliverables(contractId),
@@ -51,7 +58,13 @@ export default async function ContractDetailPage({
     listContractInvoices(contractId),
     listContractPayments(contractId),
     listContractDeposits(contractId),
+    getContractInvolvement(contractId),
+    listApprovalItemsForContract(contractId),
   ]);
+
+  const customTypes = involvement.customCheckpoints
+    .map((c) => c.checkpoint_type)
+    .filter(isCheckpointType);
 
   return (
     <div>
@@ -79,6 +92,10 @@ export default async function ContractDetailPage({
         invoices={invoices}
         payments={payments}
         deposits={deposits}
+        involvementModel={involvement.model}
+        involvementRequiredTypes={involvement.requiredTypes}
+        involvementCustomTypes={customTypes}
+        customerApprovalItems={customerApprovalItems}
       />
     </div>
   );

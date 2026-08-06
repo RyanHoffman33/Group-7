@@ -54,6 +54,8 @@ export type EngagementContract = {
   notes: string | null;
   internal_memo: string | null;
   closeout_notes: string | null;
+  /** Customer involvement model: collaborative | full_service | custom */
+  involvement_model?: string | null;
   created_at: string;
   updated_at: string | null;
 };

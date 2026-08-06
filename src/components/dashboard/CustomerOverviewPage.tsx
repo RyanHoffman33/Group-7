@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { formatDate } from "@/features/billing/aging";
-import { Money, Panel, StatusPill } from "@/components/billing/ui";
+import { formatDate, formatLabel } from "@/features/billing/aging";
+import { Money, Panel } from "@/components/billing/ui";
 import { useCustomerPortal } from "@/components/dashboard/CustomerPortalContext";
+import { involvementLabel } from "@/components/dashboard/CustomerPortalShell";
 import type { CustomerMilestoneStatus } from "@/features/dashboard/customer-sample";
 
 function MilestoneIcon({ status }: { status: CustomerMilestoneStatus }) {
@@ -28,9 +29,20 @@ function MilestoneIcon({ status }: { status: CustomerMilestoneStatus }) {
   );
 }
 
+const HERO_BY_TYPE: Record<string, { src: string; alt: string }> = {
+  corporate_conference: {
+    src: "/brand/customer-conference-hero.png?v=2",
+    alt: "Conference session in a hotel ballroom",
+  },
+  holiday_party: {
+    src: "/brand/customer-holiday-reception-hero.png?v=1",
+    alt: "Holiday reception in a decorated event space",
+  },
+};
+
 export function CustomerOverviewPage() {
   const {
-    event,
+    contract,
     days,
     progress,
     financial,
@@ -38,6 +50,18 @@ export function CustomerOverviewPage() {
     eventMilestones,
     eventDocs,
   } = useCustomerPortal();
+
+  if (!contract) {
+    return (
+      <p className="text-sm text-[var(--muted)]">
+        No event selected. Your contracts will appear here once linked.
+      </p>
+    );
+  }
+
+  const hero =
+    HERO_BY_TYPE[contract.event_type ?? ""] ??
+    HERO_BY_TYPE.corporate_conference;
 
   return (
     <div className="flex flex-col gap-3">
@@ -58,27 +82,36 @@ export function CustomerOverviewPage() {
             <div className="relative min-h-[160px] sm:min-h-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={event.heroImage}
-                alt={event.heroAlt}
+                src={hero.src}
+                alt={hero.alt}
                 className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
               <div className="absolute bottom-3 left-3 rounded bg-black/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/95">
-                {event.eventType}
+                {formatLabel(contract.event_type ?? "event")}
               </div>
             </div>
             <div className="flex flex-col justify-between p-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                  {event.status}
+                  {formatLabel(contract.status)} ·{" "}
+                  {involvementLabel(contract.involvement_model)}
                 </p>
                 <h3 className="mt-1 font-[family-name:var(--font-display)] text-[1.35rem] leading-snug text-[var(--ink)]">
-                  {event.eventName}
+                  {contract.event_name}
                 </h3>
                 <ul className="mt-3 space-y-1.5 text-[13px] text-[var(--muted)]">
-                  <li>{formatDate(event.eventDate)}</li>
-                  <li className="truncate">{event.venue}</li>
-                  <li>{event.guestCount} guests</li>
+                  <li>{formatDate(contract.event_start)}</li>
+                  <li className="truncate">
+                    {[contract.venue_name, contract.venue_city]
+                      .filter(Boolean)
+                      .join(", ") || "Venue TBD"}
+                  </li>
+                  <li>
+                    {contract.guest_count != null
+                      ? `${contract.guest_count} guests`
+                      : "Guest count TBD"}
+                  </li>
                 </ul>
               </div>
               <Link
@@ -119,107 +152,46 @@ export function CustomerOverviewPage() {
 
         <Panel compact title="Milestones" bodyClassName="px-3 py-1">
           <ul>
-            {eventMilestones.map((m) => (
+            {eventMilestones.slice(0, 5).map((m) => (
               <li
                 key={m.id}
-                className="flex items-center gap-2.5 border-b border-[var(--line)] py-1.5 last:border-0"
+                className="flex items-center gap-2 border-b border-[var(--line)] py-2 last:border-0"
               >
                 <MilestoneIcon status={m.status} />
                 <div className="min-w-0 flex-1">
-                  <p
-                    className={`truncate text-[12px] font-medium ${
-                      m.status === "complete" ? "text-[var(--muted)]" : "text-[var(--ink)]"
-                    }`}
-                  >
-                    {m.name}
-                  </p>
-                  <p
-                    className={`text-[11px] ${
-                      m.status === "action_needed"
-                        ? "font-medium text-[#d97706]"
-                        : "text-[var(--muted)]"
-                    }`}
-                  >
-                    {m.dateLabel}
-                  </p>
+                  <p className="truncate text-[13px] font-medium">{m.name}</p>
+                  <p className="text-[11px] text-[var(--muted)]">{m.dateLabel}</p>
                 </div>
               </li>
             ))}
           </ul>
         </Panel>
 
-        <Panel compact title="Financial summary" bodyClassName="px-3 py-3">
+        <Panel compact title="Financial snapshot" bodyClassName="px-3 py-3">
           <dl className="space-y-2 text-[13px]">
             <div className="flex justify-between gap-2">
-              <dt className="text-[var(--muted)]">Contract total</dt>
-              <dd className="font-semibold tabular-nums">
-                <Money amount={financial.contractTotal} />
+              <dt className="text-[var(--muted)]">Contract value</dt>
+              <dd className="font-semibold">
+                <Money amount={contract.contract_value} />
               </dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[var(--muted)]">Deposit (paid / billed)</dt>
-              <dd className="font-semibold tabular-nums">
-                <Money amount={financial.depositPaid} />
-                <span className="font-normal text-[var(--muted)]">
-                  {" "}
-                  / <Money amount={financial.depositBilled} />
-                </span>
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-[var(--muted)]">Progress invoices remaining</dt>
-              <dd className="font-semibold tabular-nums text-[#d97706]">
-                <Money amount={financial.progressRemaining} />
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2 border-t border-[var(--line)] pt-2">
-              <dt className="text-[var(--muted)]">Open balance</dt>
-              <dd className="font-semibold tabular-nums text-[#d97706]">
+              <dt className="text-[var(--muted)]">Outstanding</dt>
+              <dd className="font-semibold">
                 <Money amount={financial.outstandingBalance} />
               </dd>
             </div>
           </dl>
-          <p className="mt-2 text-[11px] text-[var(--muted)]">
-            Deposits are held against your event until production milestones are
-            billed. Status:{" "}
-            <span className="font-medium text-[var(--ink)]">
-              {financial.depositStatus === "satisfied"
-                ? "Deposit satisfied"
-                : financial.depositStatus === "partial"
-                  ? "Deposit partially paid"
-                  : financial.depositStatus === "due"
-                    ? "Deposit due"
-                    : "No deposit invoice"}
-            </span>
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              href="/dashboard/customer/invoices"
-              className="inline-flex rounded-md bg-[var(--accent)] px-3 py-2 text-[12px] font-semibold text-white hover:opacity-95"
-            >
-              View invoices
-            </Link>
-            <Link
-              href="/dashboard/customer/actions"
-              className="inline-flex rounded-md border border-[var(--line)] px-3 py-2 text-[12px] font-semibold hover:bg-[#f7f9fb]"
-            >
-              Action items
-              {pendingCount > 0 ? ` (${pendingCount})` : ""}
-            </Link>
-          </div>
+          <Link
+            href="/dashboard/customer/actions"
+            className="mt-3 inline-flex text-[12px] font-semibold text-[var(--accent)] hover:underline"
+          >
+            {pendingCount > 0
+              ? `Review ${pendingCount} approval${pendingCount === 1 ? "" : "s"}`
+              : "View action items"}
+          </Link>
         </Panel>
       </div>
-
-      <Panel compact title="Your event contact" bodyClassName="px-3 py-3">
-        <p className="text-[13px] font-semibold">{event.managerName}</p>
-        <p className="text-[12px] text-[var(--muted)]">{event.managerRole}</p>
-        <a
-          href={`mailto:${event.managerEmail}`}
-          className="mt-2 inline-block text-[12px] font-medium text-[var(--accent)] hover:underline"
-        >
-          {event.managerEmail}
-        </a>
-      </Panel>
     </div>
   );
 }
@@ -235,10 +207,10 @@ function Stat({
 }) {
   return (
     <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
-      <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">{label}</p>
+      <p className="text-[11px] font-medium text-[var(--muted)]">{label}</p>
       <p
-        className={`mt-1 text-xl font-semibold tabular-nums ${
-          warn ? "text-[#d97706]" : "text-[var(--ink)]"
+        className={`mt-1 text-lg font-semibold tabular-nums ${
+          warn ? "text-[#b45309]" : "text-[var(--ink)]"
         }`}
       >
         {value}

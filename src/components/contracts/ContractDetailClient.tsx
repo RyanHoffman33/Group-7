@@ -25,6 +25,13 @@ import {
   type ContractStatus,
 } from "@/features/contracts/status";
 import { Money, Panel, StatusPill } from "@/components/billing/ui";
+import { InvolvementPanel } from "@/components/contracts/InvolvementPanel";
+import type { ApprovalItemWithMeta } from "@/features/involvement/types";
+import type { CheckpointType, InvolvementModel } from "@/features/involvement/checkpoints";
+import {
+  INVOLVEMENT_MODEL_LABELS,
+  isInvolvementModel,
+} from "@/features/involvement/checkpoints";
 
 const TABS = [
   "Overview",
@@ -33,6 +40,7 @@ const TABS = [
   "Payment Schedule",
   "Billing",
   "Event and Engagement",
+  "Customer Involvement",
   "Approvals",
   "Change Orders",
   "Documents",
@@ -110,6 +118,10 @@ export function ContractDetailClient({
   invoices = [],
   payments = [],
   deposits = [],
+  involvementModel = "collaborative",
+  involvementRequiredTypes = [],
+  involvementCustomTypes = [],
+  customerApprovalItems = [],
 }: {
   contract: ContractListRow;
   lines: Record<string, unknown>[];
@@ -122,6 +134,10 @@ export function ContractDetailClient({
   invoices?: ContractInvoiceSummary[];
   payments?: ContractPaymentSummary[];
   deposits?: ContractDepositSummary[];
+  involvementModel?: InvolvementModel;
+  involvementRequiredTypes?: CheckpointType[];
+  involvementCustomTypes?: CheckpointType[];
+  customerApprovalItems?: ApprovalItemWithMeta[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("Overview");
@@ -181,6 +197,13 @@ export function ContractDetailClient({
             </StatusPill>
             <StatusPill tone={depositTone(contract.deposit_status)}>
               Deposit {formatLabel(contract.deposit_status)}
+            </StatusPill>
+            <StatusPill tone="accent">
+              {INVOLVEMENT_MODEL_LABELS[
+                isInvolvementModel(involvementModel)
+                  ? involvementModel
+                  : "collaborative"
+              ]}
             </StatusPill>
           </div>
         </div>
@@ -857,8 +880,23 @@ export function ContractDetailClient({
         </Panel>
       )}
 
+      {tab === "Customer Involvement" && (
+        <InvolvementPanel
+          contractId={contract.id}
+          model={
+            isInvolvementModel(involvementModel)
+              ? involvementModel
+              : "collaborative"
+          }
+          requiredTypes={involvementRequiredTypes}
+          customTypes={involvementCustomTypes}
+          approvalItems={customerApprovalItems}
+          actorLabel={actor}
+        />
+      )}
+
       {tab === "Approvals" && (
-        <Panel title="Approval history">
+        <Panel title="Internal approval history">
           {approvals.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">No approval actions yet.</p>
           ) : (
