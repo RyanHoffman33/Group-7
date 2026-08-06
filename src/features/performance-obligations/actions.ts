@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/features/users/session";
 import {
   listCustomerFacingContracts,
-  resolveCustomerIdForOrganization,
+  resolveCustomerIdForPortalSession,
 } from "@/features/involvement/queries";
 import {
   allocationReconciles,
@@ -354,9 +354,10 @@ export async function approvePerformanceObligation(input: {
       };
     }
 
-    const customerId = await resolveCustomerIdForOrganization(
-      session.organization,
-    );
+    const customerId = await resolveCustomerIdForPortalSession({
+      organization: session.organization,
+      email: session.email,
+    });
     if (!customerId) {
       return { ok: false, error: "No customer record linked to this account." };
     }

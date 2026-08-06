@@ -233,7 +233,7 @@ export async function createContract(
         venue_city: input.venue_city || null,
         guest_count: input.guest_count ?? null,
         project_manager_label: input.project_manager_label.trim(),
-        billing_method: input.billing_method || "fixed_price",
+        billing_method: "milestone",
         contract_value: net,
         original_contract_value: gross,
         change_order_value_total: 0,
@@ -1008,6 +1008,456 @@ export async function addContractDocument(input: {
     return {
       ok: false,
       error: e instanceof Error ? e.message : "Document add failed.",
+    };
+  }
+}
+
+async function nextCancelInvoiceNumber(
+  supabase: ReturnType<typeof createClient>,
+): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `INV-${year}-`;
+  const { data } = await supabase
+    .from("invoices")
+    .select("invoice_number")
+    .like("invoice_number", `${prefix}%`)
+    .order("invoice_number", { ascending: false })
+    .limit(1);
+  let seq = 1;
+  if (data?.[0]?.invoice_number) {
+    const part = String(data[0].invoice_number).split("-").pop();
+    seq = (Number(part) || 0) + 1;
+  }
+  return `${prefix}${String(seq).padStart(4, "0")}`;
+}
+
+/**
+ * Mid-stream cancellation: amounts paid thus far are recognized as revenue,
+ * incomplete POs are cancelled, and the contract is terminated.
+ */
+export async function cancelContract(input: {
+  contract_id: string;
+  actor_label: string;
+  cancel_reason: string;
+}): Promise<ActionResult> {
+  try {
+    if (!input.actor_label?.trim())
+      return { ok: false, error: "Actor is required." };
+    if (!input.cancel_reason?.trim())
+      return { ok: false, error: "A cancellation reason is required." };
+
+    const supabase = createClient();
+    const { data: c, error } = await supabase
+      .from("contracts")
+      .select("*")
+      .eq("id", input.contract_id)
+      .single();
+    if (error) throw error;
+    if (c.status === "canceled") {
+      return { ok: false, error: "Contract is already canceled." };
+    }
+    if (c.status === "closed") {
+      return { ok: false, error: "Closed contracts cannot be canceled." };
+    }
+
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+    const customerId = c.customer_id as string;
+
+    const { data: unearnedDeps } = await supabase
+      .from("deposits")
+      .select("id, amount, status")
+      .eq("contract_id", input.contract_id)
+      .eq("status", "unearned");
+    const unearnedTotal = (unearnedDeps ?? []).reduce(
+      (s, d) => s + num(d.amount),
+      0,
+    );
+
+    // Recognize paid-but-deferred invoices (cash collected already).
+    const { data: deferredInvs } = await supabase
+      .from("invoices")
+      .select("id, status, recognition_status, total")
+      .eq("contract_id", input.contract_id)
+      .eq("recognition_status", "deferred")
+      .in("status", ["paid", "partially_paid"]);
+    if (deferredInvs?.length) {
+      await supabase
+        .from("invoices")
+        .update({ recognition_status: "recognized" })
+        .in(
+          "id",
+          deferredInvs.map((i) => i.id as string),
+        );
+      for (const inv of deferredInvs) {
+        await supabase.from("ar_ledger_entries").insert({
+          invoice_id: inv.id,
+          entry_type: "revenue_recognize",
+          debit: 0,
+          credit: num(inv.total),
+          memo: "Cancellation — recognize amounts paid to date",
+        });
+        await supabase.from("recognition_evidence").insert({
+          contract_id: input.contract_id,
+          invoice_id: inv.id,
+          evidence_type: "other",
+          evidence_date: today,
+          description:
+            "Contract cancellation — paid invoice amounts recognized as revenue",
+          supporting_ref: `cancel:${input.contract_id}`,
+          created_by: input.actor_label.trim(),
+        });
+      }
+    }
+
+    // Unearned deposits (cash held) → recognize via cancellation invoice.
+    if (unearnedTotal > 0.009) {
+      const invoiceNumber = await nextCancelInvoiceNumber(supabase);
+      const { data: inv, error: iErr } = await supabase
+        .from("invoices")
+        .insert({
+          contract_id: input.contract_id,
+          customer_id: customerId,
+          invoice_number: invoiceNumber,
+          issue_date: today,
+          due_date: today,
+          subtotal: unearnedTotal,
+          tax: 0,
+          total: unearnedTotal,
+          status: "paid",
+          recognition_status: "recognized",
+          billing_method: c.billing_method || "milestone",
+          milestone_key: `cancel-${input.contract_id.slice(0, 8)}`,
+          created_by: input.actor_label.trim(),
+        })
+        .select("id")
+        .single();
+      if (iErr) throw iErr;
+
+      await supabase.from("invoice_lines").insert({
+        invoice_id: inv.id,
+        description:
+          "Cancellation — amounts paid to date recognized as revenue",
+        quantity: 1,
+        unit_rate: unearnedTotal,
+        amount: unearnedTotal,
+        performance_obligation_ref: "cancellation",
+      });
+
+      const { data: payment, error: pErr } = await supabase
+        .from("payments")
+        .insert({
+          customer_id: customerId,
+          amount: unearnedTotal,
+          paid_at: today,
+          method: "deposit_apply",
+          reference: `CANCEL-${input.contract_id.slice(0, 8)}`,
+        })
+        .select("id")
+        .single();
+      if (pErr) throw pErr;
+
+      await supabase.from("payment_applications").insert({
+        payment_id: payment.id,
+        invoice_id: inv.id,
+        amount: unearnedTotal,
+      });
+
+      for (const d of unearnedDeps ?? []) {
+        await supabase
+          .from("deposits")
+          .update({
+            status: "applied",
+            applied_to_invoice_id: inv.id,
+          })
+          .eq("id", d.id);
+      }
+
+      await supabase.from("ar_ledger_entries").insert({
+        invoice_id: inv.id,
+        entry_type: "revenue_recognize",
+        debit: 0,
+        credit: unearnedTotal,
+        memo: "Cancellation — unearned deposits recognized as revenue",
+      });
+
+      await supabase.from("recognition_evidence").insert({
+        contract_id: input.contract_id,
+        invoice_id: inv.id,
+        evidence_type: "other",
+        evidence_date: today,
+        description: `Contract canceled. $${unearnedTotal.toFixed(2)} paid to date recognized as revenue; contract terminated.`,
+        supporting_ref: `cancel:${input.contract_id}`,
+        created_by: input.actor_label.trim(),
+      });
+    } else {
+      await supabase.from("recognition_evidence").insert({
+        contract_id: input.contract_id,
+        evidence_type: "other",
+        evidence_date: today,
+        description: `Contract canceled with no unearned deposits to recognize. Reason: ${input.cancel_reason.trim()}`,
+        supporting_ref: `cancel:${input.contract_id}`,
+        created_by: input.actor_label.trim(),
+      });
+    }
+
+    // Incomplete POs → cancelled
+    await supabase
+      .from("contract_performance_obligations")
+      .update({ status: "cancelled", updated_at: now })
+      .eq("contract_id", input.contract_id)
+      .neq("status", "completed");
+
+    const { error: uErr } = await supabase
+      .from("contracts")
+      .update({
+        status: "canceled",
+        canceled_at: now,
+        cancel_reason: input.cancel_reason.trim(),
+        canceled_by: input.actor_label.trim(),
+      })
+      .eq("id", input.contract_id);
+    if (uErr) throw uErr;
+
+    await supabase.from("contract_audit_events").insert({
+      contract_id: input.contract_id,
+      event_type: "contract_canceled",
+      summary: `Contract canceled — paid amounts recognized; ${input.cancel_reason.trim()}`,
+      actor_label: input.actor_label.trim(),
+      from_status: c.status as string,
+      to_status: "canceled",
+      payload: {
+        cancel_reason: input.cancel_reason.trim(),
+        unearned_recognized: unearnedTotal,
+      },
+    });
+
+    revalidateContracts(input.contract_id);
+    revalidatePath("/compliance");
+    revalidatePath("/compliance/recognition");
+    revalidatePath("/billing/invoices");
+    revalidatePath("/billing/deposits");
+    revalidatePath("/dashboard/customer");
+    return { ok: true, id: input.contract_id };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Cancellation failed.",
+    };
+  }
+}
+
+/**
+ * Customer accepts a draft / pending_approval proposal: typed sign + deposit (= PO1 / required deposit).
+ */
+export async function customerAcceptContractProposal(input: {
+  contract_id: string;
+  signer_name: string;
+  pay_deposit: boolean;
+}): Promise<ActionResult> {
+  try {
+    const { getSessionUser } = await import("@/features/users/session");
+    const {
+      resolveCustomerIdForPortalSession,
+    } = await import("@/features/involvement/queries");
+    const session = await getSessionUser();
+    if (!session || session.roleKey !== "customer") {
+      return { ok: false, error: "Customer sign-in required." };
+    }
+    if (!input.signer_name?.trim() || input.signer_name.trim().length < 2) {
+      return { ok: false, error: "Type your full legal name to sign." };
+    }
+    if (!input.pay_deposit) {
+      return {
+        ok: false,
+        error: "You must authorize the deposit (PO #1) to accept.",
+      };
+    }
+
+    const customerId = await resolveCustomerIdForPortalSession({
+      organization: session.organization,
+      email: session.email,
+    });
+    if (!customerId) {
+      return { ok: false, error: "No customer record linked to this account." };
+    }
+
+    const supabase = createClient();
+    const { data: c, error } = await supabase
+      .from("contracts")
+      .select("*")
+      .eq("id", input.contract_id)
+      .single();
+    if (error) throw error;
+    if (c.customer_id !== customerId) {
+      return { ok: false, error: "Proposal not found for your account." };
+    }
+    if (!["draft", "pending_approval"].includes(c.status as string)) {
+      return {
+        ok: false,
+        error: "This proposal is not open for acceptance.",
+      };
+    }
+
+    const slice = {
+      status: c.status as string,
+      deposit_required: Boolean(c.deposit_required),
+      deposit_percent: num(c.deposit_percent),
+      original_contract_value: num(
+        c.original_contract_value ?? c.contract_value,
+      ),
+      contract_value: num(c.contract_value),
+      minimum_deposit_amount: c.minimum_deposit_amount as number | null,
+    };
+    const depositAmount = requiredDepositAmount(slice);
+    if (depositAmount <= 0) {
+      return {
+        ok: false,
+        error: "Proposal has no deposit amount — contact your project manager.",
+      };
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date().toISOString();
+
+    // Prefer linking deposit to first PO when present
+    const { data: firstPo } = await supabase
+      .from("contract_performance_obligations")
+      .select("id, amount, seq")
+      .eq("contract_id", input.contract_id)
+      .order("seq", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: dep, error: dErr } = await supabase
+      .from("deposits")
+      .insert({
+        contract_id: input.contract_id,
+        customer_id: customerId,
+        amount: depositAmount,
+        received_at: today,
+        status: "unearned",
+        performance_obligation_id: firstPo?.id ?? null,
+      })
+      .select("id")
+      .single();
+    if (dErr) throw dErr;
+
+    if (firstPo?.id) {
+      await supabase
+        .from("contract_performance_obligations")
+        .update({
+          installment_deposit_id: dep.id,
+          status: "active",
+          updated_at: now,
+        })
+        .eq("id", firstPo.id);
+    }
+
+    await supabase.from("ar_ledger_entries").insert({
+      invoice_id: null,
+      entry_type: "deposit_receive",
+      debit: depositAmount,
+      credit: 0,
+      memo: `Customer accepted proposal — deposit (PO #1) for ${c.event_name}`,
+    });
+
+    const { error: uErr } = await supabase
+      .from("contracts")
+      .update({
+        status: "active",
+        approved_at: now,
+        approved_by: input.signer_name.trim(),
+        activated_at: now,
+        terms_locked_at: now,
+        notes: c.notes
+          ? `${c.notes}\n\nCustomer signed: ${input.signer_name.trim()} on ${today}.`
+          : `Customer signed: ${input.signer_name.trim()} on ${today}.`,
+      })
+      .eq("id", input.contract_id);
+    if (uErr) throw uErr;
+
+    await supabase.from("contract_approvals").insert({
+      contract_id: input.contract_id,
+      action: "approve",
+      from_status: c.status as string,
+      to_status: "active",
+      actor_label: input.signer_name.trim(),
+      actor_role: "customer",
+      comments: `Customer accepted proposal with deposit $${depositAmount.toFixed(2)}. Signatory: ${input.signer_name.trim()}.`,
+    });
+
+    await supabase.from("contract_audit_events").insert({
+      contract_id: input.contract_id,
+      event_type: "customer_accepted_proposal",
+      summary: `Customer accepted proposal; deposit $${depositAmount.toFixed(2)} recorded`,
+      actor_label: input.signer_name.trim(),
+      from_status: c.status as string,
+      to_status: "active",
+      payload: { deposit_id: dep.id, deposit_amount: depositAmount },
+    });
+
+    revalidateContracts(input.contract_id);
+    revalidatePath("/dashboard/customer");
+    revalidatePath("/dashboard/customer/actions");
+    revalidatePath("/dashboard/customer/engagement");
+    return { ok: true, id: input.contract_id };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Accept failed.",
+    };
+  }
+}
+
+export async function customerRejectContractProposal(input: {
+  contract_id: string;
+  reason?: string;
+}): Promise<ActionResult> {
+  try {
+    const { getSessionUser } = await import("@/features/users/session");
+    const {
+      resolveCustomerIdForPortalSession,
+    } = await import("@/features/involvement/queries");
+    const session = await getSessionUser();
+    if (!session || session.roleKey !== "customer") {
+      return { ok: false, error: "Customer sign-in required." };
+    }
+
+    const customerId = await resolveCustomerIdForPortalSession({
+      organization: session.organization,
+      email: session.email,
+    });
+    if (!customerId) {
+      return { ok: false, error: "No customer record linked to this account." };
+    }
+
+    const reason =
+      input.reason?.trim() || "Customer declined the contract proposal.";
+
+    const supabase = createClient();
+    const { data: c, error } = await supabase
+      .from("contracts")
+      .select("id, customer_id, status, event_name")
+      .eq("id", input.contract_id)
+      .single();
+    if (error) throw error;
+    if (c.customer_id !== customerId) {
+      return { ok: false, error: "Proposal not found for your account." };
+    }
+    if (!["draft", "pending_approval"].includes(c.status as string)) {
+      return { ok: false, error: "This proposal cannot be rejected now." };
+    }
+
+    return cancelContract({
+      contract_id: input.contract_id,
+      actor_label: session.fullName,
+      cancel_reason: reason,
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Reject failed.",
     };
   }
 }

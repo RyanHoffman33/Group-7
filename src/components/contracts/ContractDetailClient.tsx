@@ -6,6 +6,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import {
   addContractDocument,
   approveChangeOrder,
+  cancelContract,
   createChangeOrder,
   markPerformanceComplete,
   submitContractForApproval,
@@ -158,6 +159,7 @@ export function ContractDetailClient({
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [actor, setActor] = useState(contract.project_manager_label || "Alex Rivera");
+  const [cancelReason, setCancelReason] = useState("");
 
   const [coDesc, setCoDesc] = useState("");
   const [coAmount, setCoAmount] = useState("0");
@@ -415,6 +417,49 @@ export function ContractDetailClient({
                   Mark performance complete
                 </button>
               ) : null}
+              {!["canceled", "closed"].includes(contract.status) ? (
+                <div className="space-y-2 rounded-md border border-[var(--line)] p-3">
+                  <p className="text-xs text-[var(--muted)]">
+                    Mid-stream cancel recognizes amounts paid to date as revenue
+                    and terminates the contract.
+                  </p>
+                  <input
+                    className={field}
+                    placeholder="Cancellation reason (required)"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className="rounded-md border border-[var(--danger)] px-4 py-2 text-sm font-semibold text-[var(--danger)] disabled:opacity-60"
+                    onClick={() => {
+                      if (!cancelReason.trim()) {
+                        setError("Cancellation reason is required.");
+                        return;
+                      }
+                      if (
+                        !confirm(
+                          "Cancel this contract? Paid amounts will be recognized as revenue and the contract terminated.",
+                        )
+                      )
+                        return;
+                      run(
+                        () =>
+                          cancelContract({
+                            contract_id: contract.id,
+                            actor_label: actor,
+                            cancel_reason: cancelReason.trim(),
+                          }),
+                        "Contract canceled — paid amounts recognized.",
+                      );
+                      setCancelReason("");
+                    }}
+                  >
+                    Cancel contract
+                  </button>
+                </div>
+              ) : null}
               <Link
                 href="/contracts/approvals"
                 className="block text-sm font-medium text-[var(--accent)]"
@@ -667,6 +712,14 @@ export function ContractDetailClient({
             <div className="sm:col-span-2">
               <dt className="text-[var(--muted)]">Cancellation policy</dt>
               <dd className="mt-1">{contract.cancellation_policy_text ?? "—"}</dd>
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                If canceled mid-stream, amounts paid to date are recognized as
+                revenue and the contract is terminated. Default fee equals the
+                initial deposit / PO #1
+                {contract.cancellation_fee_percent
+                  ? ` (${contract.cancellation_fee_percent}% of contract value).`
+                  : "."}
+              </p>
             </div>
           </dl>
         </Panel>

@@ -14,8 +14,11 @@ import type {
   CustomerFacingContract,
 } from "./types";
 
-/** Demo customer account organization → customers.name */
-export const DEMO_CUSTOMER_ORG = "Delta Consulting";
+/** Demo customer account organization → customers.name (portal login customer@). */
+export const DEMO_CUSTOMER_ORG = "Demo Customer";
+
+/** Stable id from supabase/migrations/20260806210000_demo_customer_portal.sql */
+export const DEMO_CUSTOMER_ID = "22222222-2222-2222-2222-222222222201";
 
 const CUSTOMER_SAFE_CONTRACT_SELECT =
   "id, contract_number, event_name, event_type, event_start, event_end, venue_name, venue_city, guest_count, status, project_manager_label, involvement_model, contract_value, notes, customer_id";
@@ -32,6 +35,44 @@ export async function resolveCustomerIdForOrganization(
     .limit(1)
     .maybeSingle();
   return (data?.id as string | undefined) ?? null;
+}
+
+/** Prefer org name match; fall back to billing_email for portal users. */
+export async function resolveCustomerIdForPortalSession(input: {
+  organization?: string | null;
+  email?: string | null;
+}): Promise<string | null> {
+  const byOrg = await resolveCustomerIdForOrganization(input.organization);
+  if (byOrg) return byOrg;
+  const email = input.email?.trim().toLowerCase();
+  if (!email) return null;
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("customers")
+    .select("id, name")
+    .ilike("billing_email", email)
+    .limit(20);
+  const rows = data ?? [];
+  const preferred =
+    rows.find((r) => String(r.name).toLowerCase() === DEMO_CUSTOMER_ORG.toLowerCase()) ??
+    rows.find((r) => String(r.id) === DEMO_CUSTOMER_ID) ??
+    rows[0];
+  return (preferred?.id as string | undefined) ?? null;
+}
+
+/** Draft / pending proposals awaiting customer accept or reject. */
+export async function listCustomerContractProposals(
+  customerId: string,
+): Promise<CustomerFacingContract[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("contracts")
+    .select(CUSTOMER_SAFE_CONTRACT_SELECT)
+    .eq("customer_id", customerId)
+    .in("status", ["draft", "pending_approval"])
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapCustomerFacingContract);
 }
 
 export async function listCustomerFacingContracts(

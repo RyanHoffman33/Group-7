@@ -2,7 +2,7 @@ import { CustomerObligationsClient } from "@/components/dashboard/CustomerObliga
 import { getSessionUser } from "@/features/users/session";
 import {
   listCustomerFacingContracts,
-  resolveCustomerIdForOrganization,
+  resolveCustomerIdForPortalSession,
 } from "@/features/involvement/queries";
 import {
   buildCustomerPoViews,
@@ -18,9 +18,10 @@ export default async function CustomerObligationsPage() {
     redirect("/access-denied");
   }
 
-  const customerId = await resolveCustomerIdForOrganization(
-    session.organization,
-  );
+  const customerId = await resolveCustomerIdForPortalSession({
+    organization: session.organization,
+    email: session.email,
+  });
   const contracts = customerId
     ? await listCustomerFacingContracts(customerId)
     : [];

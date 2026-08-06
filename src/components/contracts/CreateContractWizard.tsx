@@ -24,7 +24,6 @@ import { ValuationToolClient } from "@/components/valuation/ValuationToolClient"
 
 type Customer = { id: string; name: string };
 type DiscountType = "none" | "percent" | "fixed";
-type DepositType = "percent" | "fixed";
 
 type ServiceLine = {
   key: string;
@@ -52,7 +51,7 @@ type MilestoneDraft = {
   sequence_no: number;
 };
 
-const STORAGE_KEY = "mainevent-create-contract-draft-v4";
+const STORAGE_KEY = "mainevent-create-contract-draft-v6";
 
 type StepDef = { title: string; purpose: string };
 
@@ -66,8 +65,8 @@ const STEPS: StepDef[] = [
     purpose: "List what you’re selling and what must be delivered.",
   },
   {
-    title: "Pricing & Deposit",
-    purpose: "Set billing method, contract value, discounts, and deposit.",
+    title: "Pricing",
+    purpose: "Set contract value and discounts. Deposit equals PO #1 after obligations.",
   },
   {
     title: "Performance Obligations",
@@ -77,7 +76,7 @@ const STEPS: StepDef[] = [
   {
     title: "Payment Schedule",
     purpose:
-      "One installment per obligation (amounts locked to POs). Adjust due dates if needed.",
+      "Milestone installments follow POs (amounts locked). Deposit and cancel fee equal PO #1.",
   },
   {
     title: "Approvals & Involvement",
@@ -85,18 +84,13 @@ const STEPS: StepDef[] = [
   },
   {
     title: "Terms & Review",
-    purpose: "Cancellation terms, optional documents, then confirm everything.",
+    purpose: "Cancellation terms (fee = PO #1), optional documents, then confirm.",
   },
 ];
 
-/** UI label → stored billing_method value (existing enum). */
-const BILLING_METHODS: { value: string; label: string }[] = [
-  { value: "fixed_price", label: "Fixed price" },
-  { value: "milestone", label: "Milestone billing" },
-  { value: "time_and_materials", label: "Time and materials" },
-  { value: "cost_plus", label: "Cost plus" },
-  { value: "progress", label: "Custom payment schedule" },
-];
+/** Always milestone billing — installments align with performance obligations. */
+const BILLING_METHOD = "milestone";
+const BILLING_METHOD_LABEL = "Milestone billing (aligned with POs)";
 
 const DELIVERABLE_PHASES: { value: string; label: string }[] = [
   { value: "planning", label: "Planning" },
@@ -104,20 +98,15 @@ const DELIVERABLE_PHASES: { value: string; label: string }[] = [
   { value: "wrapup", label: "Wrap-up" },
 ];
 
+/** Deposit / progress / final only — schedule aligns with PO installments. */
 const MILESTONE_TYPES: { value: string; label: string }[] = [
   { value: "deposit", label: "Deposit" },
   { value: "progress", label: "Progress" },
   { value: "final", label: "Final" },
-  { value: "retainer", label: "Retainer" },
-  { value: "other", label: "Other" },
 ];
 
 function moneyRound(n: number) {
   return Math.round(n * 100) / 100;
-}
-
-function billingLabel(value: string) {
-  return BILLING_METHODS.find((m) => m.value === value)?.label ?? value;
 }
 
 function newServiceKey() {
@@ -267,16 +256,12 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     },
   ]);
 
-  const [billingMethod, setBillingMethod] = useState("fixed_price");
+  const [billingMethod] = useState(BILLING_METHOD);
   /** Manual gross override; empty string ⇒ use sum of service lines when available. */
   const [grossOverride, setGrossOverride] = useState("");
   const [discountType, setDiscountType] = useState<DiscountType>("none");
   const [discountPercentInput, setDiscountPercentInput] = useState("");
   const [discountFixedInput, setDiscountFixedInput] = useState("");
-  const [depositRequired, setDepositRequired] = useState(true);
-  const [depositType, setDepositType] = useState<DepositType>("percent");
-  const [depositPercentInput, setDepositPercentInput] = useState("30");
-  const [depositFixedInput, setDepositFixedInput] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
   const [milestones, setMilestones] = useState<MilestoneDraft[]>([]);
@@ -318,9 +303,8 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
   ]);
 
   const [cancelPolicy, setCancelPolicy] = useState(
-    "Deposit forfeited if canceled within 60 days of the event; sliding scale thereafter.",
+    "Payment milestones follow performance obligations. The initial deposit equals PO #1. If canceled after one or more POs are in progress or paid, amounts paid to date are recognized as revenue and the contract is terminated. The default cancellation fee equals the PO #1 / deposit amount.",
   );
-  const [cancelFee, setCancelFee] = useState("25");
 
   const [docTitle, setDocTitle] = useState("Engagement proposal");
   const [docUrl, setDocUrl] = useState("");
@@ -360,24 +344,28 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     [gross, discountCalc.amount],
   );
 
+  /** First titled PO amount — deposit and default cancel fee. */
+  const po1Amount = useMemo(() => {
+    const filled = pos.filter((p) => p.title.trim());
+    if (!filled.length) return 0;
+    return moneyRound(Number(filled[0].amount) || 0);
+  }, [pos]);
+
+  const depositRequired = po1Amount > 0;
   const depositCalc = useMemo(() => {
     if (!depositRequired) {
       return { percent: 0, amount: 0, fixed: null as number | null };
     }
-    if (depositType === "fixed") {
-      const amount = moneyRound(Number(depositFixedInput) || 0);
-      return { percent: 0, amount, fixed: amount };
-    }
-    const percent = Number(depositPercentInput) || 0;
-    const amount = moneyRound(net * (percent / 100));
-    return { percent, amount, fixed: null as number | null };
-  }, [
-    depositRequired,
-    depositType,
-    depositFixedInput,
-    depositPercentInput,
-    net,
-  ]);
+    const percent =
+      net > 0 ? moneyRound((po1Amount / net) * 100) : 0;
+    return { percent, amount: po1Amount, fixed: po1Amount };
+  }, [depositRequired, po1Amount, net]);
+
+  const cancelFeeAmount = po1Amount;
+  const cancelFeePercent = useMemo(() => {
+    if (net <= 0 || po1Amount <= 0) return 0;
+    return Math.min(100, moneyRound((po1Amount / net) * 100));
+  }, [po1Amount, net]);
 
   const remainingBalance = useMemo(
     () => moneyRound(Math.max(0, net - depositCalc.amount)),
@@ -426,7 +414,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       }
     }
     if (step === 2) {
-      if (!billingMethod) e.billingMethod = "Select a billing method.";
       if (gross <= 0) e.gross = "Gross value must be greater than zero.";
       if (discountType === "percent") {
         const p = Number(discountPercentInput);
@@ -444,24 +431,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       }
       if (gross > 0 && net <= 0) {
         e.net = "Net value must be greater than zero after discount.";
-      }
-      if (depositRequired) {
-        if (depositType === "percent") {
-          const p = Number(depositPercentInput);
-          if (Number.isNaN(p) || p < 0 || p > 100) {
-            e.deposit = "Deposit % must be between 0 and 100.";
-          }
-        } else {
-          const a = Number(depositFixedInput);
-          if (Number.isNaN(a) || a < 0) {
-            e.deposit = "Deposit cannot be negative.";
-          } else if (a > net + 1e-9) {
-            e.deposit = "Deposit cannot exceed net value.";
-          }
-        }
-        if (!e.deposit && depositCalc.amount > net + 1e-9) {
-          e.deposit = "Deposit cannot exceed net value.";
-        }
       }
     }
     // Step 3: Performance Obligations
@@ -544,9 +513,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     discountPercentInput,
     discountFixedInput,
     depositRequired,
-    depositType,
-    depositPercentInput,
-    depositFixedInput,
     depositCalc.amount,
     milestones,
     scheduleSum,
@@ -601,8 +567,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         if (Array.isArray(d.lines)) setLines(ensureLineKeys(d.lines as Partial<ServiceLine>[]));
         if (Array.isArray(d.deliverables))
           setDeliverables(d.deliverables as typeof deliverables);
-        if (typeof d.billingMethod === "string")
-          setBillingMethod(d.billingMethod);
         if (typeof d.grossOverride === "string")
           setGrossOverride(d.grossOverride);
         if (
@@ -616,21 +580,11 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
           setDiscountPercentInput(d.discountPercentInput);
         if (typeof d.discountFixedInput === "string")
           setDiscountFixedInput(d.discountFixedInput);
-        if (typeof d.depositRequired === "boolean")
-          setDepositRequired(d.depositRequired);
-        if (d.depositType === "percent" || d.depositType === "fixed") {
-          setDepositType(d.depositType);
-        }
-        if (typeof d.depositPercentInput === "string")
-          setDepositPercentInput(d.depositPercentInput);
-        if (typeof d.depositFixedInput === "string")
-          setDepositFixedInput(d.depositFixedInput);
         if (Array.isArray(d.milestones))
           setMilestones(d.milestones as MilestoneDraft[]);
         if (typeof d.createdBy === "string") setCreatedBy(d.createdBy);
         if (typeof d.submitNow === "boolean") setSubmitNow(d.submitNow);
         if (typeof d.cancelPolicy === "string") setCancelPolicy(d.cancelPolicy);
-        if (typeof d.cancelFee === "string") setCancelFee(d.cancelFee);
         if (typeof d.docTitle === "string") setDocTitle(d.docTitle);
         if (typeof d.docUrl === "string") setDocUrl(d.docUrl);
         if (typeof d.notes === "string") setNotes(d.notes);
@@ -673,15 +627,10 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       discountType,
       discountPercentInput,
       discountFixedInput,
-      depositRequired,
-      depositType,
-      depositPercentInput,
-      depositFixedInput,
       milestones,
       createdBy,
       submitNow,
       cancelPolicy,
-      cancelFee,
       docTitle,
       docUrl,
       notes,
@@ -713,15 +662,10 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     discountType,
     discountPercentInput,
     discountFixedInput,
-    depositRequired,
-    depositType,
-    depositPercentInput,
-    depositFixedInput,
     milestones,
     createdBy,
     submitNow,
     cancelPolicy,
-    cancelFee,
     docTitle,
     docUrl,
     notes,
@@ -780,22 +724,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     setDiscountType(nextType);
     setDiscountPercentInput("");
     setDiscountFixedInput("");
-  }
-
-  function setDepositRequiredSafe(on: boolean) {
-    setDepositRequired(on);
-    if (!on) {
-      setDepositPercentInput("");
-      setDepositFixedInput("");
-    } else if (depositType === "percent" && !depositPercentInput) {
-      setDepositPercentInput("30");
-    }
-  }
-
-  function setDepositTypeSafe(nextType: DepositType) {
-    setDepositType(nextType);
-    setDepositPercentInput(nextType === "percent" ? "30" : "");
-    setDepositFixedInput("");
   }
 
   function serviceAmountSum(keys: string[]) {
@@ -913,21 +841,17 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         venue_city: venueCity || undefined,
         guest_count: guestCount ? Number(guestCount) : undefined,
         project_manager_label: pm,
-        billing_method: billingMethod,
+        billing_method: BILLING_METHOD,
         gross_contract_value: gross,
         contract_value: net,
         deposit_required: depositRequired,
-        deposit_percent:
-          depositRequired && depositType === "percent"
-            ? depositCalc.percent
-            : 0,
-        minimum_deposit_amount:
-          depositRequired && depositType === "fixed" ? depositCalc.amount : null,
+        deposit_percent: 0,
+        minimum_deposit_amount: depositRequired ? depositCalc.amount : null,
         discount_amount: discountType === "fixed" ? discountCalc.amount : 0,
         discount_percent:
           discountType === "percent" ? discountCalc.percent : 0,
         cancellation_policy_text: cancelPolicy,
-        cancellation_fee_percent: Number(cancelFee) || 0,
+        cancellation_fee_percent: cancelFeePercent,
         notes: notes || undefined,
         created_by: createdBy,
         submit_for_approval: submitNow,
@@ -1390,21 +1314,16 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 <h3 className="text-sm font-semibold text-[var(--ink)]">
                   Contract value
                 </h3>
-                <label className="block text-sm">
-                  <FieldLabel required>Billing method</FieldLabel>
-                  <select
-                    className={err("billingMethod") ? fieldBad : field}
-                    value={billingMethod}
-                    onChange={(e) => setBillingMethod(e.target.value)}
-                  >
-                    {BILLING_METHODS.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError message={err("billingMethod")} />
-                </label>
+                <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-2 text-sm">
+                  <span className="text-[var(--muted)]">Payment model</span>
+                  <p className="mt-0.5 font-medium text-[var(--ink)]">
+                    {BILLING_METHOD_LABEL}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Installments always follow performance obligations — no
+                    recurring schedule option.
+                  </p>
+                </div>
                 <label className="block text-sm">
                   <FieldLabel required>Gross value</FieldLabel>
                   <input
@@ -1492,90 +1411,41 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
 
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold text-[var(--ink)]">
-                  Deposit
+                  Deposit & cancellation (derived)
                 </h3>
-                <label className="flex items-start gap-3 rounded-md border border-[var(--line)] bg-white px-3 py-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={depositRequired}
-                    onChange={(e) => setDepositRequiredSafe(e.target.checked)}
-                  />
-                  <span>
-                    <span className="font-medium text-[var(--ink)]">
-                      Require deposit before work starts
-                    </span>
-                    <span className="mt-1 block text-xs text-[var(--muted)]">
-                      Held until related services are delivered. The first
-                      payment installment is tagged as deposit when enabled.
-                    </span>
-                  </span>
-                </label>
-                {depositRequired ? (
-                  <>
-                    <label className="block text-sm">
-                      <FieldLabel>Deposit type</FieldLabel>
-                      <select
-                        className={field}
-                        value={depositType}
-                        onChange={(e) =>
-                          setDepositTypeSafe(e.target.value as DepositType)
-                        }
-                      >
-                        <option value="percent">Percentage of net</option>
-                        <option value="fixed">Fixed amount</option>
-                      </select>
-                    </label>
-                    {depositType === "percent" ? (
-                      <label className="block text-sm">
-                        <FieldLabel>Deposit %</FieldLabel>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            step="0.01"
-                            className={`${err("deposit") ? fieldBad : field} pr-10`}
-                            value={depositPercentInput}
-                            onChange={(e) =>
-                              setDepositPercentInput(e.target.value)
-                            }
-                          />
-                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[var(--muted)]">
-                            %
-                          </span>
-                        </div>
-                        <FieldError message={err("deposit")} />
-                      </label>
-                    ) : (
-                      <label className="block text-sm">
-                        <FieldLabel>Deposit amount</FieldLabel>
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className={err("deposit") ? fieldBad : field}
-                          value={depositFixedInput}
-                          onChange={(e) => setDepositFixedInput(e.target.value)}
-                          placeholder="0.00"
-                        />
-                        <FieldError message={err("deposit")} />
-                      </label>
-                    )}
-                    <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-2 text-sm">
-                      <span className="text-[var(--muted)]">
-                        Deposit required
-                      </span>
-                      <p className="mt-0.5 font-semibold tabular-nums">
-                        {formatCurrency(depositCalc.amount)}
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-[var(--muted)]">
-                    No deposit required for this engagement.
+                <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-3 text-sm text-[var(--muted)]">
+                  <p className="font-medium text-[var(--ink)]">
+                    No separate down payment to enter
                   </p>
-                )}
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+                    <li>
+                      Deposit automatically equals <strong>PO #1</strong> (first
+                      performance obligation) after obligations are set.
+                    </li>
+                    <li>
+                      Default cancellation fee also equals <strong>PO #1</strong>.
+                    </li>
+                    <li>
+                      Mid-stream cancel: amounts paid to date are recognized as
+                      revenue and the contract is terminated.
+                    </li>
+                  </ul>
+                  <p className="mt-3 text-sm">
+                    {po1Amount > 0 ? (
+                      <>
+                        Current PO #1 → deposit / cancel fee:{" "}
+                        <strong className="text-[var(--ink)] tabular-nums">
+                          {formatCurrency(po1Amount)}
+                        </strong>
+                      </>
+                    ) : (
+                      <>
+                        Deposit will equal PO #1 after obligations are set on
+                        the next steps.
+                      </>
+                    )}
+                  </p>
+                </div>
               </section>
             </div>
 
@@ -1604,15 +1474,19 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--muted)]">Deposit</dt>
+                    <dt className="text-[var(--muted)]">Deposit (PO #1)</dt>
                     <dd className="tabular-nums">
-                      {formatCurrency(depositCalc.amount)}
+                      {po1Amount > 0
+                        ? formatCurrency(depositCalc.amount)
+                        : "Set after POs"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-2">
-                    <dt className="font-semibold">Remaining balance</dt>
+                    <dt className="font-semibold">Remaining after deposit</dt>
                     <dd className="font-semibold tabular-nums">
-                      {formatCurrency(remainingBalance)}
+                      {po1Amount > 0
+                        ? formatCurrency(remainingBalance)
+                        : formatCurrency(net)}
                     </dd>
                   </div>
                 </dl>
@@ -1808,10 +1682,33 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         {step === 4 && (
           <div className="space-y-3">
             <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-3 text-sm text-[var(--muted)]">
-              Installments are generated from performance obligations (one
-              payment per PO, amounts locked). Edit due dates or payment type
-              labels if needed. To change amounts, go back and edit the
-              obligations.
+              Milestone installments are generated from performance obligations
+              (one payment per PO, amounts locked). The first installment is the
+              deposit (PO #1). Edit due dates or payment type labels if needed.
+              To change amounts, go back and edit the obligations.
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">
+                <span className="text-xs text-[var(--muted)]">
+                  Deposit (= PO #1)
+                </span>
+                <p className="mt-0.5 font-semibold tabular-nums text-[var(--ink)]">
+                  {formatCurrency(depositCalc.amount)}
+                </p>
+              </div>
+              <div className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">
+                <span className="text-xs text-[var(--muted)]">
+                  Default cancel fee (= PO #1)
+                </span>
+                <p className="mt-0.5 font-semibold tabular-nums text-[var(--ink)]">
+                  {formatCurrency(cancelFeeAmount)}
+                  {cancelFeePercent > 0 ? (
+                    <span className="ml-1 text-xs font-normal text-[var(--muted)]">
+                      ({cancelFeePercent}% of net)
+                    </span>
+                  ) : null}
+                </p>
+              </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-[var(--muted)]">
@@ -2025,28 +1922,31 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 <FieldLabel required>Cancellation policy</FieldLabel>
                 <textarea
                   className={err("cancelPolicy") ? fieldBad : field}
-                  rows={3}
+                  rows={4}
                   value={cancelPolicy}
                   onChange={(e) => setCancelPolicy(e.target.value)}
                 />
                 <FieldError message={err("cancelPolicy")} />
+                <p className="mt-2 text-xs text-[var(--muted)]">
+                  Mid-stream cancellation recognizes amounts paid to date as
+                  revenue and terminates the contract. Default fee equals PO #1.
+                </p>
               </label>
-              <label className="text-sm">
-                <FieldLabel>Default cancellation fee %</FieldLabel>
-                <div className="relative max-w-xs">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className={`${field} pr-10`}
-                    value={cancelFee}
-                    onChange={(e) => setCancelFee(e.target.value)}
-                  />
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[var(--muted)]">
-                    %
-                  </span>
+              <div className="text-sm">
+                <FieldLabel>Default cancellation fee (from PO #1)</FieldLabel>
+                <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-2">
+                  <p className="font-semibold tabular-nums text-[var(--ink)]">
+                    {formatCurrency(cancelFeeAmount)}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Auto-set to match the initial deposit / PO #1
+                    {cancelFeePercent > 0
+                      ? ` (${cancelFeePercent}% of net).`
+                      : "."}{" "}
+                    Not editable — change PO #1 to adjust.
+                  </p>
                 </div>
-              </label>
+              </div>
               <label className="text-sm">
                 <FieldLabel>Document title</FieldLabel>
                 <input
@@ -2109,7 +2009,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 </div>
                 <div>
                   <dt className="text-xs text-[var(--muted)]">Billing</dt>
-                  <dd>{billingLabel(billingMethod)}</dd>
+                  <dd>{BILLING_METHOD_LABEL}</dd>
                 </div>
                 <div>
                   <dt className="text-xs text-[var(--muted)]">Value</dt>
@@ -2118,7 +2018,9 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-[var(--muted)]">Deposit</dt>
+                  <dt className="text-xs text-[var(--muted)]">
+                    Deposit / cancel fee (PO #1)
+                  </dt>
                   <dd>
                     {depositRequired
                       ? formatCurrency(depositCalc.amount)

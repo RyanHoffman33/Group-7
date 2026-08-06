@@ -138,7 +138,7 @@ export const users: AppUser[] = [
     demoPassword: DEMO_PASSWORD,
     roleKey: "customer",
     status: "active",
-    organization: "Delta Consulting",
+    organization: "Demo Customer",
     lastLoginAt: null,
     createdAt: "2026-04-15",
   },

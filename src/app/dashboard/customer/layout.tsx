@@ -5,7 +5,7 @@ import { getSessionUser } from "@/features/users/session";
 import {
   listApprovalItemsForCustomerContracts,
   listCustomerFacingContracts,
-  resolveCustomerIdForOrganization,
+  resolveCustomerIdForPortalSession,
 } from "@/features/involvement/queries";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +21,10 @@ export default async function CustomerPortalLayout({
     redirect("/access-denied?from=/dashboard/customer");
   }
 
-  const customerId = await resolveCustomerIdForOrganization(
-    session.organization,
-  );
+  const customerId = await resolveCustomerIdForPortalSession({
+    organization: session.organization,
+    email: session.email,
+  });
   const contracts = customerId
     ? await listCustomerFacingContracts(customerId)
     : [];

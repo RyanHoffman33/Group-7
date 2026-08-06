@@ -12,7 +12,7 @@ import {
 import {
   getApprovalItemForCustomer,
   listCustomerFacingContracts,
-  resolveCustomerIdForOrganization,
+  resolveCustomerIdForPortalSession,
 } from "./queries";
 
 export type InvolvementActionResult =
@@ -190,9 +190,10 @@ export async function decideCustomerApproval(input: {
       };
     }
 
-    const customerId = await resolveCustomerIdForOrganization(
-      session.organization,
-    );
+    const customerId = await resolveCustomerIdForPortalSession({
+      organization: session.organization,
+      email: session.email,
+    });
     if (!customerId) {
       return { ok: false, error: "No customer record linked to this account." };
     }
