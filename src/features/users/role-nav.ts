@@ -257,7 +257,7 @@ export function allowedRoutePrefixes(roleKey: AppRole): string[] {
     roleHasPermission(roleKey, "contracts.read") &&
     !INTERNAL_FINANCE_BLOCKED.includes(roleKey)
   ) {
-    prefixes.push("/contracts", "/valuation");
+    prefixes.push("/contracts", "/valuation", "/engagement");
   }
   if (
     (roleHasPermission(roleKey, "billing.read") || roleHasPermission(roleKey, "ar.read")) &&

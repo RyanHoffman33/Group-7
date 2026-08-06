@@ -50,6 +50,8 @@ const eventsLinks = [
 ];
 
 const vendorLinks = [
+  { href: "/vendor", label: "Portal home" },
+  { href: "/vendor/rfqs", label: "RFQs & quotes" },
   { href: "/vendor/layouts/lay-1", label: "Theater Layout" },
   { href: "/vendor/layouts/lay-2", label: "Banquet Layout" },
 ];
@@ -58,6 +60,7 @@ const attendeeLinks = [{ href: "/attendee/survey", label: "Event Survey" }];
 
 const customerLinks = [
   { href: "/dashboard/customer", label: "Overview" },
+  { href: "/dashboard/customer/engagement", label: "Inquiry & Quotes" },
   { href: "/dashboard/customer/event", label: "Event Details" },
   { href: "/dashboard/customer/actions", label: "Action Items & Quotes" },
   { href: "/dashboard/customer/invoices", label: "Invoices" },
@@ -69,6 +72,8 @@ const contractsLinksAll = [
   { href: "/contracts", label: "Contracts Dashboard" },
   { href: "/contracts/list", label: "All Contracts" },
   { href: "/contracts/new", label: "Create Contract", needsWrite: true },
+  { href: "/engagement/approvals", label: "Inquiry Approvals" },
+  { href: "/engagement/sourcing", label: "Vendor Sourcing" },
   { href: "/contracts/requests", label: "Requests for Performance" },
   { href: "/contracts/approvals", label: "Contract Approvals" },
   { href: "/contracts/changes", label: "Contract Changes" },
@@ -178,7 +183,14 @@ function isVendorRoute(pathname: string) {
 }
 
 function isContractsRoute(pathname: string) {
-  return pathname === "/contracts" || pathname.startsWith("/contracts/");
+  return (
+    pathname === "/contracts" ||
+    pathname.startsWith("/contracts/") ||
+    pathname === "/engagement" ||
+    pathname.startsWith("/engagement/") ||
+    pathname === "/valuation" ||
+    pathname.startsWith("/valuation/")
+  );
 }
 
 function isWorkRoute(pathname: string) {
@@ -237,7 +249,9 @@ function isLinkActive(pathname: string, href: string) {
     href === "/costs" ||
     href === "/profitability" ||
     href === "/analytics" ||
-    href === "/dashboard"
+    href === "/dashboard" ||
+    href === "/engagement/approvals" ||
+    href === "/engagement/sourcing"
   ) {
     return pathname === href;
   }
@@ -504,7 +518,7 @@ export function AppShell({
             ) : null}
             {showVendor ? (
               <NavAccordion
-                title="Layouts"
+                title="Vendor Portal"
                 open={openSection === "vendor"}
                 onToggle={() => toggleSection("vendor")}
                 active={vendorActive}

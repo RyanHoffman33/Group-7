@@ -9,6 +9,7 @@ import {
 import { roleHasPermission } from "@/features/access/matrix";
 import { buildValuationRecommendation } from "@/features/valuation/recommend";
 import { QUOTE_PACKAGES, type QuotePackageId } from "@/features/valuation/types";
+import { createClient } from "@/lib/supabase/server";
 import { ensureCustomerForOrganization } from "@/features/contracts/customers-demo";
 import { eventRequests } from "./seed";
 import type { EventRequest, ReferralSource } from "./types";
@@ -125,6 +126,41 @@ export async function submitEventRequestAction(
   };
   eventRequests.push(request);
   await clearNeedsIntake(user.id);
+
+  // Persist into engagement workflow (Supabase) so exec/PM queues stay live.
+  try {
+    const customer = await ensureCustomerForOrganization({
+      name: organization,
+      billingEmail: user.email,
+      phone: user.phone ?? "",
+    });
+    const supabase = createClient();
+    await supabase.from("engagement_inquiries").insert({
+      customer_id: customer.id,
+      customer_user_email: user.email,
+      organization,
+      contact_name: user.fullName,
+      contact_email: user.email,
+      contact_phone: user.phone ?? "",
+      event_name: eventName,
+      event_type: eventType,
+      preferred_start: preferredDate,
+      preferred_end: null,
+      location: venuePreference,
+      guest_count: estimatedGuests,
+      budget_range: budgetRange,
+      description: messageToTeam,
+      status: "pending_approval",
+    });
+    await supabase.from("engagement_notifications").insert({
+      audience: "internal",
+      title: "New customer inquiry awaiting approval",
+      body: `${eventName} from ${organization} needs exec/PM approval and a company quote.`,
+      href: "/engagement/approvals",
+    });
+  } catch {
+    /* keep in-memory request even if Supabase write fails */
+  }
 
   return { requestId: request.id, showSurvey: true };
 }
