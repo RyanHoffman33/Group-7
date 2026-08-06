@@ -33,6 +33,7 @@ const complianceLinks = [
   { href: "/compliance/costs", label: "Cost Classification" },
   { href: "/compliance/audit", label: "Audit Pack" },
   { href: "/compliance/policies", label: "Policies" },
+  { href: "/compliance/controls", label: "Controls" },
 ];
 
 const usersLinksAll = [
