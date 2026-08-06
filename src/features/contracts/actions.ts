@@ -212,7 +212,28 @@ export async function createContract(
 
     const supabase = createClient();
     const contract_number = await nextContractNumber();
-    const status = input.submit_for_approval ? "pending_approval" : "draft";
+
+    const { DEMO_CUSTOMER_ID, DEMO_CUSTOMER_ORG } = await import(
+      "@/features/involvement/queries"
+    );
+    let customerIsDemoPortal = input.customer_id === DEMO_CUSTOMER_ID;
+    if (!customerIsDemoPortal) {
+      const { data: custRow } = await supabase
+        .from("customers")
+        .select("id, name")
+        .eq("id", input.customer_id)
+        .maybeSingle();
+      const custName = String(custRow?.name ?? "").trim().toLowerCase();
+      customerIsDemoPortal =
+        custName === DEMO_CUSTOMER_ORG.toLowerCase() ||
+        input.customer_id === "22222222-2222-2222-2222-222222222201";
+    }
+
+    const status = input.submit_for_approval
+      ? customerIsDemoPortal
+        ? "pending_customer_acceptance"
+        : "pending_approval"
+      : "draft";
     const involvementModel =
       input.involvement_model === "full_service" ||
       input.involvement_model === "custom" ||
@@ -370,14 +391,20 @@ export async function createContract(
         contract_id: id,
         action: "submit",
         from_status: "draft",
-        to_status: "pending_approval",
+        to_status: status,
         actor_label: input.created_by,
         actor_role: "coordinator",
-        comments: "Submitted via create contract workflow",
+        comments: customerIsDemoPortal
+          ? "Submitted to customer for acceptance"
+          : "Submitted via create contract workflow",
       });
     }
 
     revalidateContracts(id);
+    if (customerIsDemoPortal && input.submit_for_approval) {
+      revalidatePath("/dashboard/customer");
+      revalidatePath("/dashboard/customer/proposals");
+    }
     return { ok: true, id };
   } catch (e) {
     return {
@@ -1248,7 +1275,8 @@ export async function cancelContract(input: {
 }
 
 /**
- * Customer accepts a draft / pending_approval proposal: typed sign + deposit (= PO1 / required deposit).
+ * Customer accepts a pending_customer_acceptance (or legacy draft/pending_approval)
+ * proposal: typed sign + deposit (= PO1 / required deposit) → active or deposit_pending.
  */
 export async function customerAcceptContractProposal(input: {
   contract_id: string;
@@ -1292,7 +1320,12 @@ export async function customerAcceptContractProposal(input: {
     if (c.customer_id !== customerId) {
       return { ok: false, error: "Proposal not found for your account." };
     }
-    if (!["draft", "pending_approval"].includes(c.status as string)) {
+    const openForAccept = [
+      "pending_customer_acceptance",
+      "draft",
+      "pending_approval",
+    ];
+    if (!openForAccept.includes(c.status as string)) {
       return {
         ok: false,
         error: "This proposal is not open for acceptance.",
@@ -1362,13 +1395,17 @@ export async function customerAcceptContractProposal(input: {
       memo: `Customer accepted proposal — deposit (PO #1) for ${c.event_name}`,
     });
 
+    const nextStatus = isDepositSatisfied(slice, depositAmount)
+      ? statusAfterDepositSatisfied()
+      : statusAfterApproval({ deposit_required: Boolean(c.deposit_required) });
+
     const { error: uErr } = await supabase
       .from("contracts")
       .update({
-        status: "active",
+        status: nextStatus,
         approved_at: now,
         approved_by: input.signer_name.trim(),
-        activated_at: now,
+        activated_at: nextStatus === "active" ? now : null,
         terms_locked_at: now,
         notes: c.notes
           ? `${c.notes}\n\nCustomer signed: ${input.signer_name.trim()} on ${today}.`
@@ -1381,7 +1418,7 @@ export async function customerAcceptContractProposal(input: {
       contract_id: input.contract_id,
       action: "approve",
       from_status: c.status as string,
-      to_status: "active",
+      to_status: nextStatus,
       actor_label: input.signer_name.trim(),
       actor_role: "customer",
       comments: `Customer accepted proposal with deposit $${depositAmount.toFixed(2)}. Signatory: ${input.signer_name.trim()}.`,
@@ -1393,7 +1430,7 @@ export async function customerAcceptContractProposal(input: {
       summary: `Customer accepted proposal; deposit $${depositAmount.toFixed(2)} recorded`,
       actor_label: input.signer_name.trim(),
       from_status: c.status as string,
-      to_status: "active",
+      to_status: nextStatus,
       payload: { deposit_id: dep.id, deposit_amount: depositAmount },
     });
 
@@ -1401,6 +1438,7 @@ export async function customerAcceptContractProposal(input: {
     revalidatePath("/dashboard/customer");
     revalidatePath("/dashboard/customer/actions");
     revalidatePath("/dashboard/customer/engagement");
+    revalidatePath("/dashboard/customer/proposals");
     return { ok: true, id: input.contract_id };
   } catch (e) {
     return {
@@ -1445,7 +1483,12 @@ export async function customerRejectContractProposal(input: {
     if (c.customer_id !== customerId) {
       return { ok: false, error: "Proposal not found for your account." };
     }
-    if (!["draft", "pending_approval"].includes(c.status as string)) {
+    const openForReject = [
+      "pending_customer_acceptance",
+      "draft",
+      "pending_approval",
+    ];
+    if (!openForReject.includes(c.status as string)) {
       return { ok: false, error: "This proposal cannot be rejected now." };
     }
 

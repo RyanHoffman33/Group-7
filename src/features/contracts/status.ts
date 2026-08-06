@@ -15,6 +15,7 @@
 export const CONTRACT_STATUSES = [
   "draft",
   "pending_approval",
+  "pending_customer_acceptance",
   "approved",
   "deposit_pending",
   "active",
@@ -51,6 +52,7 @@ export type ContractBillingSlice = {
 const OPEN_WORK_STATUSES: ContractStatus[] = [
   "draft",
   "pending_approval",
+  "pending_customer_acceptance",
   "approved",
   "deposit_pending",
   "active",
@@ -88,7 +90,7 @@ export function isDepositSatisfied(
  * - Production progress / milestones / T&M: once active (work authorized) or completed.
  * - Final / closeout invoice: completed (or active if performance_complete already true).
  * - Cancellation fee: canceled.
- * - Never bill: draft, pending_approval (except no charges at all).
+ * - Never bill: draft, pending_approval, pending_customer_acceptance.
  */
 export function canBillChargeKind(
   status: string,
@@ -219,6 +221,7 @@ export const CHANGE_ORDER_OWNERSHIP = {
 export const STATUS_LABELS: Record<ContractStatus, string> = {
   draft: "Draft",
   pending_approval: "Pending approval",
+  pending_customer_acceptance: "Pending customer acceptance",
   approved: "Approved",
   deposit_pending: "Deposit pending",
   active: "Active",
@@ -238,6 +241,7 @@ export function statusTone(
     case "completed":
       return "accent";
     case "pending_approval":
+    case "pending_customer_acceptance":
     case "deposit_pending":
     case "draft":
       return "warn";

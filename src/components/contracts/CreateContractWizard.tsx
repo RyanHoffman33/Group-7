@@ -25,6 +25,19 @@ import { ValuationToolClient } from "@/components/valuation/ValuationToolClient"
 type Customer = { id: string; name: string };
 type DiscountType = "none" | "percent" | "fixed";
 
+/** Portal demo org — matches DEMO_CUSTOMER_ID / Demo Customer name. */
+const DEMO_PORTAL_CUSTOMER_ID = "22222222-2222-2222-2222-222222222201";
+const DEMO_CUSTOMER_NAME = "Demo Customer";
+
+function isDemoPortalCustomer(c: { id: string; name: string } | undefined) {
+  if (!c) return false;
+  const name = c.name.trim().toLowerCase();
+  return (
+    c.id === DEMO_PORTAL_CUSTOMER_ID ||
+    name === DEMO_CUSTOMER_NAME.toLowerCase()
+  );
+}
+
 type ServiceLine = {
   key: string;
   description: string;
@@ -546,10 +559,8 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     // Intentionally syncs local form state once on mount for Back/Continue + refresh.
     /* eslint-disable react-hooks/set-state-in-effect -- sessionStorage draft hydrate */
     try {
-      const raw =
-        sessionStorage.getItem(STORAGE_KEY) ??
-        sessionStorage.getItem("mainevent-create-contract-draft-v3") ??
-        sessionStorage.getItem("mainevent-create-contract-draft-v2");
+      // v6 only — do not hydrate billingMethod / depositType from older drafts.
+      const raw = sessionStorage.getItem(STORAGE_KEY);
       if (raw) {
         const d = JSON.parse(raw) as Record<string, unknown>;
         if (typeof d.step === "number") {
@@ -845,7 +856,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         gross_contract_value: gross,
         contract_value: net,
         deposit_required: depositRequired,
-        deposit_percent: 0,
+        deposit_percent: depositRequired ? depositCalc.percent : 0,
         minimum_deposit_amount: depositRequired ? depositCalc.amount : null,
         discount_amount: discountType === "fixed" ? discountCalc.amount : 0,
         discount_percent:
@@ -914,6 +925,24 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
   const err = (key: string) => (showErrors ? fieldErrors[key] : undefined);
   const customerName =
     customers.find((c) => c.id === customerId)?.name ?? "—";
+  const submitToCustomer = isDemoPortalCustomer(
+    customers.find((c) => c.id === customerId),
+  );
+  const submitCheckboxLabel = submitToCustomer
+    ? "Submit proposal to customer"
+    : "Submit for PM approval";
+  const afterCreateLabel = submitNow
+    ? submitToCustomer
+      ? "Submit proposal to customer"
+      : "Submit for PM approval"
+    : "Save as draft";
+  const createButtonLabel = pending
+    ? "Saving…"
+    : submitNow
+      ? submitToCustomer
+        ? "Create & send to customer"
+        : "Create & submit"
+      : "Create draft";
 
   return (
     <div className="space-y-4">
@@ -1784,21 +1813,15 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 </label>
                 <label className="text-sm sm:col-span-2">
                   <FieldLabel>Type</FieldLabel>
-                  <select
-                    className={field}
-                    value={m.milestone_type}
-                    onChange={(e) => {
-                      const nextM = [...milestones];
-                      nextM[i] = { ...m, milestone_type: e.target.value };
-                      setMilestones(nextM);
-                    }}
-                  >
-                    {MILESTONE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    className={`${field} bg-[#f8fafb]`}
+                    value={
+                      MILESTONE_TYPES.find((t) => t.value === m.milestone_type)
+                        ?.label ?? m.milestone_type
+                    }
+                    readOnly
+                    title="Type follows installment position (deposit / progress / final)"
+                  />
                 </label>
               </div>
             ))}
@@ -1843,7 +1866,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 checked={submitNow}
                 onChange={(e) => setSubmitNow(e.target.checked)}
               />
-              Submit for PM approval right after create
+              {submitCheckboxLabel}
             </label>
 
             <fieldset className="sm:col-span-2">
@@ -2051,9 +2074,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 </div>
                 <div>
                   <dt className="text-xs text-[var(--muted)]">After create</dt>
-                  <dd>
-                    {submitNow ? "Submit for PM approval" : "Save as draft"}
-                  </dd>
+                  <dd>{afterCreateLabel}</dd>
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-[var(--muted)]">Services</dt>
@@ -2116,11 +2137,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 onClick={submit}
                 className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {pending
-                  ? "Saving…"
-                  : submitNow
-                    ? "Create & submit"
-                    : "Create draft"}
+                {createButtonLabel}
               </button>
             )}
           </div>

@@ -69,7 +69,7 @@ export async function listCustomerContractProposals(
     .from("contracts")
     .select(CUSTOMER_SAFE_CONTRACT_SELECT)
     .eq("customer_id", customerId)
-    .in("status", ["draft", "pending_approval"])
+    .in("status", ["draft", "pending_approval", "pending_customer_acceptance"])
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(mapCustomerFacingContract);
