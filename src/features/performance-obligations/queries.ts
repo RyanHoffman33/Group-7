@@ -22,6 +22,9 @@ function mapPo(row: Record<string, unknown>): ContractPerformanceObligation {
     description: row.description != null ? String(row.description) : null,
     completion_definition: String(row.completion_definition ?? ""),
     amount: num(row.amount),
+    service_keys: Array.isArray(row.service_keys)
+      ? (row.service_keys as unknown[]).map(String)
+      : [],
     status: isPoStatus(status) ? status : "draft",
     installment_deposit_id:
       row.installment_deposit_id != null

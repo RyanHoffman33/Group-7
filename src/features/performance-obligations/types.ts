@@ -13,6 +13,8 @@ export type ContractPerformanceObligation = {
   description: string | null;
   completion_definition: string;
   amount: number;
+  /** Stable service line keys covered by this PO (from create-contract wizard). */
+  service_keys: string[];
   status: PoStatus;
   installment_deposit_id: string | null;
   invoice_id: string | null;
@@ -63,6 +65,7 @@ export type PoDraftInput = {
   description?: string;
   completion_definition: string;
   amount: number;
+  service_keys?: string[];
 };
 
 export const PO_STATUS_LABELS: Record<PoStatus, string> = {

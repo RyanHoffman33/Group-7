@@ -139,6 +139,9 @@ export async function saveContractPerformanceObligations(input: {
       description: o.description?.trim() || null,
       completion_definition: o.completion_definition.trim(),
       amount: Number(o.amount),
+      service_keys: Array.isArray(o.service_keys)
+        ? o.service_keys.map(String).filter(Boolean)
+        : [],
       status,
     }));
 

@@ -104,12 +104,14 @@ export type CreateContractInput = {
   submit_for_approval?: boolean;
   involvement_model?: string;
   custom_checkpoint_types?: string[];
-  /** Optional ASC 606 commercial POs (amounts must sum to contract_value). */
+  /** ASC 606 commercial POs (amounts must sum to contract_value). */
   performance_obligations?: {
     title: string;
     description?: string;
     completion_definition: string;
     amount: number;
+    /** Stable service line keys covered by this PO. */
+    service_keys?: string[];
   }[];
 };
 
@@ -344,6 +346,9 @@ export async function createContract(
             description: p.description?.trim() || null,
             completion_definition: p.completion_definition.trim(),
             amount: num(p.amount),
+            service_keys: Array.isArray(p.service_keys)
+              ? p.service_keys.map(String).filter(Boolean)
+              : [],
             status: "draft",
           })),
         );

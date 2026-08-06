@@ -26,7 +26,33 @@ type Customer = { id: string; name: string };
 type DiscountType = "none" | "percent" | "fixed";
 type DepositType = "percent" | "fixed";
 
-const STORAGE_KEY = "mainevent-create-contract-draft-v3";
+type ServiceLine = {
+  key: string;
+  description: string;
+  line_type: string;
+  quantity: number;
+  unit_rate: number;
+  amount: number;
+};
+
+type PoDraft = {
+  title: string;
+  description: string;
+  completion_definition: string;
+  amount: string;
+  service_keys: string[];
+};
+
+type MilestoneDraft = {
+  milestone_key: string;
+  label: string;
+  amount: string;
+  due_date: string;
+  milestone_type: string;
+  sequence_no: number;
+};
+
+const STORAGE_KEY = "mainevent-create-contract-draft-v4";
 
 type StepDef = { title: string; purpose: string };
 
@@ -44,12 +70,14 @@ const STEPS: StepDef[] = [
     purpose: "Set billing method, contract value, discounts, and deposit.",
   },
   {
-    title: "Payment Schedule",
-    purpose: "Split the net value into payment due dates. Totals must match.",
+    title: "Performance Obligations",
+    purpose:
+      "Group services into ASC 606 obligations. Every service must be covered before you continue.",
   },
   {
-    title: "Performance Obligations",
-    purpose: "Define how the contract is completed and billed under ASC 606.",
+    title: "Payment Schedule",
+    purpose:
+      "One installment per obligation (amounts locked to POs). Adjust due dates if needed.",
   },
   {
     title: "Approvals & Involvement",
@@ -90,6 +118,85 @@ function moneyRound(n: number) {
 
 function billingLabel(value: string) {
   return BILLING_METHODS.find((m) => m.value === value)?.label ?? value;
+}
+
+function newServiceKey() {
+  return `svc-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function ensureLineKeys(lines: Array<Partial<ServiceLine>>): ServiceLine[] {
+  return lines.map((l, i) => ({
+    key: typeof l.key === "string" && l.key ? l.key : newServiceKey(),
+    description: String(l.description ?? ""),
+    line_type: String(l.line_type ?? (i === 0 ? "package" : "service")),
+    quantity: Number(l.quantity) || 1,
+    unit_rate: Number(l.unit_rate) || 0,
+    amount: Number(l.amount) || 0,
+  }));
+}
+
+function ensurePos(raw: Array<Partial<PoDraft>>): PoDraft[] {
+  return raw.map((p) => ({
+    title: String(p.title ?? ""),
+    description: String(p.description ?? ""),
+    completion_definition: String(p.completion_definition ?? ""),
+    amount: p.amount != null ? String(p.amount) : "",
+    service_keys: Array.isArray(p.service_keys)
+      ? p.service_keys.map(String)
+      : [],
+  }));
+}
+
+function defaultDueDate(
+  index: number,
+  total: number,
+  eventStart: string,
+  eventEnd: string,
+): string {
+  const start = eventStart ? eventStart.slice(0, 10) : "";
+  const end = eventEnd ? eventEnd.slice(0, 10) : start;
+  if (!start) return "";
+  if (total <= 1) return start;
+  if (index === 0) return start;
+  if (index === total - 1) return end || start;
+  if (!end || end === start) return start;
+  const a = new Date(`${start}T12:00:00`);
+  const b = new Date(`${end}T12:00:00`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return start;
+  const t = index / (total - 1);
+  const ms = a.getTime() + (b.getTime() - a.getTime()) * t;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+function milestonesFromPos(
+  pos: PoDraft[],
+  prev: MilestoneDraft[],
+  eventStart: string,
+  eventEnd: string,
+  depositRequired: boolean,
+): MilestoneDraft[] {
+  const filled = pos.filter((p) => p.title.trim());
+  return filled.map((p, i) => {
+    const key = `po-${i + 1}`;
+    const existing = prev.find((m) => m.milestone_key === key);
+    const last = i === filled.length - 1;
+    const milestone_type =
+      i === 0 && depositRequired
+        ? "deposit"
+        : last
+          ? "final"
+          : "progress";
+    return {
+      milestone_key: key,
+      label: p.title.trim(),
+      amount: String(moneyRound(Number(p.amount) || 0)),
+      due_date:
+        existing?.due_date ||
+        defaultDueDate(i, filled.length, eventStart, eventEnd),
+      milestone_type,
+      sequence_no: i + 1,
+    };
+  });
 }
 
 function FieldLabel({
@@ -141,8 +248,9 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
   const [guestCount, setGuestCount] = useState("");
   const [pm, setPm] = useState("Alex Rivera");
 
-  const [lines, setLines] = useState([
+  const [lines, setLines] = useState<ServiceLine[]>([
     {
+      key: newServiceKey(),
       description: "Full production package",
       line_type: "package",
       quantity: 1,
@@ -171,24 +279,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
   const [depositFixedInput, setDepositFixedInput] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
-  const [milestones, setMilestones] = useState([
-    {
-      milestone_key: "deposit",
-      label: "Deposit",
-      amount: "",
-      due_date: "",
-      milestone_type: "deposit",
-      sequence_no: 1,
-    },
-    {
-      milestone_key: "final",
-      label: "Final payment",
-      amount: "",
-      due_date: "",
-      milestone_type: "final",
-      sequence_no: 2,
-    },
-  ]);
+  const [milestones, setMilestones] = useState<MilestoneDraft[]>([]);
 
   const [createdBy, setCreatedBy] = useState("Coordinator Lee");
   const [submitNow, setSubmitNow] = useState(false);
@@ -201,19 +292,20 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     "change_order",
     "cancellation",
   ]);
-  const [definePos, setDefinePos] = useState(true);
-  const [pos, setPos] = useState([
+  const [pos, setPos] = useState<PoDraft[]>([
     {
       title: "Planning & design",
       description: "",
       completion_definition: "Customer approves planning package as complete.",
       amount: "",
+      service_keys: [],
     },
     {
       title: "Event production",
       description: "",
       completion_definition: "Customer confirms event-day delivery.",
       amount: "",
+      service_keys: [],
     },
     {
       title: "Wrap-up & closeout",
@@ -221,6 +313,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       completion_definition:
         "Customer accepts final wrap-up and closes engagement.",
       amount: "",
+      service_keys: [],
     },
   ]);
 
@@ -232,6 +325,11 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
   const [docTitle, setDocTitle] = useState("Engagement proposal");
   const [docUrl, setDocUrl] = useState("");
   const [notes, setNotes] = useState("");
+
+  const catalogServices = useMemo(
+    () => lines.filter((l) => l.description.trim()),
+    [lines],
+  );
 
   const linesGross = useMemo(
     () => moneyRound(lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)),
@@ -296,6 +394,21 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     [pos],
   );
 
+  const coveredServiceKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of pos) {
+      for (const k of p.service_keys) set.add(k);
+    }
+    return set;
+  }, [pos]);
+
+  const uncoveredServices = useMemo(
+    () => catalogServices.filter((s) => !coveredServiceKeys.has(s.key)),
+    [catalogServices, coveredServiceKeys],
+  );
+
+  const requirePos = catalogServices.length > 0;
+
   const fieldErrors = useMemo(() => {
     const e: Record<string, string> = {};
     if (step === 0) {
@@ -351,8 +464,44 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         }
       }
     }
+    // Step 3: Performance Obligations
     if (step === 3) {
-      if (!milestones.length) e.schedule = "Add at least one payment.";
+      if (requirePos) {
+        const filled = pos.filter((p) => p.title.trim());
+        if (!filled.length) {
+          e.pos = "Add at least one performance obligation.";
+        }
+        for (let i = 0; i < pos.length; i++) {
+          const p = pos[i];
+          if (!p.title.trim()) continue;
+          if (!p.completion_definition.trim()) {
+            e[`poDone${i}`] = "Say what “done” means.";
+          }
+          if (!(Number(p.amount) > 0)) {
+            e[`poAmt${i}`] = "Amount must be greater than $0.";
+          }
+          if (!p.service_keys.length) {
+            e[`poSvc${i}`] = "Select at least one service for this obligation.";
+          }
+        }
+        if (uncoveredServices.length) {
+          e.poCoverage = `Uncovered services: ${uncoveredServices
+            .map((s) => s.description.trim())
+            .join(", ")}. Every service must appear in at least one obligation.`;
+        }
+        if (filled.length && Math.abs(poSum - net) > 0.01) {
+          e.poMatch = `Obligation amounts (${formatCurrency(poSum)}) must equal net (${formatCurrency(net)}).`;
+        }
+      }
+    }
+    // Step 4: Payment Schedule (derived from POs)
+    if (step === 4) {
+      if (!milestones.length) {
+        e.schedule =
+          requirePos
+            ? "Define performance obligations first — the schedule is built from them."
+            : "Add at least one payment.";
+      }
       if (
         depositRequired &&
         milestones.some(
@@ -368,25 +517,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         if (!milestones[i].label.trim()) {
           e[`msLabel${i}`] = "Name this payment.";
         }
-      }
-    }
-    if (step === 4 && definePos) {
-      const filled = pos.filter((p) => p.title.trim());
-      if (!filled.length) {
-        e.pos = "Add at least one obligation, or uncheck “Define now”.";
-      }
-      for (let i = 0; i < pos.length; i++) {
-        const p = pos[i];
-        if (!p.title.trim()) continue;
-        if (!p.completion_definition.trim()) {
-          e[`poDone${i}`] = "Say what “done” means.";
-        }
-        if (!(Number(p.amount) > 0)) {
-          e[`poAmt${i}`] = "Amount must be greater than $0.";
-        }
-      }
-      if (filled.length && Math.abs(poSum - net) > 0.01) {
-        e.poMatch = `Obligation amounts (${formatCurrency(poSum)}) must equal net (${formatCurrency(net)}).`;
       }
     }
     if (step === 5) {
@@ -420,9 +550,10 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     depositCalc.amount,
     milestones,
     scheduleSum,
-    definePos,
     pos,
     poSum,
+    requirePos,
+    uncoveredServices,
     createdBy,
     involvementModel,
     customCheckpoints,
@@ -431,6 +562,19 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
 
   const stepValid = Object.keys(fieldErrors).length === 0;
 
+  // Keep payment schedule aligned with POs whenever obligations change.
+  useEffect(() => {
+    if (!hydrated) return;
+    const filled = pos.filter((p) => p.title.trim());
+    if (!filled.length) {
+      if (requirePos) setMilestones([]);
+      return;
+    }
+    setMilestones((prev) =>
+      milestonesFromPos(filled, prev, eventStart, eventEnd, depositRequired),
+    );
+  }, [pos, eventStart, eventEnd, depositRequired, hydrated, requirePos]);
+
   useEffect(() => {
     // Restore create-contract draft from sessionStorage (external system).
     // Intentionally syncs local form state once on mount for Back/Continue + refresh.
@@ -438,13 +582,12 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     try {
       const raw =
         sessionStorage.getItem(STORAGE_KEY) ??
+        sessionStorage.getItem("mainevent-create-contract-draft-v3") ??
         sessionStorage.getItem("mainevent-create-contract-draft-v2");
       if (raw) {
         const d = JSON.parse(raw) as Record<string, unknown>;
         if (typeof d.step === "number") {
-          // Clamp: v2 had POs on step 3; map old indices if draft is v2-shaped
-          const s = d.step as number;
-          setStep(Math.min(STEPS.length - 1, Math.max(0, s)));
+          setStep(Math.min(STEPS.length - 1, Math.max(0, d.step as number)));
         }
         if (typeof d.customerId === "string") setCustomerId(d.customerId);
         if (typeof d.eventName === "string") setEventName(d.eventName);
@@ -455,7 +598,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         if (typeof d.venueCity === "string") setVenueCity(d.venueCity);
         if (typeof d.guestCount === "string") setGuestCount(d.guestCount);
         if (typeof d.pm === "string") setPm(d.pm);
-        if (Array.isArray(d.lines)) setLines(d.lines as typeof lines);
+        if (Array.isArray(d.lines)) setLines(ensureLineKeys(d.lines as Partial<ServiceLine>[]));
         if (Array.isArray(d.deliverables))
           setDeliverables(d.deliverables as typeof deliverables);
         if (typeof d.billingMethod === "string")
@@ -483,7 +626,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         if (typeof d.depositFixedInput === "string")
           setDepositFixedInput(d.depositFixedInput);
         if (Array.isArray(d.milestones))
-          setMilestones(d.milestones as typeof milestones);
+          setMilestones(d.milestones as MilestoneDraft[]);
         if (typeof d.createdBy === "string") setCreatedBy(d.createdBy);
         if (typeof d.submitNow === "boolean") setSubmitNow(d.submitNow);
         if (typeof d.cancelPolicy === "string") setCancelPolicy(d.cancelPolicy);
@@ -491,8 +634,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         if (typeof d.docTitle === "string") setDocTitle(d.docTitle);
         if (typeof d.docUrl === "string") setDocUrl(d.docUrl);
         if (typeof d.notes === "string") setNotes(d.notes);
-        if (typeof d.definePos === "boolean") setDefinePos(d.definePos);
-        if (Array.isArray(d.pos)) setPos(d.pos as typeof pos);
+        if (Array.isArray(d.pos)) setPos(ensurePos(d.pos as Partial<PoDraft>[]));
         if (
           d.involvementModel === "collaborative" ||
           d.involvementModel === "full_service" ||
@@ -543,7 +685,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       docTitle,
       docUrl,
       notes,
-      definePos,
       pos,
       involvementModel,
       customCheckpoints,
@@ -584,7 +725,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     docTitle,
     docUrl,
     notes,
-    definePos,
     pos,
     involvementModel,
     customCheckpoints,
@@ -594,6 +734,23 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     setShowErrors(false);
     setError(null);
   }, [step]);
+
+  // Drop stale service keys when a service line is removed.
+  useEffect(() => {
+    const valid = new Set(catalogServices.map((s) => s.key));
+    setPos((prev) => {
+      let changed = false;
+      const next = prev.map((p) => {
+        const keys = p.service_keys.filter((k) => valid.has(k));
+        if (keys.length !== p.service_keys.length) {
+          changed = true;
+          return { ...p, service_keys: keys };
+        }
+        return p;
+      });
+      return changed ? next : prev;
+    });
+  }, [catalogServices]);
 
   function next() {
     if (!stepValid) {
@@ -641,42 +798,54 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     setDepositFixedInput("");
   }
 
-  function splitMilestonesFromValue() {
-    const v = net;
-    if (v <= 0) return;
-    const dep = depositRequired ? depositCalc.amount : 0;
-    const rest = moneyRound(v - dep);
-    setMilestones([
-      {
-        milestone_key: "deposit",
-        label: "Deposit",
-        amount: String(dep),
-        due_date: eventStart ? eventStart.slice(0, 10) : "",
-        milestone_type: "deposit",
-        sequence_no: 1,
-      },
-      {
-        milestone_key: "final",
-        label: "Final payment",
-        amount: String(rest),
-        due_date: eventEnd ? eventEnd.slice(0, 10) : "",
-        milestone_type: "final",
-        sequence_no: 2,
-      },
-    ]);
+  function serviceAmountSum(keys: string[]) {
+    return moneyRound(
+      catalogServices
+        .filter((s) => keys.includes(s.key))
+        .reduce((sum, s) => sum + (Number(s.amount) || 0), 0),
+    );
+  }
+
+  function togglePoService(poIndex: number, serviceKey: string) {
+    setPos((prev) => {
+      const next = [...prev];
+      const p = next[poIndex];
+      const has = p.service_keys.includes(serviceKey);
+      const service_keys = has
+        ? p.service_keys.filter((k) => k !== serviceKey)
+        : [...p.service_keys, serviceKey];
+      const priced = serviceAmountSum(service_keys);
+      next[poIndex] = {
+        ...p,
+        service_keys,
+        // Auto-fill from service prices when available; otherwise keep manual amount.
+        amount: priced > 0 ? String(priced) : p.amount,
+      };
+      return next;
+    });
   }
 
   function splitPosFromValue() {
     const v = net;
     if (v <= 0) return;
-    const a = moneyRound(v * 0.3);
-    const b = moneyRound(v * 0.5);
-    const c = moneyRound(v - a - b);
-    setPos((prev) => [
-      { ...prev[0], amount: String(a) },
-      { ...prev[1], amount: String(b) },
-      { ...prev[2], amount: String(c) },
-    ]);
+    const titled = pos.filter((p) => p.title.trim());
+    const n = Math.max(1, titled.length || pos.length);
+    const base = moneyRound(v / n);
+    setPos((prev) => {
+      const targets = prev.filter((p) => p.title.trim());
+      const list = targets.length ? targets : prev;
+      let allocated = 0;
+      return prev.map((p, i) => {
+        const idx = list.indexOf(p);
+        if (idx < 0) return p;
+        const isLast = idx === list.length - 1;
+        const amount = isLast
+          ? moneyRound(v - allocated)
+          : base;
+        if (!isLast) allocated = moneyRound(allocated + amount);
+        return { ...p, amount: String(amount) };
+      });
+    });
   }
 
   function submit() {
@@ -691,7 +860,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       );
       return;
     }
-    const poPayload = definePos
+    const poPayload = requirePos
       ? pos
           .filter((p) => p.title.trim())
           .map((p) => ({
@@ -699,9 +868,10 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
             description: p.description || undefined,
             completion_definition: p.completion_definition,
             amount: Number(p.amount) || 0,
+            service_keys: p.service_keys,
           }))
       : undefined;
-    if (definePos && poPayload) {
+    if (requirePos && poPayload) {
       const sum = poPayload.reduce((s, p) => s + p.amount, 0);
       if (Math.abs(sum - net) > 0.01) {
         setError(
@@ -710,9 +880,24 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         return;
       }
       if (
-        poPayload.some((p) => !p.completion_definition.trim() || p.amount <= 0)
+        poPayload.some(
+          (p) =>
+            !p.completion_definition.trim() ||
+            p.amount <= 0 ||
+            !p.service_keys.length,
+        )
       ) {
-        setError("Each obligation needs completion criteria and an amount > 0.");
+        setError(
+          "Each obligation needs completion criteria, an amount > 0, and at least one service.",
+        );
+        return;
+      }
+      if (uncoveredServices.length) {
+        setError(
+          `Uncovered services: ${uncoveredServices
+            .map((s) => s.description.trim())
+            .join(", ")}.`,
+        );
         return;
       }
     }
@@ -789,6 +974,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       }
       try {
         sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem("mainevent-create-contract-draft-v3");
         sessionStorage.removeItem("mainevent-create-contract-draft-v2");
       } catch {
         /* ignore */
@@ -1003,11 +1189,12 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
             <div>
               <p className="mb-1 text-sm font-semibold">Services</p>
               <p className="mb-3 text-xs text-[var(--muted)]">
-                Sellable lines. Totals roll into Pricing unless you override.
+                Sellable lines. These become the catalog for performance
+                obligations. Totals roll into Pricing unless you override.
               </p>
               {lines.map((l, i) => (
                 <div
-                  key={i}
+                  key={l.key}
                   className="mb-3 grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-4"
                 >
                   <label className="text-sm sm:col-span-2">
@@ -1089,6 +1276,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   setLines([
                     ...lines,
                     {
+                      key: newServiceKey(),
                       description: "",
                       line_type: "service",
                       quantity: 1,
@@ -1318,7 +1506,8 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       Require deposit before work starts
                     </span>
                     <span className="mt-1 block text-xs text-[var(--muted)]">
-                      Held until related services are delivered.
+                      Held until related services are delivered. The first
+                      payment installment is tagged as deposit when enabled.
                     </span>
                   </span>
                 </label>
@@ -1433,191 +1622,76 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         )}
 
         {step === 3 && (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-[var(--muted)]">
-                Scheduled: <strong>{formatCurrency(scheduleSum)}</strong>
-                {" · "}
-                Net: <strong>{formatCurrency(net)}</strong>
-              </p>
-              <button
-                type="button"
-                className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
-                onClick={splitMilestonesFromValue}
-              >
-                Auto-split deposit + final
-              </button>
-            </div>
-            {Math.abs(scheduleSum - net) > 0.01 ? (
-              <p
-                className="rounded-md border border-[#f59e0b]/40 bg-[#fffbeb] px-3 py-2 text-sm text-[#92400e]"
-                role="status"
-              >
-                {err("scheduleMatch") ||
-                  `Off by ${formatCurrency(Math.abs(scheduleSum - net))}. Adjust amounts or auto-split.`}
-              </p>
-            ) : (
-              <p className="text-xs text-[var(--ok)]">
-                Schedule matches net contract value.
-              </p>
-            )}
-            <FieldError message={err("schedule") || err("depositRow")} />
-            {milestones.map((m, i) => (
-              <div
-                key={i}
-                className="mb-1 grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-4"
-              >
-                <label className="text-sm sm:col-span-2">
-                  <FieldLabel required>Payment name</FieldLabel>
-                  <input
-                    className={err(`msLabel${i}`) ? fieldBad : field}
-                    value={m.label}
-                    onChange={(e) => {
-                      const nextM = [...milestones];
-                      const label = e.target.value;
-                      nextM[i] = {
-                        ...m,
-                        label,
-                        milestone_key: (() => {
-                          const keep =
-                            m.milestone_key &&
-                            ["deposit", "final"].includes(m.milestone_key);
-                          if (keep) return m.milestone_key;
-                          const slug = label
-                            .toLowerCase()
-                            .replace(/[^a-z0-9]+/g, "-")
-                            .replace(/^-|-$/g, "");
-                          return slug || `ms-${i + 1}`;
-                        })(),
-                      };
-                      setMilestones(nextM);
-                    }}
-                    placeholder="e.g. Deposit on signing"
-                  />
-                  <FieldError message={err(`msLabel${i}`)} />
-                </label>
-                <label className="text-sm">
-                  <FieldLabel>Amount</FieldLabel>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className={field}
-                    value={m.amount}
-                    onChange={(e) => {
-                      const nextM = [...milestones];
-                      nextM[i] = { ...m, amount: e.target.value };
-                      setMilestones(nextM);
-                    }}
-                  />
-                </label>
-                <label className="text-sm">
-                  <FieldLabel>Due date</FieldLabel>
-                  <input
-                    type="date"
-                    className={field}
-                    value={m.due_date}
-                    onChange={(e) => {
-                      const nextM = [...milestones];
-                      nextM[i] = { ...m, due_date: e.target.value };
-                      setMilestones(nextM);
-                    }}
-                  />
-                </label>
-                <label className="text-sm sm:col-span-2">
-                  <FieldLabel>Type</FieldLabel>
-                  <select
-                    className={field}
-                    value={m.milestone_type}
-                    onChange={(e) => {
-                      const nextM = [...milestones];
-                      nextM[i] = { ...m, milestone_type: e.target.value };
-                      setMilestones(nextM);
-                    }}
-                  >
-                    {MILESTONE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="text-sm font-medium text-[var(--accent)]"
-              onClick={() =>
-                setMilestones([
-                  ...milestones,
-                  {
-                    milestone_key: `ms-${milestones.length + 1}`,
-                    label: "",
-                    amount: "",
-                    due_date: "",
-                    milestone_type: "progress",
-                    sequence_no: milestones.length + 1,
-                  },
-                ])
-              }
-            >
-              + Add payment
-            </button>
-          </div>
-        )}
-
-        {step === 4 && (
           <div className="space-y-4">
-            <label className="flex items-start gap-3 rounded-md border border-[var(--line)] px-3 py-3 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={definePos}
-                onChange={(e) => setDefinePos(e.target.checked)}
-              />
-              <span>
-                <span className="font-medium">Define performance obligations now</span>
-                <span className="mt-1 block text-xs text-[var(--muted)]">
-                  Each obligation needs a title, what “done” means, and an amount.
-                  Amounts must sum to net ({formatCurrency(net)}). You can also
-                  add them later on the contract detail page.
-                </span>
-              </span>
-            </label>
-
-            {!definePos ? (
+            {!requirePos ? (
               <p className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-3 text-sm text-[var(--muted)]">
-                Skipping for now. After create, open the contract and use
-                Performance Obligations to allocate the net value.
+                No services listed — performance obligations are optional.
+                Add services on Services & Scope if you want ASC 606 tracking.
               </p>
             ) : (
-              <div className="space-y-3">
+              <>
+                <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-3 text-sm text-[var(--muted)]">
+                  <p className="font-medium text-[var(--ink)]">
+                    Rules for this step
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+                    <li>
+                      Each obligation must include one or more services from
+                      Services & Scope.
+                    </li>
+                    <li>
+                      Every service must appear in at least one obligation
+                      before you can continue.
+                    </li>
+                    <li>
+                      Obligation amounts must sum to net (
+                      {formatCurrency(net)}). Selecting priced services
+                      auto-fills the amount; adjust if discount changes the
+                      allocation.
+                    </li>
+                    <li>
+                      The next step builds the payment schedule from these
+                      obligations automatically.
+                    </li>
+                  </ul>
+                </div>
+
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm text-[var(--muted)]">
                     Allocated: <strong>{formatCurrency(poSum)}</strong>
                     {" · "}
                     Net: <strong>{formatCurrency(net)}</strong>
+                    {" · "}
+                    Covered:{" "}
+                    <strong>
+                      {catalogServices.length - uncoveredServices.length}/
+                      {catalogServices.length} services
+                    </strong>
                   </p>
                   <button
                     type="button"
                     className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
                     onClick={splitPosFromValue}
                   >
-                    Split 30% / 50% / 20%
+                    Split net evenly
                   </button>
                 </div>
-                {err("pos") || err("poMatch") ? (
+
+                {err("pos") || err("poMatch") || err("poCoverage") ? (
                   <p
                     className="rounded-md border border-[var(--danger)]/30 bg-[#fef2f2] px-3 py-2 text-sm text-[var(--danger)]"
                     role="alert"
                   >
-                    {err("pos") || err("poMatch")}
+                    {err("poCoverage") || err("pos") || err("poMatch")}
                   </p>
-                ) : Math.abs(poSum - net) <= 0.01 && poSum > 0 ? (
+                ) : Math.abs(poSum - net) <= 0.01 &&
+                  poSum > 0 &&
+                  uncoveredServices.length === 0 ? (
                   <p className="text-xs text-[var(--ok)]">
-                    Obligation amounts match net contract value.
+                    All services covered and amounts match net.
                   </p>
                 ) : null}
+
                 {pos.map((p, i) => (
                   <div
                     key={i}
@@ -1653,6 +1727,43 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       />
                       <FieldError message={err(`poDone${i}`)} />
                     </label>
+
+                    <fieldset className="sm:col-span-2">
+                      <legend className="mb-1 text-xs font-medium text-[var(--muted)]">
+                        Services covered <span className="text-[var(--danger)]">*</span>
+                      </legend>
+                      {catalogServices.length === 0 ? (
+                        <p className="text-xs text-[var(--muted)]">
+                          No services with descriptions yet.
+                        </p>
+                      ) : (
+                        <div className="grid gap-1.5 sm:grid-cols-2">
+                          {catalogServices.map((s) => (
+                            <label
+                              key={s.key}
+                              className="flex items-start gap-2 rounded-md border border-[var(--line)] px-2 py-1.5 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-0.5"
+                                checked={p.service_keys.includes(s.key)}
+                                onChange={() => togglePoService(i, s.key)}
+                              />
+                              <span>
+                                <span className="font-medium">{s.description}</span>
+                                {Number(s.amount) > 0 ? (
+                                  <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                                    {formatCurrency(Number(s.amount))}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <FieldError message={err(`poSvc${i}`)} />
+                    </fieldset>
+
                     <label className="text-sm">
                       <FieldLabel>Allocated amount</FieldLabel>
                       <input
@@ -1682,14 +1793,139 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                         description: "",
                         completion_definition: "",
                         amount: "",
+                        service_keys: [],
                       },
                     ])
                   }
                 >
                   + Add obligation
                 </button>
-              </div>
+              </>
             )}
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="space-y-3">
+            <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-3 text-sm text-[var(--muted)]">
+              Installments are generated from performance obligations (one
+              payment per PO, amounts locked). Edit due dates or payment type
+              labels if needed. To change amounts, go back and edit the
+              obligations.
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-[var(--muted)]">
+                Scheduled: <strong>{formatCurrency(scheduleSum)}</strong>
+                {" · "}
+                Net: <strong>{formatCurrency(net)}</strong>
+              </p>
+            </div>
+            {Math.abs(scheduleSum - net) > 0.01 ? (
+              <p
+                className="rounded-md border border-[#f59e0b]/40 bg-[#fffbeb] px-3 py-2 text-sm text-[#92400e]"
+                role="status"
+              >
+                {err("scheduleMatch") ||
+                  `Off by ${formatCurrency(Math.abs(scheduleSum - net))}. Adjust PO amounts on the previous step.`}
+              </p>
+            ) : milestones.length > 0 ? (
+              <p className="text-xs text-[var(--ok)]">
+                Schedule matches net contract value.
+              </p>
+            ) : null}
+            <FieldError message={err("schedule") || err("depositRow")} />
+            {milestones.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">
+                {requirePos
+                  ? "No obligations defined yet — go back to Performance Obligations."
+                  : "No payments yet. Add obligations or create a manual installment."}
+              </p>
+            ) : null}
+            {milestones.map((m, i) => (
+              <div
+                key={m.milestone_key}
+                className="mb-1 grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-4"
+              >
+                <label className="text-sm sm:col-span-2">
+                  <FieldLabel required>Payment name</FieldLabel>
+                  <input
+                    className={err(`msLabel${i}`) ? fieldBad : field}
+                    value={m.label}
+                    onChange={(e) => {
+                      const nextM = [...milestones];
+                      nextM[i] = { ...m, label: e.target.value };
+                      setMilestones(nextM);
+                    }}
+                    placeholder="e.g. Planning installment"
+                  />
+                  <FieldError message={err(`msLabel${i}`)} />
+                </label>
+                <label className="text-sm">
+                  <FieldLabel>Amount (from PO)</FieldLabel>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className={`${field} bg-[#f8fafb]`}
+                    value={m.amount}
+                    readOnly
+                    title="Amount is locked to the matching performance obligation"
+                  />
+                </label>
+                <label className="text-sm">
+                  <FieldLabel>Due date</FieldLabel>
+                  <input
+                    type="date"
+                    className={field}
+                    value={m.due_date}
+                    onChange={(e) => {
+                      const nextM = [...milestones];
+                      nextM[i] = { ...m, due_date: e.target.value };
+                      setMilestones(nextM);
+                    }}
+                  />
+                </label>
+                <label className="text-sm sm:col-span-2">
+                  <FieldLabel>Type</FieldLabel>
+                  <select
+                    className={field}
+                    value={m.milestone_type}
+                    onChange={(e) => {
+                      const nextM = [...milestones];
+                      nextM[i] = { ...m, milestone_type: e.target.value };
+                      setMilestones(nextM);
+                    }}
+                  >
+                    {MILESTONE_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ))}
+            {!requirePos ? (
+              <button
+                type="button"
+                className="text-sm font-medium text-[var(--accent)]"
+                onClick={() =>
+                  setMilestones([
+                    ...milestones,
+                    {
+                      milestone_key: `ms-${milestones.length + 1}`,
+                      label: "",
+                      amount: "",
+                      due_date: "",
+                      milestone_type: "progress",
+                      sequence_no: milestones.length + 1,
+                    },
+                  ])
+                }
+              >
+                + Add payment
+              </button>
+            ) : null}
           </div>
         )}
 
@@ -1890,21 +2126,21 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-[var(--muted)]">Payments</dt>
-                  <dd>
-                    {milestones.length} milestone
-                    {milestones.length === 1 ? "" : "s"} ·{" "}
-                    {formatCurrency(scheduleSum)}
-                  </dd>
-                </div>
-                <div>
                   <dt className="text-xs text-[var(--muted)]">
                     Performance obligations
                   </dt>
                   <dd>
-                    {definePos
+                    {requirePos
                       ? `${pos.filter((p) => p.title.trim()).length} defined · ${formatCurrency(poSum)}`
-                      : "Define later on contract"}
+                      : "None (no services)"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Payments</dt>
+                  <dd>
+                    {milestones.length} installment
+                    {milestones.length === 1 ? "" : "s"} ·{" "}
+                    {formatCurrency(scheduleSum)}
                   </dd>
                 </div>
                 <div>
@@ -1920,10 +2156,8 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-[var(--muted)]">Services</dt>
                   <dd>
-                    {lines.filter((l) => l.description.trim()).length} line
-                    {lines.filter((l) => l.description.trim()).length === 1
-                      ? ""
-                      : "s"}
+                    {catalogServices.length} line
+                    {catalogServices.length === 1 ? "" : "s"}
                     {" · "}
                     {deliverables.filter((d) => d.title.trim()).length}{" "}
                     deliverable
