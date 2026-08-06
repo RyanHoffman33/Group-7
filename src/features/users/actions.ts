@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { findUserByEmail } from "@/features/users/directory";
+import { findRegisteredByEmail } from "@/features/users/registered-store";
 import {
   SESSION_COOKIE,
   authenticateDemo,
@@ -90,7 +91,8 @@ export async function registerAction(
     return { error: "Please correct the highlighted fields.", fieldErrors };
   }
 
-  if (findUserByEmail(email)) {
+  const normalizedEmail = email.toLowerCase();
+  if (findUserByEmail(normalizedEmail) || findRegisteredByEmail(normalizedEmail)) {
     return {
       error: "An account with this email already exists. Please sign in instead.",
       fieldErrors: { email: "This email is already registered." },
@@ -100,7 +102,7 @@ export async function registerAction(
   const created = registerCustomerAccount({
     firstName,
     lastName,
-    email,
+    email: normalizedEmail,
     phone,
     password,
   });
@@ -108,13 +110,11 @@ export async function registerAction(
     return { error: created.error };
   }
 
-  const sessionResult = await establishSession(email, password);
-  if (!sessionResult.ok) {
-    return {
-      error:
-        "Account created, but sign-in failed. Please sign in with your new credentials.",
-    };
-  }
+  // Sign in immediately as customer (default role) using the created user —
+  // do not depend on a second directory lookup that can miss after HMR.
+  const session = toSessionUser(created.user);
+  session.needsIntake = true;
+  await writeSessionCookie(session);
   redirect("/request");
 }
 

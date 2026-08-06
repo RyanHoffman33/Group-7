@@ -28,8 +28,9 @@ export default function RegisterPage() {
           Create New Account
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Register as a client to submit an event request. You will be signed
-          in automatically after creating your account.
+          Register as a client. Creating your account signs you in automatically
+          as a <strong className="text-[var(--ink)]">Customer</strong> (unless
+          management later changes your role).
         </p>
 
         <form action={formAction} className="mt-8 space-y-4">
@@ -117,7 +118,7 @@ export default function RegisterPage() {
             disabled={pending}
             className="w-full rounded-md bg-[var(--ink)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {pending ? "Creating account…" : "Create account"}
+            {pending ? "Creating account…" : "Create account & sign in"}
           </button>
         </form>
 
