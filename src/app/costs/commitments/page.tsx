@@ -20,10 +20,10 @@ export default async function CommitmentsPage() {
     <div>
       <PageHeader
         title="Commitments"
-        description="Costs contracted or booked but not yet actualized. Mark as actualized when the real invoice/cost is known."
+        description="Costs contracted or booked but not yet incurred. Use Record Actual Cost when the real amount is known. Items waiting for approval stay in the Approval Queue first."
       />
 
-      <Panel title="Committed — not yet actualized">
+      <Panel title="Committed — not yet recorded as actual">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wider text-[var(--muted)]">

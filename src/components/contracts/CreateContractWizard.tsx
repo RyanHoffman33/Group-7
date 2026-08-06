@@ -30,10 +30,10 @@ const STORAGE_KEY = "mainevent-create-contract-draft-v2";
 
 const STEPS = [
   "Customer & Event",
-  "Scope & Services",
+  "Services & Deliverables",
   "Financial Terms",
   "Payment Schedule",
-  "Approvals & Controls",
+  "Approvals",
   "Cancellation",
   "Documents & Review",
 ];
@@ -421,8 +421,17 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     }
     if (step === 3) {
       if (!milestones.length) return "Add payment milestones.";
+      if (
+        depositRequired &&
+        milestones.some(
+          (m) =>
+            m.milestone_type === "deposit" && !(Number(m.amount) > 0),
+        )
+      ) {
+        return "Deposit payment rows must be greater than $0 when a deposit is required.";
+      }
       if (Math.abs(scheduleSum - net) > 0.01) {
-        return `Schedule total (${scheduleSum}) must equal net contract value (${net}).`;
+        return `Schedule total (${formatCurrency(scheduleSum)}) must equal net contract value (${formatCurrency(net)}).`;
       }
     }
     if (step === 4) {
@@ -751,14 +760,19 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         {step === 1 && (
           <div className="space-y-4">
             <div>
-              <p className="mb-2 text-sm font-semibold">Service / package lines</p>
+              <p className="mb-2 text-sm font-semibold">Services & packages</p>
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                Enter each sellable service. Line total updates from quantity ×
+                unit price. Contract-level discounts are set under Financial
+                Terms.
+              </p>
               {lines.map((l, i) => (
                 <div
                   key={i}
-                  className="mb-3 grid gap-2 sm:grid-cols-5"
+                  className="mb-3 grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-4"
                 >
                   <label className="text-sm sm:col-span-2">
-                    <FieldLabel>Description</FieldLabel>
+                    <FieldLabel>Service name / description</FieldLabel>
                     <input
                       className={field}
                       value={l.description}
@@ -767,12 +781,14 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                         next[i] = { ...l, description: e.target.value };
                         setLines(next);
                       }}
+                      placeholder="e.g. Full-day AV package"
                     />
                   </label>
                   <label className="text-sm">
                     <FieldLabel>Quantity</FieldLabel>
                     <input
                       type="number"
+                      min={0}
                       className={field}
                       value={l.quantity}
                       onChange={(e) => {
@@ -788,9 +804,11 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     />
                   </label>
                   <label className="text-sm">
-                    <FieldLabel>Unit rate</FieldLabel>
+                    <FieldLabel>Unit price</FieldLabel>
                     <input
                       type="number"
+                      min={0}
+                      step="0.01"
                       className={field}
                       value={l.unit_rate}
                       onChange={(e) => {
@@ -805,10 +823,12 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       }}
                     />
                   </label>
-                  <label className="text-sm">
-                    <FieldLabel>Amount</FieldLabel>
+                  <label className="text-sm sm:col-span-2">
+                    <FieldLabel>Line total (calculated)</FieldLabel>
                     <input
                       type="number"
+                      min={0}
+                      step="0.01"
                       className={field}
                       value={l.amount}
                       onChange={(e) => {
@@ -836,35 +856,50 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   ])
                 }
               >
-                + Add line
+                + Add service
               </button>
             </div>
             <div>
-              <p className="mb-2 text-sm font-semibold">Deliverables</p>
+              <p className="mb-2 text-sm font-semibold">
+                Contractual deliverables
+              </p>
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                What must be delivered for this engagement. Reference codes are
+                assigned automatically.
+              </p>
               {deliverables.map((d, i) => (
                 <div key={i} className="mb-3 grid gap-2 sm:grid-cols-3">
                   <label className="text-sm">
-                    <FieldLabel>Code</FieldLabel>
-                    <input
-                      className={field}
-                      value={d.code}
-                      onChange={(e) => {
-                        const next = [...deliverables];
-                        next[i] = { ...d, code: e.target.value };
-                        setDeliverables(next);
-                      }}
-                    />
-                  </label>
-                  <label className="text-sm">
-                    <FieldLabel>Title</FieldLabel>
+                    <FieldLabel>Deliverable name</FieldLabel>
                     <input
                       className={field}
                       value={d.title}
                       onChange={(e) => {
                         const next = [...deliverables];
-                        next[i] = { ...d, title: e.target.value };
+                        next[i] = {
+                          ...d,
+                          title: e.target.value,
+                          code:
+                            d.code && d.code !== `DLV-${i + 1}`
+                              ? d.code
+                              : `DLV-${i + 1}`,
+                        };
                         setDeliverables(next);
                       }}
+                      placeholder="e.g. Stage setup"
+                    />
+                  </label>
+                  <label className="text-sm sm:col-span-2">
+                    <FieldLabel>Description</FieldLabel>
+                    <input
+                      className={field}
+                      value={d.description}
+                      onChange={(e) => {
+                        const next = [...deliverables];
+                        next[i] = { ...d, description: e.target.value };
+                        setDeliverables(next);
+                      }}
+                      placeholder="What must be delivered"
                     />
                   </label>
                   <label className="text-sm">
@@ -885,6 +920,10 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       ))}
                     </select>
                   </label>
+                  <p className="text-xs text-[var(--muted)] sm:col-span-3">
+                    Reference code {d.code || `DLV-${i + 1}`} is assigned
+                    automatically.
+                  </p>
                 </div>
               ))}
               <button
@@ -1043,8 +1082,8 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       Deposit required before work begins
                     </span>
                     <span className="mt-1 block text-xs text-[var(--muted)]">
-                      Customer deposits are recorded as liabilities until the
-                      related contractual performance obligations are satisfied.
+                      Required before work begins. Held until related services
+                      are delivered.
                     </span>
                   </span>
                 </label>
@@ -1168,8 +1207,8 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-[var(--muted)]">
-                Schedule sum: <strong>{formatCurrency(scheduleSum)}</strong> · Net
-                contract: <strong>{formatCurrency(net)}</strong>
+                Scheduled total: <strong>{formatCurrency(scheduleSum)}</strong>{" "}
+                · Net contract value: <strong>{formatCurrency(net)}</strong>
               </p>
               <button
                 type="button"
@@ -1179,36 +1218,59 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 Split deposit + final from value
               </button>
             </div>
+            {Math.abs(scheduleSum - net) > 0.01 ? (
+              <p
+                className="rounded-md border border-[#f59e0b]/40 bg-[#fffbeb] px-3 py-2 text-sm text-[#92400e]"
+                role="status"
+              >
+                Schedule does not match net contract value (
+                {formatCurrency(Math.abs(scheduleSum - net))} difference). Adjust
+                amounts or use “Split deposit + final from value.”
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--ok)]">
+                Schedule totals match the net contract value.
+              </p>
+            )}
             {milestones.map((m, i) => (
-              <div key={i} className="mb-1 grid gap-2 sm:grid-cols-5">
-                <label className="text-sm">
-                  <FieldLabel>Key</FieldLabel>
-                  <input
-                    className={field}
-                    value={m.milestone_key}
-                    onChange={(e) => {
-                      const next = [...milestones];
-                      next[i] = { ...m, milestone_key: e.target.value };
-                      setMilestones(next);
-                    }}
-                  />
-                </label>
-                <label className="text-sm">
-                  <FieldLabel>Label</FieldLabel>
+              <div
+                key={i}
+                className="mb-1 grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-4"
+              >
+                <label className="text-sm sm:col-span-2">
+                  <FieldLabel>Milestone name</FieldLabel>
                   <input
                     className={field}
                     value={m.label}
                     onChange={(e) => {
                       const next = [...milestones];
-                      next[i] = { ...m, label: e.target.value };
+                      const label = e.target.value;
+                      next[i] = {
+                        ...m,
+                        label,
+                        milestone_key: (() => {
+                          const keep =
+                            m.milestone_key &&
+                            ["deposit", "final"].includes(m.milestone_key);
+                          if (keep) return m.milestone_key;
+                          const slug = label
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, "-")
+                            .replace(/^-|-$/g, "");
+                          return slug || `ms-${i + 1}`;
+                        })(),
+                      };
                       setMilestones(next);
                     }}
+                    placeholder="e.g. Deposit on signing"
                   />
                 </label>
                 <label className="text-sm">
                   <FieldLabel>Amount</FieldLabel>
                   <input
                     type="number"
+                    min={0}
+                    step="0.01"
                     className={field}
                     value={m.amount}
                     onChange={(e) => {
@@ -1217,6 +1279,13 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       setMilestones(next);
                     }}
                   />
+                  {m.milestone_type === "deposit" &&
+                  Number(m.amount) === 0 &&
+                  depositRequired ? (
+                    <span className="mt-1 block text-xs text-[var(--danger)]">
+                      Deposit rows should not be $0 when a deposit is required.
+                    </span>
+                  ) : null}
                 </label>
                 <label className="text-sm">
                   <FieldLabel>Due date</FieldLabel>
@@ -1231,8 +1300,8 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     }}
                   />
                 </label>
-                <label className="text-sm">
-                  <FieldLabel>Type</FieldLabel>
+                <label className="text-sm sm:col-span-2">
+                  <FieldLabel>Billing trigger</FieldLabel>
                   <select
                     className={field}
                     value={m.milestone_type}
@@ -1268,7 +1337,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 ])
               }
             >
-              + Add milestone
+              + Add payment
             </button>
           </div>
         )}

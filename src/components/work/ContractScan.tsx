@@ -571,8 +571,7 @@ export function ObligationStatusCard({
           </span>
           <div>
             <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
-              Performance obligation (ASC 606) · {obligation.phase} ·{" "}
-              {obligation.code}
+              Deliverable · {obligation.phase}
             </p>
             <h4 className="font-semibold text-[var(--ink)]">
               {obligation.title}

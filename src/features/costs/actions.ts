@@ -203,14 +203,19 @@ export async function createTimeEntryAction(
   _prev: { error?: string } | null,
   formData: FormData,
 ): Promise<{ error?: string } | null> {
+  const { getSessionUser } = await import("@/features/users/session");
+  const session = await getSessionUser();
+  const worker =
+    session?.fullName?.trim() ||
+    String(formData.get("worker_label") ?? "").trim();
   const result = await createTimeEntry({
     contract_id: String(formData.get("contract_id") ?? ""),
-    worker_label: String(formData.get("worker_label") ?? ""),
+    worker_label: worker,
     hours: Number(formData.get("hours")),
     rate: Number(formData.get("rate")),
     incurred_date: String(formData.get("incurred_date") ?? ""),
     notes: String(formData.get("notes") || ""),
-    entered_by: String(formData.get("worker_label") ?? ""),
+    entered_by: worker,
   });
   if (!result.ok) return { error: result.error ?? "Failed to log time." };
   if (!result.id) return { error: "Saved, but no entry id was returned." };
@@ -461,8 +466,13 @@ export async function approveCostEntry(
 
 export async function rejectCostEntry(
   id: string,
+  reason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    const rejectionReason = reason?.trim();
+    if (!rejectionReason) {
+      return { ok: false, error: "A rejection reason is required." };
+    }
     const supabase = createClient();
     const { data, error: loadErr } = await supabase
       .from("cost_entries")
@@ -474,9 +484,14 @@ export async function rejectCostEntry(
     if (data.approval_status !== "pending_approval")
       return { ok: false, error: "Entry is not pending approval." };
 
+    const priorNotes = String(data.notes ?? "").trim();
+    const notes = priorNotes
+      ? `${priorNotes}\nRejected: ${rejectionReason}`
+      : `Rejected: ${rejectionReason}`;
+
     const { error } = await supabase
       .from("cost_entries")
-      .update({ approval_status: "rejected" })
+      .update({ approval_status: "rejected", notes })
       .eq("id", id);
     if (error) return { ok: false, error: error.message };
 
@@ -484,9 +499,9 @@ export async function rejectCostEntry(
       costEntryId: id,
       action: "rejected",
       actor: "manager",
-      detail: "Cost rejected",
+      detail: `Cost rejected: ${rejectionReason}`,
       before: snapshotRow(data as Record<string, unknown>),
-      after: { approval_status: "rejected" },
+      after: { approval_status: "rejected", notes },
     });
 
     revalidateCosts(data.contract_id as string, id);
@@ -616,7 +631,20 @@ export async function actualizeCostEntry(input: {
     if (loadErr) return { ok: false, error: loadErr.message };
     if (!existing) return { ok: false, error: "Not found." };
     if (existing.commitment_status !== "committed")
-      return { ok: false, error: "Only committed costs can be actualized." };
+      return { ok: false, error: "Only committed costs can be recorded as actual." };
+    if (existing.approval_status === "pending_approval") {
+      return {
+        ok: false,
+        error:
+          "This commitment is waiting for approval. Approve it first, then record the actual cost.",
+      };
+    }
+    if (existing.approval_status === "rejected") {
+      return {
+        ok: false,
+        error: "This commitment was rejected and cannot be recorded as actual cost.",
+      };
+    }
 
     const prior =
       existing.prior_committed_amount != null

@@ -86,7 +86,13 @@ export default async function CostsHubPage() {
           <StatCard
             label="Open flags"
             value={String(stats.openFlags)}
-            hint={`${stats.openFlags} control${stats.openFlags === 1 ? "" : "s"} needing attention →`}
+            hint={
+              stats.openFlags === 0
+                ? "All clear →"
+                : stats.openFlags === 1
+                  ? "1 item needs attention →"
+                  : `${stats.openFlags} items need attention →`
+            }
             tone={stats.openFlags > 0 ? "danger" : "default"}
           />
         </Link>

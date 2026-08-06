@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatCurrency, formatDate } from "@/features/billing/aging";
+import { formatDate } from "@/features/billing/aging";
 import { getDashboardMetrics } from "@/features/contracts/queries";
 import { STATUS_LABELS, type ContractStatus } from "@/features/contracts/status";
 import {
@@ -12,6 +12,11 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function shortContractRef(value: string) {
+  if (value.length <= 18) return value;
+  return `${value.slice(0, 10)}…${value.slice(-4)}`;
+}
+
 export default async function ContractsDashboardPage() {
   const m = await getDashboardMetrics();
 
@@ -19,7 +24,7 @@ export default async function ContractsDashboardPage() {
     <div>
       <PageHeader
         title="Contracts Dashboard"
-        description="Engagement pipeline for MainEvent: approvals, deposits, event readiness, and closeout — without treating status changes as revenue."
+        description="What needs attention next — approvals, deposits, and closeout — without treating status changes as revenue."
         actions={
           <Link
             href="/contracts/new"
@@ -40,43 +45,41 @@ export default async function ContractsDashboardPage() {
         <StatCard
           label="Pending approval"
           value={String(m.pendingApprovalCount)}
-          hint="PM queue"
+          hint="Waiting on review"
           tone={m.pendingApprovalCount > 0 ? "warn" : "default"}
         />
         <StatCard
           label="Awaiting deposit"
           value={String(m.depositPendingCount)}
-          hint="% of original value"
+          hint="Open engagements only"
           tone={m.depositPendingCount > 0 ? "warn" : "default"}
         />
         <StatCard
-          label="Current contract value"
-          value={formatCurrency(m.totalCurrentValue)}
-          hint="Excludes canceled/closed"
-        />
-      </div>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
-          label="Approved change-order value (Σ)"
-          value={formatCurrency(m.totalChangeOrderValue)}
-          hint="change_order_value_total across contracts"
-        />
-        <StatCard
-          label="Requiring action"
+          label="Items needing action"
           value={String(m.requiringAction.length)}
           tone={m.requiringAction.length ? "danger" : "default"}
         />
-        <StatCard
-          label="Ready for closeout review"
-          value={String(m.readyForCloseout.length)}
-          hint="Completed or performance complete"
-        />
       </div>
+
+      <p className="mt-3 text-xs text-[var(--muted)]">
+        Portfolio value, approved change-order totals, and closeout counts live on{" "}
+        <Link href="/contracts/list" className="text-[var(--accent)] hover:underline">
+          All Contracts
+        </Link>
+        ,{" "}
+        <Link href="/contracts/changes" className="text-[var(--accent)] hover:underline">
+          Contract Changes
+        </Link>
+        , and{" "}
+        <Link href="/contracts/closeout" className="text-[var(--accent)] hover:underline">
+          Closeout
+        </Link>
+        .
+      </p>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Panel
-          title="Contracts requiring action"
+          title="Needs action now"
           action={
             <Link
               href="/contracts/list"
@@ -93,18 +96,36 @@ export default async function ContractsDashboardPage() {
           ) : (
             <ul className="divide-y divide-[var(--line)]">
               {m.requiringAction.map((c) => (
-                <li key={c.id} className="flex items-start justify-between gap-3 py-3">
+                <li
+                  key={c.id}
+                  className="flex items-start justify-between gap-3 py-3"
+                >
                   <div>
                     <Link
                       href={`/contracts/${c.id}`}
                       className="font-semibold text-[var(--accent)]"
+                      title={c.contract_number ?? c.id}
                     >
-                      {c.contract_number}
+                      {shortContractRef(c.contract_number ?? c.id)}
                     </Link>
                     <p className="text-sm text-[var(--ink)]">{c.event_name}</p>
-                    <p className="text-xs text-[var(--muted)]">{c.action_hint}</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {c.customer_name}
+                    </p>
+                    {c.action_hint ? (
+                      <p className="mt-1 text-sm text-[var(--warn)]">
+                        {c.action_hint}
+                      </p>
+                    ) : null}
                   </div>
-                  <StatusPill tone="warn">
+                  <StatusPill
+                    tone={
+                      c.status === "pending_approval" ||
+                      c.status === "deposit_pending"
+                        ? "warn"
+                        : "accent"
+                    }
+                  >
                     {STATUS_LABELS[c.status as ContractStatus] ?? c.status}
                   </StatusPill>
                 </li>
@@ -113,107 +134,74 @@ export default async function ContractsDashboardPage() {
           )}
         </Panel>
 
-        <Panel title="At risk / deposit & approval">
+        <Panel title="Deposit & approval risks">
           {m.atRisk.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">No deposit or approval risk flags.</p>
+            <p className="text-sm text-[var(--muted)]">
+              No deposit or approval risks flagged.
+            </p>
           ) : (
             <ul className="divide-y divide-[var(--line)]">
-              {m.atRisk.slice(0, 10).map((c) => (
-                <li key={c.id} className="py-3 text-sm">
+              {m.atRisk.slice(0, 8).map((c) => (
+                <li key={c.id} className="py-3">
                   <Link
                     href={`/contracts/${c.id}`}
                     className="font-semibold text-[var(--accent)]"
+                    title={c.contract_number ?? undefined}
                   >
-                    {c.contract_number}
+                    {shortContractRef(c.contract_number ?? c.id)} · {c.event_name}
                   </Link>
-                  <span className="text-[var(--muted)]"> · {c.customer_name}</span>
-                  <div className="text-xs text-[var(--muted)]">
-                    Deposit {c.deposit_status} · {c.action_hint}
-                  </div>
+                  <p className="text-xs text-[var(--muted)]">
+                    {c.action_hint ??
+                      STATUS_LABELS[c.status as ContractStatus] ??
+                      c.status}
+                  </p>
                 </li>
               ))}
             </ul>
           )}
         </Panel>
+      </div>
 
-        <Panel title="Upcoming events (45 days)">
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Panel
+          title="Upcoming events"
+          action={
+            <Link
+              href="/contracts/list"
+              className="text-sm font-medium text-[var(--accent)]"
+            >
+              Pipeline
+            </Link>
+          }
+        >
           {m.upcomingEvents.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">No events in the next 45 days.</p>
+            <p className="text-sm text-[var(--muted)]">
+              No events in the next 45 days.
+            </p>
           ) : (
             <ul className="divide-y divide-[var(--line)]">
               {m.upcomingEvents.map((c) => (
-                <li key={c.id} className="flex justify-between gap-2 py-3 text-sm">
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between gap-3 py-3 text-sm"
+                >
                   <div>
                     <Link
                       href={`/contracts/${c.id}`}
-                      className="font-semibold text-[var(--accent)]"
+                      className="font-medium text-[var(--accent)]"
                     >
                       {c.event_name}
                     </Link>
-                    <div className="text-xs text-[var(--muted)]">
-                      {c.venue_city ?? "—"} · {c.project_manager_label}
-                    </div>
+                    <p className="text-xs text-[var(--muted)]">
+                      {c.customer_name}
+                    </p>
                   </div>
-                  <span className="tabular-nums text-[var(--muted)]">
-                    {formatDate(c.event_start)}
+                  <span className="text-[var(--muted)]">
+                    {c.event_start ? formatDate(c.event_start) : "—"}
                   </span>
                 </li>
               ))}
             </ul>
-          )}
-        </Panel>
-
-        <Panel
-          title="Upcoming payment milestones"
-          action={
-            <Link
-              href="/billing/determine"
-              className="text-sm font-medium text-[var(--accent)]"
-            >
-              Billing
-            </Link>
-          }
-        >
-          {m.upcomingMilestones.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">No open milestones with due dates.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase tracking-wider text-[var(--muted)]">
-                  <tr className="border-b border-[var(--line)]">
-                    <th className="pb-2 font-medium">Contract</th>
-                    <th className="pb-2 font-medium">Milestone</th>
-                    <th className="pb-2 font-medium">Due</th>
-                    <th className="pb-2 font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {m.upcomingMilestones.map((row, i) => (
-                    <tr
-                      key={`${row.contract_id}-${i}`}
-                      className="border-b border-[var(--line)] last:border-0"
-                    >
-                      <td className="py-2">
-                        <Link
-                          href={`/contracts/${row.contract_id}`}
-                          className="font-medium text-[var(--accent)]"
-                        >
-                          {row.contract_number}
-                        </Link>
-                        <div className="text-xs text-[var(--muted)]">
-                          {row.event_name}
-                        </div>
-                      </td>
-                      <td className="py-2">{row.label}</td>
-                      <td className="py-2">{formatDate(row.due_date)}</td>
-                      <td className="py-2">
-                        <Money amount={row.amount} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
         </Panel>
 
@@ -224,45 +212,28 @@ export default async function ContractsDashboardPage() {
               href="/contracts/closeout"
               className="text-sm font-medium text-[var(--accent)]"
             >
-              Closeout desk
+              Open closeout
             </Link>
           }
         >
           {m.readyForCloseout.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">No completed engagements to review.</p>
+            <p className="text-sm text-[var(--muted)]">
+              Nothing ready for closeout review.
+            </p>
           ) : (
             <ul className="divide-y divide-[var(--line)]">
-              {m.readyForCloseout.map((c) => (
-                <li key={c.id} className="flex justify-between py-3 text-sm">
-                  <Link
-                    href={`/contracts/${c.id}`}
-                    className="font-semibold text-[var(--accent)]"
-                  >
-                    {c.contract_number}
-                  </Link>
-                  <Money amount={Number(c.contract_value)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-
-        <Panel title="Canceled (policy / forfeit review)">
-          {m.canceledRecent.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">No canceled contracts.</p>
-          ) : (
-            <ul className="divide-y divide-[var(--line)]">
-              {m.canceledRecent.map((c) => (
+              {m.readyForCloseout.slice(0, 6).map((c) => (
                 <li key={c.id} className="py-3 text-sm">
                   <Link
-                    href={`/contracts/${c.id}`}
-                    className="font-semibold text-[var(--accent)]"
+                    href={`/contracts/closeout?contract=${c.id}`}
+                    className="font-medium text-[var(--accent)]"
                   >
-                    {c.contract_number}
+                    {c.event_name}
                   </Link>
-                  <div className="text-xs text-[var(--muted)]">
-                    {c.cancel_reason ?? "No reason on file"}
-                  </div>
+                  <p className="text-xs text-[var(--muted)]">
+                    {shortContractRef(c.contract_number ?? c.id)} ·{" "}
+                    <Money amount={Number(c.contract_value)} />
+                  </p>
                 </li>
               ))}
             </ul>

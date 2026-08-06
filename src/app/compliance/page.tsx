@@ -16,7 +16,7 @@ export default async function ComplianceDashboardPage() {
     <div>
       <PageHeader
         title="Contract position"
-        description="ASC 606 contract assets (earned not billed), contract liabilities (unearned deposits + deferred billed), and open A/R — read from Billing without rewriting invoices."
+        description="Contract assets (earned not billed), unearned deposits, deferred billed amounts, and open A/R — read from Billing without rewriting invoices."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

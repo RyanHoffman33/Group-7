@@ -24,10 +24,9 @@ export default async function AlertsPage() {
       />
 
       <div className="mb-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]">
-        Production: schedule <code className="text-[var(--ink)]">POST /api/billing/aging-check</code>{" "}
-        daily via Vercel Cron with{" "}
-        <code className="text-[var(--ink)]">Authorization: Bearer $BILLING_CRON_SECRET</code>.
-        Use the button above to test locally.
+        Aging alerts update when receivables move into a new past-due range.
+        Use <strong className="font-medium text-[var(--ink)]">Run aging check</strong>{" "}
+        above to refresh open alerts for the billing team.
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

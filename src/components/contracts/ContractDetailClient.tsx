@@ -221,7 +221,7 @@ export function ContractDetailClient({
             </dd>
           </div>
           <div>
-            <dt className="text-[var(--muted)]">Change orders Σ</dt>
+            <dt className="text-[var(--muted)]">Approved change orders</dt>
             <dd className="font-semibold">
               <Money amount={Number(contract.change_order_value_total)} />
             </dd>

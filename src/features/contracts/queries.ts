@@ -20,13 +20,13 @@ export type ContractListRow = EngagementContract & {
   next_milestone_label: string | null;
   next_milestone_due: string | null;
   action_hint: string | null;
-  /** Σ invoice.total excluding void/canceled/draft */
+  /** Invoice total billed (excluding void/canceled/draft) */
   billed_to_date: number;
-  /** Σ payment_applications on those invoices */
+  /** Payments applied to those invoices */
   paid_to_date: number;
-  /** Σ (invoice.total − apps) for open A/R statuses */
+  /** Open customer balance */
   open_ar: number;
-  /** GREATEST(0, contract_value − billed_to_date) */
+  /** Remaining unbilled contract value */
   unbilled_remaining: number;
 };
 
@@ -187,6 +187,7 @@ function actionHint(
   c: EngagementContract,
   depositStatus: DepositInfo["status"],
 ): string | null {
+  if (c.status === "closed" || c.status === "canceled") return null;
   if (c.status === "draft") return "Complete and submit for approval";
   if (c.status === "pending_approval") return "Awaiting PM approval";
   if (c.status === "deposit_pending" || depositStatus === "pending") {
@@ -197,7 +198,6 @@ function actionHint(
     return "Mark completed / prepare closeout";
   }
   if (c.status === "completed") return "Review for closeout";
-  if (c.status === "canceled") return "Cancellation documentation on file";
   return null;
 }
 
@@ -705,7 +705,11 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     )
     .slice(0, 8);
 
-  const atRisk = rows.filter(
+  const openRows = rows.filter(
+    (r) => !["closed", "canceled"].includes(r.status),
+  );
+
+  const atRisk = openRows.filter(
     (r) =>
       r.action_hint?.includes("Deposit") ||
       r.status === "deposit_pending" ||
@@ -713,7 +717,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       r.status === "pending_approval",
   );
 
-  const requiringAction = rows.filter((r) => r.action_hint != null).slice(0, 12);
+  const requiringAction = openRows
+    .filter((r) => r.action_hint != null)
+    .slice(0, 12);
 
   const readyForCloseout = rows.filter(
     (r) => r.status === "completed" || (r.status === "active" && r.performance_complete),
@@ -747,7 +753,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     activeCount: rows.filter((r) => r.status === "active").length,
     pendingApprovalCount: rows.filter((r) => r.status === "pending_approval")
       .length,
-    depositPendingCount: rows.filter(
+    depositPendingCount: openRows.filter(
       (r) => r.status === "deposit_pending" || r.deposit_status === "pending",
     ).length,
     upcomingEvents,
@@ -829,27 +835,27 @@ export async function getCloseoutChecks(
       label: "Event completed / performance complete",
       ok: eventDone,
       detail: eventDone
-        ? "Performance complete or event end has passed"
-        : "Mark performance complete or complete the engagement first",
+        ? "Event marked complete or end date has passed"
+        : "Mark the event complete before closeout",
     },
     {
       key: "approval",
       label: "Contract approved (not draft/pending)",
       ok: !["draft", "pending_approval"].includes(contract.status),
-      detail: `Status is ${contract.status}`,
+      detail: `Status is ${String(contract.status).replace(/_/g, " ")}`,
     },
     {
       key: "costs",
-      label: "Costs recorded or acknowledged",
-      ok: (costCount ?? 0) > 0 || Boolean(contract.closeout_notes),
+      label: "Costs recorded",
+      ok: (costCount ?? 0) > 0,
       detail:
         (costCount ?? 0) > 0
           ? `${costCount} cost entries on contract`
-          : "No cost entries — add closeout notes if costs are N/A",
+          : "No cost entries recorded yet",
     },
     {
       key: "invoice",
-      label: "Final / material invoice activity",
+      label: "Invoices on file",
       ok: hasFinalish || contract.status === "canceled",
       detail: hasFinalish
         ? `${invs.length} invoice(s) on contract`
@@ -857,34 +863,34 @@ export async function getCloseoutChecks(
     },
     {
       key: "ar",
-      label: "No material open customer balance",
+      label: "Customer balance cleared",
       ok: openAr.length === 0,
       detail:
         openAr.length === 0
-          ? "No open A/R on this contract"
+          ? "No open invoices remain"
           : `${openAr.length} open invoice(s) remain`,
     },
     {
       key: "cos",
-      label: "No open change orders",
+      label: "Change orders settled",
       ok: openMods.length === 0,
       detail:
         openMods.length === 0
           ? "All change orders applied or none open"
-          : `${openMods.length} CO(s) still draft/approved (not applied)`,
+          : `${openMods.length} change order(s) still draft or approved but not applied`,
     },
     {
       key: "docs",
-      label: "Documentation present",
-      ok: (docs ?? []).length > 0 || Boolean(contract.closeout_notes),
+      label: "Supporting documents attached",
+      ok: (docs ?? []).length > 0,
       detail:
         (docs ?? []).length > 0
-          ? `${docs!.length} document(s)`
-          : "Add closeout notes or attach a document",
+          ? `${docs!.length} document(s) on file`
+          : "No documents attached yet — upload before confirming",
     },
     {
       key: "disputes",
-      label: "No disputed invoices",
+      label: "No open disputes",
       ok: disputed.length === 0,
       detail:
         disputed.length === 0
@@ -894,7 +900,9 @@ export async function getCloseoutChecks(
   ];
 
   const required = checks.filter((c) =>
-    ["event", "approval", "ar", "cos", "disputes"].includes(c.key),
+    ["event", "approval", "ar", "cos", "disputes", "docs", "costs", "invoice"].includes(
+      c.key,
+    ),
   );
   const canClose =
     contract.status !== "closed" &&

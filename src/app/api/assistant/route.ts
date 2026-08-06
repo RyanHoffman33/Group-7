@@ -139,10 +139,10 @@ function answerFromSnapshot(snapshot: string, question: string): string {
     return `From the live snapshot, unearned deposits (contract liability) are **${line("- Unearned deposits (liability)") ?? line("- Unearned deposits") ?? "see /compliance/deposits-retainers"}**. Deposits stay liabilities until applied/earned — cash alone is not revenue.`;
   }
   if (q.includes("aging") || q.includes("90") || q.includes("collect")) {
-    return `Portfolio A/R outstanding is **${line("- Total outstanding A/R")}**, with expected collections **${line("- Expected collections (A/R × P(collect))")}**. Aging mix is on the Aging page; 90+ is listed in the snapshot aging mix line.`;
+    return `Portfolio A/R outstanding is **${line("- Total outstanding A/R")}**, with expected collections **${line("- Expected collections")}**. Aging detail is on the Aging page; 90+ days is listed in the snapshot aging mix.`;
   }
   if (q.includes("asset") || q.includes("earned not") || q.includes("not billed")) {
-    return `Contract assets (earned not billed) total **${line("- Contract assets (earned not billed)")}**. That is performance earned ahead of billing under ASC 606 — see Contract position.`;
+    return `Amounts earned but not yet billed total **${line("- Contract assets (earned not billed)")}**. See Contract Position for the revenue picture.`;
   }
   if (q.includes("liability") || q.includes("deferred")) {
     return `Contract liabilities are **${line("- Contract liabilities (unearned deposits + deferred billed)")}**. Deferred open A/R is **${line("- Deferred open A/R (billed, not yet recognized)")}**.`;
@@ -161,7 +161,7 @@ function answerFromSnapshot(snapshot: string, question: string): string {
     return `From Cost & Resources: actual costs are **${line("- Total actual costs")}**, open commitments are **${line("- Open commitments")}**. Pending cost approvals: **${line("- Pending cost approvals")}**.`;
   }
   if (q.includes("flag") || q.includes("exception") || q.includes("no commitment")) {
-    return `There are **${line("- Open cost control flags")}** open cost control flags (commitment variance, no commitment on file, etc.). Pending approvals over the threshold are tracked separately under Approvals.`;
+    return `There are **${line("- Open cost control flags")}** cost flags needing attention (commitment variance, missing commitment, etc.). Larger amounts waiting for approval appear under Approvals.`;
   }
   if (q.includes("approv") && q.includes("cost")) {
     return `Pending cost approvals: **${line("- Pending cost approvals")}**. Threshold: **${line("- Approval threshold")}**.`;
@@ -171,7 +171,7 @@ function answerFromSnapshot(snapshot: string, question: string): string {
   }
 
   return [
-    "I can answer from MainEvent’s live Billing, Compliance, and Cost & Resources snapshot even without an AI key.",
+    "I can answer from MainEvent’s live Billing, Compliance, and Cost & Resources snapshot.",
     "",
     `- Outstanding A/R: ${line("- Total outstanding A/R")}`,
     `- Unearned deposits: ${line("- Unearned deposits (liability)")}`,
@@ -180,7 +180,7 @@ function answerFromSnapshot(snapshot: string, question: string): string {
     `- Open commitments: ${line("- Open commitments")}`,
     `- Cost flags: ${line("- Open cost control flags")}`,
     "",
-    "Add a free GEMINI_API_KEY (or GROQ_API_KEY) to .env.local for full natural-language answers. Try asking about deposits, aging, costs, commitments, or flags.",
+    "Try asking about deposits, aging, costs, commitments, or flags.",
   ].join("\n");
 }
 

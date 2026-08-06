@@ -301,7 +301,7 @@ export default async function WorkEventPage({
     <div>
       <EngagementHeaderWithException
         title={status.event_name}
-        description={`${status.customer_name} · Track distinct performance obligations in completion order. Completion here is satisfaction evidence for ASC 606 (GAAP Compliance) and billing handoff — not the journal entry itself.`}
+        description={`${status.customer_name} · Track deliverables in completion order. Marking work complete supports billing readiness; journal entries stay in Compliance.`}
         contractId={contractId}
         defaultOpen={exception === "1" || exception === "true"}
         parties={parties.map((p) => ({
@@ -354,16 +354,15 @@ export default async function WorkEventPage({
       ) : null}
 
       <div className="mb-4 rounded-lg border border-[var(--line)] bg-[var(--accent-soft)]/40 px-4 py-3 text-sm text-[var(--ink)]">
-        <p className="font-semibold">ASC 606 story on this page</p>
+        <p className="font-semibold">How this page works</p>
         <p className="mt-1 text-[var(--muted)]">
-          Each card is a <strong>performance obligation</strong> (promised good
-          or service). Crew <strong>assignments</strong> sit under a PO as
-          execution steps.{" "}
-          <strong>Exceptions</strong> are contract changes / issues and always
-          appear at the end until approved for Billing. Revenue recognition and
-          contract asset/liability balances live in{" "}
+          Each card is a <strong>deliverable</strong> promised on the contract.
+          Crew <strong>assignments</strong> are the steps to complete it.{" "}
+          <strong>Exceptions</strong> are issues or scope changes and stay at
+          the end until approved for billing. Revenue and balance-sheet effects
+          live in{" "}
           <Link href="/compliance" className="text-[var(--accent)] hover:underline">
-            GAAP Compliance
+            Compliance
           </Link>
           .
         </p>
@@ -384,7 +383,7 @@ export default async function WorkEventPage({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Link href={`/work/events/${contractId}?focus=outstanding`}>
           <StatCard
-            label="Promised POs"
+            label="Promised"
             value={String(status.promised_count)}
             hint="Click outstanding view"
           />

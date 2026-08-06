@@ -99,7 +99,7 @@ export function CreateInvoiceForm({
         <input
           name="description"
           required
-          placeholder="Milestone / performance obligation"
+          placeholder="e.g. Final payment for gala AV"
           className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2"
         />
       </label>
@@ -136,21 +136,21 @@ export function CreateInvoiceForm({
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-[var(--muted)]">
-          Milestone key (duplicate control)
+          Payment milestone
         </span>
         <input
           name="milestone_key"
-          placeholder="e.g. final-balance"
+          placeholder="e.g. Final balance"
           className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2"
         />
       </label>
       <label className="text-sm sm:col-span-2">
         <span className="mb-1 block text-[var(--muted)]">
-          Performance obligation ref
+          Related deliverable (optional)
         </span>
         <input
           name="performance_obligation_ref"
-          placeholder="PO-event"
+          placeholder="e.g. Stage setup"
           className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2"
         />
       </label>

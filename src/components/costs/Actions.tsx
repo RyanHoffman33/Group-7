@@ -26,10 +26,14 @@ const labelClass = "text-xs font-medium text-[var(--muted)]";
 
 export function TimeEntryForm({
   contracts,
+  teamMemberName,
+  approvedHourlyRate = DEFAULT_LABOR_RATE,
 }: {
   contracts: { id: string; event_name: string }[];
+  teamMemberName?: string;
+  approvedHourlyRate?: number;
 }) {
-  const [rate, setRate] = useState(String(DEFAULT_LABOR_RATE));
+  const rate = String(approvedHourlyRate);
   const [state, formAction, pending] = useActionState(
     createTimeEntryAction,
     null,
@@ -38,8 +42,9 @@ export function TimeEntryForm({
   return (
     <form action={formAction} className="mx-auto max-w-md space-y-4">
       <p className="rounded-md bg-[var(--accent-soft)] px-3 py-2 text-xs text-[var(--accent)]">
-        Fast venue entry — amounts ≥ ${APPROVAL_THRESHOLD.toLocaleString()} go
-        to the Approval Queue. Costs are recorded when incurred, not when paid.
+        Log hours for the signed-in team member. Amounts ≥ $
+        {APPROVAL_THRESHOLD.toLocaleString()} go to the Approval Queue. Costs are
+        recorded when incurred, not when paid.
       </p>
 
       <label className="block space-y-1.5">
@@ -57,13 +62,13 @@ export function TimeEntryForm({
       </label>
 
       <label className="block space-y-1.5">
-        <span className={labelClass}>Your name</span>
+        <span className={labelClass}>Team member</span>
         <input
           name="worker_label"
           required
-          className={fieldClass}
-          placeholder="Alex Rivera"
-          autoComplete="name"
+          readOnly
+          className={`${fieldClass} bg-[#f7f9fb]`}
+          value={teamMemberName || "Signed-in user"}
         />
       </label>
 
@@ -81,16 +86,16 @@ export function TimeEntryForm({
           />
         </label>
         <label className="block space-y-1.5">
-          <span className={labelClass}>Rate ($/hr)</span>
+          <span className={labelClass}>Approved rate ($/hr)</span>
           <input
             name="rate"
             type="number"
             min="0"
             step="0.01"
             required
+            readOnly
             value={rate}
-            onChange={(e) => setRate(e.target.value)}
-            className={fieldClass}
+            className={`${fieldClass} bg-[#f7f9fb]`}
             inputMode="decimal"
           />
         </label>
@@ -138,6 +143,8 @@ export function ExpenseEntryForm({
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<CostCategory>("vendor");
   const [reimbursable, setReimbursable] = useState(false);
+  const [vendorId, setVendorId] = useState("");
+  const needsOtherVendor = vendorId === "";
 
   return (
     <form
@@ -149,13 +156,23 @@ export function ExpenseEntryForm({
         start(async () => {
           try {
             const selectedCategory = String(fd.get("category")) as CostCategory;
+            const invoiceRef = String(fd.get("invoice_ref") || "").trim();
+            const needsInvoice =
+              selectedCategory === "vendor" ||
+              selectedCategory === "contractor" ||
+              selectedCategory === "materials" ||
+              selectedCategory === "equipment";
+            if (needsInvoice && !invoiceRef) {
+              setError("Enter an invoice or reference number for this charge.");
+              return;
+            }
             const r = await createExpenseEntry({
               contract_id: String(fd.get("contract_id")),
               category: selectedCategory,
               amount: Number(fd.get("amount")),
               vendor_id: String(fd.get("vendor_id") || "") || undefined,
               vendor_name: String(fd.get("vendor_name") || "") || undefined,
-              invoice_ref: String(fd.get("invoice_ref") || ""),
+              invoice_ref: invoiceRef,
               commitment_status: String(
                 fd.get("commitment_status"),
               ) as CostCommitmentStatus,
@@ -174,6 +191,7 @@ export function ExpenseEntryForm({
             } else {
               setCategory("vendor");
               setReimbursable(false);
+              setVendorId("");
               router.refresh();
             }
           } catch (err) {
@@ -183,10 +201,11 @@ export function ExpenseEntryForm({
       }}
     >
       <p className="text-xs text-[var(--muted)]">
-        Log contractor, materials, equipment, vendor, advertising, travel,
-        reimbursable, payroll, replacement parts, allocated, and other direct
-        costs. Amounts ≥ ${APPROVAL_THRESHOLD.toLocaleString()} require
-        approval. Committed ≠ paid; Actual = cost incurred.
+        Record vendor and expense charges. Amounts ≥ $
+        {APPROVAL_THRESHOLD.toLocaleString()} require approval. Use{" "}
+        <strong>Committed</strong> for planned spend and <strong>Actual</strong>{" "}
+        when the cost is incurred. Duplicate invoice numbers are flagged
+        automatically.
       </p>
 
       <label className="block space-y-1">
@@ -205,8 +224,13 @@ export function ExpenseEntryForm({
 
       <label className="block space-y-1">
         <span className={labelClass}>Vendor</span>
-        <select name="vendor_id" className={fieldClass} defaultValue="">
-          <option value="">Other / type name below…</option>
+        <select
+          name="vendor_id"
+          className={fieldClass}
+          value={vendorId}
+          onChange={(e) => setVendorId(e.target.value)}
+        >
+          <option value="">Other vendor…</option>
           {vendors.map((v) => (
             <option key={v.id} value={v.id}>
               {v.name}
@@ -215,10 +239,12 @@ export function ExpenseEntryForm({
         </select>
       </label>
 
-      <label className="block space-y-1">
-        <span className={labelClass}>Vendor name (if other)</span>
-        <input name="vendor_name" className={fieldClass} />
-      </label>
+      {needsOtherVendor ? (
+        <label className="block space-y-1">
+          <span className={labelClass}>Other vendor name</span>
+          <input name="vendor_name" required className={fieldClass} />
+        </label>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block space-y-1">
@@ -333,6 +359,7 @@ export function ApprovalActions({ entryId }: { entryId: string }) {
         disabled={pending}
         className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
         onClick={() => {
+          if (!confirm("Approve this cost entry?")) return;
           setError(null);
           start(async () => {
             const r = await approveCostEntry(entryId);
@@ -348,9 +375,16 @@ export function ApprovalActions({ entryId }: { entryId: string }) {
         disabled={pending}
         className="rounded-md border border-[var(--line)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--ink)] disabled:opacity-60"
         onClick={() => {
+          if (!confirm("Reject this cost entry?")) return;
+          const reason = window.prompt("Rejection reason (required):");
+          if (reason == null) return;
+          if (!reason.trim()) {
+            setError("A rejection reason is required.");
+            return;
+          }
           setError(null);
           start(async () => {
-            const r = await rejectCostEntry(entryId);
+            const r = await rejectCostEntry(entryId, reason.trim());
             if (!r.ok) setError(r.error ?? "Failed");
             else router.refresh();
           });
@@ -395,6 +429,7 @@ export function ActualizeCostButton({
         disabled={pending}
         className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
         onClick={() => {
+          if (!confirm("Record actual cost for this commitment?")) return;
           setError(null);
           start(async () => {
             const r = await actualizeCostEntry({
@@ -406,7 +441,7 @@ export function ActualizeCostButton({
           });
         }}
       >
-        {pending ? "Saving…" : "Mark actualized"}
+        {pending ? "Saving…" : "Record Actual Cost"}
       </button>
       {error ? (
         <p className="w-full text-xs text-[var(--danger)]">{error}</p>
@@ -433,9 +468,13 @@ export function ResolveFlagsForm({
       onSubmit={(e) => {
         e.preventDefault();
         setError(null);
+        if (note.trim().length < 8) {
+          setError("Add a short note explaining how this was resolved.");
+          return;
+        }
         start(async () => {
           const r = await resolveCostFlags(entryId, {
-            note: note.trim() || undefined,
+            note: note.trim(),
           });
           if (!r.ok) setError(r.error ?? "Failed");
           else {
@@ -446,13 +485,14 @@ export function ResolveFlagsForm({
       }}
     >
       <label className="block space-y-1">
-        <span className={labelClass}>Resolution note (optional)</span>
+        <span className={labelClass}>Resolution note</span>
         <textarea
           rows={compact ? 2 : 3}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           className={fieldClass}
           placeholder="What was corrected or why this is OK…"
+          required
         />
       </label>
       <button
@@ -460,7 +500,7 @@ export function ResolveFlagsForm({
         disabled={pending}
         className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
       >
-        {pending ? "Saving…" : "Mark flags resolved"}
+        {pending ? "Saving…" : "Mark resolved"}
       </button>
       {error ? (
         <p className="text-xs text-[var(--danger)]">{error}</p>

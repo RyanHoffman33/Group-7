@@ -10,8 +10,8 @@ export default async function ApprovalsPage() {
   return (
     <div>
       <PageHeader
-        title="Approvals"
-        description="Project manager queue. Approval locks commercial terms; it does not recognize revenue or collect deposits."
+        title="Contract Approvals"
+        description="Project manager queue for contract commercial terms. Approval locks pricing; it does not recognize revenue or collect deposits."
       />
       <Panel>
         <ApprovalQueueClient rows={rows} />

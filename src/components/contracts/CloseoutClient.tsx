@@ -12,6 +12,11 @@ type Row = ContractListRow & {
   checks: CloseoutCheck[];
 };
 
+function shortContractRef(value: string) {
+  if (value.length <= 18) return value;
+  return `${value.slice(0, 10)}…${value.slice(-4)}`;
+}
+
 export function CloseoutClient({ rows }: { rows: Row[] }) {
   const router = useRouter();
   const [actor, setActor] = useState("Alex Rivera");
@@ -51,8 +56,9 @@ export function CloseoutClient({ rows }: { rows: Row[] }) {
                   <Link
                     href={`/contracts/${c.id}`}
                     className="font-semibold text-[var(--accent)]"
+                    title={c.contract_number}
                   >
-                    {c.contract_number}
+                    {shortContractRef(c.contract_number)}
                   </Link>
                   <div className="text-sm">
                     {c.event_name} · {c.customer_name}
@@ -102,7 +108,7 @@ export function CloseoutClient({ rows }: { rows: Row[] }) {
                       }
                       if (
                         !confirm(
-                          `Close contract ${c.contract_number}? This is a control checkpoint.`,
+                          `Close contract ${c.contract_number}? Confirm all checklist items are complete.`,
                         )
                       )
                         return;

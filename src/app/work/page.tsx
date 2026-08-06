@@ -56,7 +56,7 @@ export default async function WorkDashboardPage({
     <div>
       <PageHeader
         title="Work & Performance"
-        description="Promised / scheduled / completed / outstanding count distinct performance obligations per engagement. Work tracks satisfaction evidence; GAAP Compliance handles recognition."
+        description="Track promised, scheduled, completed, and outstanding deliverables for each engagement. Completion here supports billing readiness; recognition stays in Compliance."
         actions={
           <Link
             href="/work/exceptions"
@@ -290,6 +290,10 @@ export default async function WorkDashboardPage({
                                 {days != null && days <= 7
                                   ? `Event in ${days}d — ${e.outstanding_pct}% unconfirmed`
                                   : "High outstanding"}
+                              </StatusPill>
+                            ) : days != null && days < 0 ? (
+                              <StatusPill tone="warn">
+                                Past event date — review outstanding work
                               </StatusPill>
                             ) : e.pending_exceptions > 0 ? (
                               <StatusPill tone="warn">

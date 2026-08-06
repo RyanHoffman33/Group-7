@@ -24,7 +24,7 @@ export default async function AgingPage() {
     <div>
       <PageHeader
         title="Aging & collections"
-        description="Classic A/R aging with collection probabilities from each customer’s payment history (portfolio priors when history is thin)."
+        description="A/R aging with expected collections based on each customer’s payment history."
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -40,7 +40,7 @@ export default async function AgingPage() {
               <Money amount={b.amount} />
             </p>
             <p className="text-xs text-[var(--muted)]">
-              E[collect] <Money amount={b.expected} />
+              Expected collections <Money amount={b.expected} />
             </p>
           </div>
         ))}
@@ -64,9 +64,9 @@ export default async function AgingPage() {
                 <th className="pb-2 font-medium">Bucket</th>
                 <th className="pb-2 font-medium">DPD</th>
                 <th className="pb-2 font-medium">Outstanding</th>
-                <th className="pb-2 font-medium">P(collect)</th>
-                <th className="pb-2 font-medium">Expected $</th>
-                <th className="pb-2 font-medium">Recognition</th>
+                <th className="pb-2 font-medium">Likelihood to collect</th>
+                <th className="pb-2 font-medium">Expected collection</th>
+                <th className="pb-2 font-medium">Revenue status</th>
               </tr>
             </thead>
             <tbody>

@@ -35,7 +35,7 @@ export default async function BillingDashboardPage() {
         <StatCard
           label="Expected collections"
           value={formatCurrency(metrics.expectedCollections)}
-          hint="Outstanding × P(collect) by customer history"
+          hint="Based on each customer’s payment history"
           tone="accent"
         />
         <StatCard

@@ -106,7 +106,7 @@ export async function buildCompanySnapshot(): Promise<string> {
     .slice(0, 8)
     .map(
       (r) =>
-        `- ${r.invoice_number} | ${r.customer_name} | ${r.event_name} | ${formatCurrency(r.outstanding)} | bucket ${r.bucket} | recognition ${r.recognition_status} | P(collect) ${(r.p_collect * 100).toFixed(0)}%`,
+        `- ${r.invoice_number} | ${r.customer_name} | ${r.event_name} | ${formatCurrency(r.outstanding)} | aging ${r.bucket} | revenue status ${r.recognition_status} | likelihood to collect ${(r.p_collect * 100).toFixed(0)}%`,
     )
     .join("\n");
 
@@ -197,7 +197,7 @@ AS OF: ${new Date().toISOString().slice(0, 10)}
 
 PORTFOLIO TOTALS
 - Total outstanding A/R: ${formatCurrency(metrics.totalOutstanding)}
-- Expected collections (A/R × P(collect)): ${formatCurrency(metrics.expectedCollections)}
+- Expected collections: ${formatCurrency(metrics.expectedCollections)}
 - Unearned deposits (liability): ${formatCurrency(metrics.unearnedDeposits)}
 - Deferred open A/R (billed, not yet recognized): ${formatCurrency(metrics.deferredRevenue)}
 - Recognized open A/R: ${formatCurrency(metrics.recognizedOpenAr)}
@@ -262,14 +262,14 @@ RULES FOR ANSWERS
 - Use ONLY the numbers above. Do not invent invoices, customers, costs, or dollar amounts.
 - If something is not in the snapshot, say you do not have that detail in the live data.
 - Contract keys: lines are labeled with human contract_number (ME-YYYY-…) then event name. When the user cites ME-…, match that contract_number — it is NOT a UUID primary key. Prefer PER-CONTRACT POSITION "recognized" and PROFITABILITY BY EVENT "recognized rev" for recognition questions.
-- Prefer plain business language; mention ASC 606 / liability / asset when relevant.
-- For costs: distinguish commitments vs actuals, approvals vs control flags, and Cost & Resources tracking vs GAAP cost classification.
+- Prefer plain business language; avoid classroom jargon and raw system field names.
+- For costs: distinguish commitments vs actuals, approvals vs flags, and operational costs vs compliance classifications.
 - Keep answers concise (2–6 short paragraphs or bullets).
 `.trim();
 }
 
 export const ASSISTANT_SYSTEM = `You are MainEvent's internal finance assistant for an event-production Contract-to-Cash system.
-You help students and teammates understand Billing & A/R, ASC 606 Compliance, and Cost & Resource Tracking using a live data snapshot.
-Be accurate, concise, and educational. Never invent financial figures.
-Contracts are identified by human contract_number (e.g. ME-2026-222222222220) and/or event name; ME- numbers are contract_number values, not UUIDs.
-When asked about costs, use the COST & RESOURCE TRACKING section (actuals, commitments, approvals, flags by category) — not only GAAP cost classifications.`;
+You help teammates understand Billing & A/R, Compliance, and Cost & Resource Tracking using a live data snapshot.
+Be accurate, concise, and practical. Never invent financial figures.
+Contracts are identified by human contract number (e.g. ME-2026-…) and/or event name.
+When asked about costs, use the COST & RESOURCE TRACKING section (actuals, commitments, approvals, flags by category).`;

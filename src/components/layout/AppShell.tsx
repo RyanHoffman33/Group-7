@@ -70,7 +70,7 @@ const contractsLinksAll = [
   { href: "/contracts/list", label: "All Contracts" },
   { href: "/contracts/new", label: "Create Contract", needsWrite: true },
   { href: "/contracts/requests", label: "Requests for Performance" },
-  { href: "/contracts/approvals", label: "Approvals" },
+  { href: "/contracts/approvals", label: "Contract Approvals" },
   { href: "/contracts/changes", label: "Contract Changes" },
   { href: "/valuation", label: "Valuation Tool" },
   { href: "/contracts/closeout", label: "Contract Closeout" },
@@ -556,7 +556,7 @@ export function AppShell({
                       : "text-white/70 hover:bg-white/8 hover:text-white"
                   }`}
                 >
-                  Approvals
+                  Approvals & Exceptions
                 </Link>
               </li>
             ) : null}
@@ -659,12 +659,20 @@ export function AppShell({
                 {session.roleName} · MainEvent
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Integrated Contract-to-Cash — role drives what you can open
+                Integrated Contract-to-Cash
               </p>
             </div>
           </div>
         </header>
-        <main className="px-6 py-8">{children}</main>
+        <main
+          className="px-6 py-8"
+          style={{
+            paddingBottom:
+              "max(2rem, var(--ask-mainevent-pad, 2rem))",
+          }}
+        >
+          {children}
+        </main>
       </div>
       {showBilling || showCompliance || showCosts || showAnalyticsCenter ? (
         <AssistantChat />

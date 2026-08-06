@@ -30,7 +30,7 @@ export default async function FlagsExceptionsPage({
     <div>
       <PageHeader
         title="Flags & exceptions"
-        description="Control exceptions — commitment variance, no commitment, duplicate invoice, late / after-billing entry, and budget flags. Amounts at or above the approval threshold wait in Approvals while pending; they are excluded from this open list so the same concern is not queued twice."
+        description="Items that need a decision — commitment variance, missing commitment, duplicate invoice, late entry, or budget flags. Large amounts waiting for approval appear only in the Approval Queue."
         actions={
           <div className="flex flex-wrap gap-2 text-sm">
             <Link
@@ -62,7 +62,7 @@ export default async function FlagsExceptionsPage({
         title={
           showResolved
             ? `${rows.length} resolved flag(s)`
-            : `${rows.length} control(s) needing attention`
+            : `${rows.length} ${rows.length === 1 ? "item needs" : "items need"} attention`
         }
       >
         <div className="overflow-x-auto">

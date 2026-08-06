@@ -90,7 +90,10 @@ export default async function ContractChangesPage() {
                     className="border-b border-[var(--line)] last:border-0"
                   >
                     <td className="py-3 font-semibold">
-                      {String(m.mod_number)}
+                      <span className="block">{String(m.mod_number)}</span>
+                      <span className="block text-xs font-normal text-[var(--muted)]">
+                        on {String(m.event_name || m.contract_number)}
+                      </span>
                     </td>
                     <td className="py-3">
                       <Link

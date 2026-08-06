@@ -79,6 +79,7 @@ export function ApprovalsClient({
                   className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
                   onClick={() =>
                     start(async () => {
+                      if (!confirm(`Approve “${item.title}”?`)) return;
                       setError(null);
                       setMessage(null);
                       const res = await decideApprovalAction({
@@ -98,12 +99,21 @@ export function ApprovalsClient({
                   className="rounded-md border border-[var(--line)] px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
                   onClick={() =>
                     start(async () => {
+                      if (!confirm(`Reject “${item.title}”?`)) return;
+                      const comment = window.prompt(
+                        "Rejection reason (required):",
+                      );
+                      if (comment == null) return;
+                      if (!comment.trim()) {
+                        setError("A rejection reason is required.");
+                        return;
+                      }
                       setError(null);
                       setMessage(null);
                       const res = await decideApprovalAction({
                         approvalId: item.id,
                         decision: "rejected",
-                        comment: "Rejected from queue",
+                        comment: comment.trim(),
                       });
                       if (res.ok) setMessage(res.message);
                       else setError(res.error);
