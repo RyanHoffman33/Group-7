@@ -1,8 +1,74 @@
 import { Money } from "@/components/billing/ui";
 import type { VendorFavorability } from "@/features/analytics/favorability";
-import { SEGMENT_PALETTES } from "@/components/analytics/TopNBarChart";
 
-const colors = SEGMENT_PALETTES.vendors;
+/** Amber/gold that sits with MainEvent teal — no purple glow. */
+const STAR = {
+  fill: "#c9922a",
+  empty: "#e8dcc4",
+  soft: "#faf6ee",
+  chip: "#f3ebe0",
+  chipInk: "#7a5a1e",
+} as const;
+
+/** Map 0–100 favorability → 0–5 stars in half-star steps (score ÷ 20). */
+export function scoreToStars(score: number): number {
+  const raw = Math.min(100, Math.max(0, score)) / 20;
+  return Math.round(raw * 2) / 2;
+}
+
+function ratingLabel(stars: number): string {
+  if (stars >= 4.5) return "Preferred";
+  if (stars >= 3.5) return "Strong";
+  if (stars >= 2.5) return "Solid";
+  if (stars >= 1.5) return "Fair";
+  return "Watch";
+}
+
+const STAR_PATH =
+  "M12 2.6l2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.5 6.6 19.4l1-6.1L3.2 9l6.1-.9L12 2.6z";
+
+function StarIcon({ state }: { state: "full" | "half" | "empty" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5"
+      aria-hidden
+    >
+      {state === "half" ? (
+        <>
+          <path fill={STAR.empty} d={STAR_PATH} />
+          <svg width="12" height="24" viewBox="0 0 12 24" overflow="hidden">
+            <path fill={STAR.fill} d={STAR_PATH} />
+          </svg>
+        </>
+      ) : (
+        <path
+          fill={state === "full" ? STAR.fill : STAR.empty}
+          d={STAR_PATH}
+        />
+      )}
+    </svg>
+  );
+}
+
+function StarRow({ stars }: { stars: number }) {
+  const slots: Array<"full" | "half" | "empty"> = [];
+  for (let i = 1; i <= 5; i++) {
+    if (stars >= i) slots.push("full");
+    else if (stars >= i - 0.5) slots.push("half");
+    else slots.push("empty");
+  }
+  return (
+    <div
+      className="flex items-center gap-0.5"
+      aria-label={`${stars} out of 5 stars`}
+    >
+      {slots.map((state, i) => (
+        <StarIcon key={i} state={state} />
+      ))}
+    </div>
+  );
+}
 
 export function VendorFavorabilityChart({
   items,
@@ -19,58 +85,58 @@ export function VendorFavorabilityChart({
     );
   }
 
-  const max = Math.max(1, ...items.map((i) => i.score));
-
   return (
-    <ol className="space-y-3">
+    <ol className="grid gap-3 sm:grid-cols-1">
       {items.map((item, index) => {
-        const pct = (item.score / max) * 100;
+        const stars = scoreToStars(item.score);
+        const chip = ratingLabel(stars);
         return (
-          <li key={item.label} className="group">
-            <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <div className="flex min-w-0 items-baseline gap-2">
+          <li
+            key={item.label}
+            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 shadow-[0_1px_2px_rgba(15,28,46,0.04)]"
+            style={{ background: `linear-gradient(135deg, var(--surface) 60%, ${STAR.soft} 100%)` }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-2.5">
                 <span
-                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold tabular-nums"
+                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold tabular-nums"
                   style={{
-                    background: colors.soft,
-                    color: colors.ink,
+                    background: STAR.chip,
+                    color: STAR.chipInk,
                   }}
                   aria-hidden
                 >
                   {index + 1}
                 </span>
-                <span className="min-w-0 truncate text-[13px] font-medium leading-tight text-[var(--ink)]">
-                  {item.label}
-                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)] sm:text-sm">
+                    {item.label}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <StarRow stars={stars} />
+                    <span
+                      className="text-[12px] font-semibold tabular-nums"
+                      style={{ color: STAR.chipInk }}
+                    >
+                      {stars.toFixed(1)} / 5
+                    </span>
+                  </div>
+                </div>
               </div>
               <span
-                className="shrink-0 text-[13px] font-semibold tabular-nums"
-                style={{ color: colors.ink }}
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{
+                  background: STAR.chip,
+                  color: STAR.chipInk,
+                }}
               >
-                {item.score}
+                {chip}
               </span>
             </div>
-            <div className="flex items-center gap-2.5 pl-7">
-              <div
-                className="h-3 flex-1 overflow-hidden rounded-full"
-                style={{ background: colors.track }}
-              >
-                <div
-                  className="h-full rounded-full transition-[width] duration-500 ease-out"
-                  style={{
-                    width: `${Math.max(pct, pct > 0 ? 2 : 0)}%`,
-                    background: colors.bar,
-                    boxShadow: "0 1px 2px rgba(11, 110, 110, 0.18)",
-                  }}
-                />
-              </div>
-              <span className="w-[4.5rem] shrink-0 text-right text-[11px] tabular-nums text-[var(--muted)]">
-                {(item.cleanPct * 100).toFixed(0)}% clean
-              </span>
-            </div>
-            <p className="mt-1 pl-7 text-[11px] text-[var(--muted)]">
+            <p className="mt-2 pl-[2.125rem] text-[11px] leading-snug text-[var(--muted)]">
               {item.events} event{item.events === 1 ? "" : "s"} · margin{" "}
-              <Money amount={item.margin} />
+              <Money amount={item.margin} /> ·{" "}
+              {(item.cleanPct * 100).toFixed(0)}% clean
             </p>
           </li>
         );

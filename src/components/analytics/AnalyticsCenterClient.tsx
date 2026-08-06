@@ -271,11 +271,11 @@ export function AnalyticsCenterClient({
       <div className="mt-4">
         <Panel title="Vendor favorability">
           <p className="mb-5 text-xs leading-relaxed text-[var(--muted)]">
-            Favorability score (demo) · top 5 · blends margin contribution,
-            cost-entry cleanliness, and event volume · respects Year / Quarter /
-            Month filters
+            Favorability (demo) · top 5 · 0–100 blend of margin, cost-entry
+            cleanliness, and event volume maps to a 1–5 star rating (score ÷ 20,
+            half-stars) · respects Year / Quarter / Month filters
           </p>
-          <div className="max-w-xl">
+          <div className="max-w-2xl">
             <VendorFavorabilityChart items={vendorFavorability} />
           </div>
         </Panel>
