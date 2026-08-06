@@ -169,10 +169,13 @@ export async function listRecentPoApprovals(limit = 25): Promise<
   (PoApproval & { po_title?: string; event_name?: string })[]
 > {
   const supabase = createClient();
+  // Disambiguate PO embed: po_approvals has two FKs to
+  // contract_performance_obligations (performance_obligation_id +
+  // installment_for_po_id). Unhinted embeds return PGRST201 / HTTP 300.
   const { data, error } = await supabase
     .from("po_approvals")
     .select(
-      "*, contract_performance_obligations(title), contracts(event_name)",
+      "*, contract_performance_obligations!performance_obligation_id(title), contracts!contract_id(event_name)",
     )
     .order("approved_at", { ascending: false })
     .limit(limit);
