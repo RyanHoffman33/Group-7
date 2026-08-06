@@ -26,25 +26,32 @@ import {
 } from "@/features/contracts/status";
 import { Money, Panel, StatusPill } from "@/components/billing/ui";
 import { InvolvementPanel } from "@/components/contracts/InvolvementPanel";
+import { PerformanceObligationsPanel } from "@/components/contracts/PerformanceObligationsPanel";
 import type { ApprovalItemWithMeta } from "@/features/involvement/types";
 import type { CheckpointType, InvolvementModel } from "@/features/involvement/checkpoints";
 import {
   INVOLVEMENT_MODEL_LABELS,
   isInvolvementModel,
 } from "@/features/involvement/checkpoints";
+import type {
+  ContractPerformanceObligation,
+  ContractPoSummary,
+  PoApproval,
+} from "@/features/performance-obligations";
 
 const TABS = [
   "Overview",
-  "Scope and Services",
-  "Financial Terms",
+  "Scope",
+  "Obligations",
+  "Financials",
   "Payment Schedule",
   "Billing",
-  "Event and Engagement",
-  "Customer Involvement",
+  "Event",
+  "Involvement",
   "Approvals",
   "Change Orders",
   "Documents",
-  "Audit History",
+  "History",
 ] as const;
 
 type Tab = (typeof TABS)[number];
@@ -122,6 +129,9 @@ export function ContractDetailClient({
   involvementRequiredTypes = [],
   involvementCustomTypes = [],
   customerApprovalItems = [],
+  performanceObligations = [],
+  poSummary = null,
+  poApprovals = [],
 }: {
   contract: ContractListRow;
   lines: Record<string, unknown>[];
@@ -138,6 +148,9 @@ export function ContractDetailClient({
   involvementRequiredTypes?: CheckpointType[];
   involvementCustomTypes?: CheckpointType[];
   customerApprovalItems?: ApprovalItemWithMeta[];
+  performanceObligations?: ContractPerformanceObligation[];
+  poSummary?: ContractPoSummary | null;
+  poApprovals?: PoApproval[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("Overview");
@@ -503,7 +516,7 @@ export function ContractDetailClient({
         </div>
       )}
 
-      {tab === "Scope and Services" && (
+      {tab === "Scope" && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Panel title="Line items">
             {lines.length === 0 ? (
@@ -571,7 +584,19 @@ export function ContractDetailClient({
         </div>
       )}
 
-      {tab === "Financial Terms" && (
+      {tab === "Obligations" && (
+        <PerformanceObligationsPanel
+          contractId={contract.id}
+          contractValue={Number(contract.contract_value)}
+          contractStatus={contract.status}
+          obligations={performanceObligations}
+          summary={poSummary}
+          approvals={poApprovals}
+          actorLabel={actor}
+        />
+      )}
+
+      {tab === "Financials" && (
         <Panel title="Commercial terms">
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
@@ -838,7 +863,7 @@ export function ContractDetailClient({
         </div>
       )}
 
-      {tab === "Event and Engagement" && (
+      {tab === "Event" && (
         <Panel title="Event">
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
@@ -880,7 +905,7 @@ export function ContractDetailClient({
         </Panel>
       )}
 
-      {tab === "Customer Involvement" && (
+      {tab === "Involvement" && (
         <InvolvementPanel
           contractId={contract.id}
           model={
@@ -1152,7 +1177,7 @@ export function ContractDetailClient({
         </div>
       )}
 
-      {tab === "Audit History" && (
+      {tab === "History" && (
         <Panel title="Activity trail">
           {audit.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">No activity yet.</p>

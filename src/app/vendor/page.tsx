@@ -53,8 +53,16 @@ export default async function VendorPortalPage() {
     <div>
       <PageHeader
         title="Vendor Portal"
-        description={`Welcome, ${session.fullName}. Assigned work and room layouts only — no internal P&L.`}
+        description={`Welcome, ${session.fullName}. Assigned work, RFQs, and room layouts only — no internal P&L.`}
       />
+      <div className="mb-4">
+        <Link
+          href="/vendor/rfqs"
+          className="inline-flex rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white"
+        >
+          Open RFQs & quotes
+        </Link>
+      </div>
       {assignment && layoutRows.some((r) => r.current?.status === "pending_approval") ? (
         <div className="mb-4">
           <AlertCard

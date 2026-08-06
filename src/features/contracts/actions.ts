@@ -104,6 +104,15 @@ export type CreateContractInput = {
   submit_for_approval?: boolean;
   involvement_model?: string;
   custom_checkpoint_types?: string[];
+  /** ASC 606 commercial POs (amounts must sum to contract_value). */
+  performance_obligations?: {
+    title: string;
+    description?: string;
+    completion_definition: string;
+    amount: number;
+    /** Stable service line keys covered by this PO. */
+    service_keys?: string[];
+  }[];
 };
 
 export async function createContract(
@@ -306,6 +315,44 @@ export async function createContract(
         })),
       );
       if (mErr) throw mErr;
+    }
+
+    if (input.performance_obligations?.length) {
+      const poSum = input.performance_obligations.reduce(
+        (s, p) => s + num(p.amount),
+        0,
+      );
+      if (Math.abs(poSum - net) > 0.01) {
+        return {
+          ok: false,
+          error: `Performance obligation amounts ($${poSum.toFixed(2)}) must equal net contract value ($${net.toFixed(2)}).`,
+        };
+      }
+      for (const p of input.performance_obligations) {
+        if (!p.title?.trim() || !p.completion_definition?.trim()) {
+          return {
+            ok: false,
+            error: "Each performance obligation needs a title and completion criteria.",
+          };
+        }
+      }
+      const { error: poErr } = await supabase
+        .from("contract_performance_obligations")
+        .insert(
+          input.performance_obligations.map((p, i) => ({
+            contract_id: id,
+            seq: i + 1,
+            title: p.title.trim(),
+            description: p.description?.trim() || null,
+            completion_definition: p.completion_definition.trim(),
+            amount: num(p.amount),
+            service_keys: Array.isArray(p.service_keys)
+              ? p.service_keys.map(String).filter(Boolean)
+              : [],
+            status: "draft",
+          })),
+        );
+      if (poErr) throw poErr;
     }
 
     if (input.document?.title) {
