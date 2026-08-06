@@ -1,10 +1,33 @@
-import { ASSISTANT_SYSTEM, buildCompanySnapshot } from "@/features/assistant/snapshot";
+import {
+  buildAssistantSystemPrompt,
+  buildRoleScopedSnapshot,
+} from "@/features/assistant/snapshot";
 import { getSessionUser } from "@/features/users/session";
 import { roleHasAnyPermission } from "@/features/access/matrix";
+import type { AppRole } from "@/features/users/types";
 
 export const runtime = "nodejs";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+
+function canUseAssistant(role: AppRole): boolean {
+  if (role === "attendee") return false;
+  return roleHasAnyPermission(role, [
+    "billing.read",
+    "compliance.read",
+    "ar.read",
+    "dashboards.executive",
+    "contracts.read",
+    "costs.read",
+    "profitability.read",
+    "analytics.read",
+    "customer.portal",
+    "vendor.portal",
+    "events.operate",
+    "events.assigned_only",
+    "approvals.queue",
+  ]);
+}
 
 async function callGemini(
   apiKey: string,
@@ -31,7 +54,7 @@ async function callGemini(
       systemInstruction: {
         parts: [
           {
-            text: `${system}\n\nLIVE COMPANY SNAPSHOT:\n${snapshot}`,
+            text: `${system}\n\nLIVE ROLE-SCOPED SNAPSHOT:\n${snapshot}`,
           },
         ],
       },
@@ -80,7 +103,7 @@ async function callGroq(
       messages: [
         {
           role: "system",
-          content: `${system}\n\nLIVE COMPANY SNAPSHOT:\n${snapshot}`,
+          content: `${system}\n\nLIVE ROLE-SCOPED SNAPSHOT:\n${snapshot}`,
         },
         ...history.slice(-8),
         { role: "user", content: userMessage },
@@ -130,57 +153,59 @@ function answerFromSnapshot(snapshot: string, question: string): string {
   if (meMatch) {
     const contractLine = findContractSnapshotLine(snapshot, meMatch[0]);
     if (contractLine) {
-      return `From the live snapshot for **${meMatch[0]}**:\n\n${contractLine}\n\n(ME-… is the human contract_number. Recognized amounts appear as "recognized" / "recognized rev" on that line.)`;
+      return `From the live snapshot for **${meMatch[0]}**:\n\n${contractLine}\n\n(ME-… is the human contract_number. Recognized amounts appear as "recognized" / "recognized rev" on that line when present.)`;
     }
-    return `I do not see contract_number **${meMatch[0]}** in the live PER-CONTRACT POSITION or PROFITABILITY snapshot. Check the number (seeded IDs look like ME-2026-222222222201) or ask by event name.`;
+    return `I do not see contract_number **${meMatch[0]}** in your role-scoped live snapshot. It may be out of scope for your role, or the number may differ (seeded IDs look like ME-2026-…).`;
   }
 
   if (q.includes("deposit") || q.includes("unearned")) {
-    return `From the live snapshot, unearned deposits (contract liability) are **${line("- Unearned deposits (liability)") ?? line("- Unearned deposits") ?? "see /compliance/deposits-retainers"}**. Deposits stay liabilities until applied/earned — cash alone is not revenue.`;
+    return `From the live snapshot, unearned deposits (contract liability) are **${line("- Unearned deposits (liability)") ?? line("- Unearned deposits") ?? "see deposits section / your contracts"}**. Deposits stay liabilities until applied/earned — cash alone is not revenue.`;
   }
   if (q.includes("aging") || q.includes("90") || q.includes("collect")) {
-    return `Portfolio A/R outstanding is **${line("- Total outstanding A/R")}**, with expected collections **${line("- Expected collections")}**. Aging detail is on the Aging page; 90+ days is listed in the snapshot aging mix.`;
+    return `Portfolio A/R outstanding is **${line("- Total outstanding A/R") ?? "not in your snapshot"}**, with expected collections **${line("- Expected collections") ?? "n/a"}**.`;
   }
   if (q.includes("asset") || q.includes("earned not") || q.includes("not billed")) {
-    return `Amounts earned but not yet billed total **${line("- Contract assets (earned not billed)")}**. See Contract Position for the revenue picture.`;
+    return `Amounts earned but not yet billed total **${line("- Contract assets (earned not billed)") ?? "not in your snapshot"}**.`;
   }
   if (q.includes("liability") || q.includes("deferred")) {
-    return `Contract liabilities are **${line("- Contract liabilities (unearned deposits + deferred billed)")}**. Deferred open A/R is **${line("- Deferred open A/R (billed, not yet recognized)")}**.`;
+    return `Contract liabilities are **${line("- Contract liabilities (unearned deposits + deferred billed)") ?? "not in your snapshot"}**. Deferred open A/R is **${line("- Deferred open A/R (billed, not yet recognized)") ?? "n/a"}**.`;
   }
   if (q.includes("recogn") || q.includes("606") || q.includes("revenue")) {
-    return `Recognized billed revenue in the position view is **${line("- Recognized revenue (billed & recognized)")}**. Recognition requires performance (and evidence on Compliance). See /compliance/recognition and Policies.`;
+    return `Recognized billed revenue in the position view is **${line("- Recognized revenue (billed & recognized)") ?? "not in your snapshot"}**.`;
   }
   if (q.includes("alert")) {
-    return `There are **${line("- Open billing alerts")}** unacknowledged aging alerts right now.`;
+    return `There are **${line("- Open billing alerts") ?? "n/a"}** unacknowledged aging alerts right now.`;
   }
   if (
     q.includes("commit") ||
     q.includes("actual cost") ||
     (q.includes("cost") && (q.includes("total") || q.includes("how much")))
   ) {
-    return `From Cost & Resources: actual costs are **${line("- Total actual costs")}**, open commitments are **${line("- Open commitments")}**. Pending cost approvals: **${line("- Pending cost approvals")}**.`;
+    return `From Cost & Resources: actual costs are **${line("- Total actual costs") ?? "not in your snapshot"}**, open commitments are **${line("- Open commitments") ?? "n/a"}**. Pending cost approvals: **${line("- Pending cost approvals") ?? "n/a"}**.`;
   }
   if (q.includes("flag") || q.includes("exception") || q.includes("no commitment")) {
-    return `There are **${line("- Open cost control flags")}** cost flags needing attention (commitment variance, missing commitment, etc.). Larger amounts waiting for approval appear under Approvals.`;
+    return `There are **${line("- Open cost control flags") ?? "n/a"}** cost flags needing attention (when costs are in scope for your role).`;
   }
   if (q.includes("approv") && q.includes("cost")) {
-    return `Pending cost approvals: **${line("- Pending cost approvals")}**. Threshold: **${line("- Approval threshold")}**.`;
+    return `Pending cost approvals: **${line("- Pending cost approvals") ?? "n/a"}**. Threshold: **${line("- Approval threshold") ?? "n/a"}**.`;
   }
-  if (q.includes("category") || q.includes("labor") || q.includes("vendor")) {
-    return `Costs by category and average cost per project are in the live snapshot under COST & RESOURCE TRACKING. Open /costs on the dashboard for the full breakdown.`;
+  if (q.includes("rfq") || q.includes("inquiry") || q.includes("pipeline")) {
+    return `Engagement / RFQ detail is in your role-scoped snapshot under ENGAGEMENT PIPELINE or YOUR RFQs. Ask about a specific event name or status.`;
+  }
+  if (q.includes("favorability") || q.includes("analytics") || q.includes("yoy")) {
+    return `Analytics highlights (when in scope) include trailing revenue **${line("- Trailing ~6mo revenue") ?? "n/a"}** and growth **${line("- YoY / half growth") ?? "n/a"}**.`;
   }
 
   return [
-    "I can answer from MainEvent’s live Billing, Compliance, and Cost & Resources snapshot.",
+    "I can answer from your role-scoped MainEvent live snapshot (domains you are allowed to see).",
     "",
-    `- Outstanding A/R: ${line("- Total outstanding A/R")}`,
-    `- Unearned deposits: ${line("- Unearned deposits (liability)")}`,
-    `- Contract assets: ${line("- Contract assets (earned not billed)")}`,
-    `- Actual costs: ${line("- Total actual costs")}`,
-    `- Open commitments: ${line("- Open commitments")}`,
-    `- Cost flags: ${line("- Open cost control flags")}`,
+    `- Outstanding A/R: ${line("- Total outstanding A/R") ?? "n/a for role"}`,
+    `- Unearned deposits: ${line("- Unearned deposits (liability)") ?? "n/a for role"}`,
+    `- Contract assets: ${line("- Contract assets (earned not billed)") ?? "n/a for role"}`,
+    `- Actual costs: ${line("- Total actual costs") ?? "n/a for role"}`,
+    `- Open commitments: ${line("- Open commitments") ?? "n/a for role"}`,
     "",
-    "Try asking about deposits, aging, costs, commitments, or flags.",
+    "Try asking about a ME- contract number, deposits, aging, costs, work progress, or engagement — within your role.",
   ].join("\n");
 }
 
@@ -190,18 +215,11 @@ export async function POST(req: Request) {
     if (!session) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (
-      !roleHasAnyPermission(session.roleKey, [
-        "billing.read",
-        "compliance.read",
-        "ar.read",
-        "dashboards.executive",
-      ])
-    ) {
+    if (!canUseAssistant(session.roleKey)) {
       return Response.json(
         {
           error:
-            "Access denied — financial assistant requires billing or compliance read permission.",
+            "Access denied — Ask MainEvent is not available for this role.",
         },
         { status: 403 },
       );
@@ -220,7 +238,10 @@ export async function POST(req: Request) {
     }
 
     const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
-    const snapshot = await buildCompanySnapshot();
+    const [snapshot, system] = await Promise.all([
+      buildRoleScopedSnapshot(session),
+      Promise.resolve(buildAssistantSystemPrompt(session)),
+    ]);
 
     const geminiKey = process.env.GEMINI_API_KEY;
     const groqKey = process.env.GROQ_API_KEY;
@@ -233,7 +254,7 @@ export async function POST(req: Request) {
       try {
         reply = await callGemini(
           geminiKey,
-          ASSISTANT_SYSTEM,
+          system,
           snapshot,
           history,
           message,
@@ -253,7 +274,7 @@ export async function POST(req: Request) {
       try {
         reply = await callGroq(
           groqKey,
-          ASSISTANT_SYSTEM,
+          system,
           snapshot,
           history,
           message,

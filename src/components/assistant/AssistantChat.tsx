@@ -7,7 +7,7 @@ type Msg = { role: "user" | "assistant"; content: string };
 const STARTERS = [
   "How much unearned deposit liability do we have?",
   "What’s earned but not yet billed?",
-  "How much have we committed vs actual costs?",
+  "Summarize open contracts and A/R",
   "What cost flags need attention?",
 ];
 
@@ -22,7 +22,7 @@ export function AssistantChat() {
     {
       role: "assistant",
       content:
-        "Hi — I’m Ask MainEvent. Ask about receivables, deposits, contract position, or costs (commitments, actuals, approvals, and flags). I use live numbers from Billing, Compliance, and Costs.",
+        "Hi — I’m Ask MainEvent. I answer from live app data scoped to your role (contracts, billing, costs, work, engagement, analytics — only what you’re allowed to see). Ask about an ME- contract, A/R, deposits, or costs.",
     },
   ]);
   const endRef = useRef<HTMLDivElement>(null);

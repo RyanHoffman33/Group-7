@@ -691,7 +691,15 @@ export function AppShell({
           {children}
         </main>
       </div>
-      {showBilling || showCompliance || showCosts || showAnalyticsCenter ? (
+      {showBilling ||
+      showCompliance ||
+      showCosts ||
+      showAnalyticsCenter ||
+      showContracts ||
+      showWork ||
+      showCustomer ||
+      showVendor ||
+      showIntake ? (
         <AssistantChat />
       ) : null}
     </div>
