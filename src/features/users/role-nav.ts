@@ -7,6 +7,7 @@ export type NavSection =
   | "billing"
   | "compliance"
   | "contracts"
+  | "intake"
   | "work"
   | "costs"
   | "profitability"
@@ -52,6 +53,9 @@ export function navSectionsForRole(roleKey: AppRole): NavSection[] {
     roleHasPermission(roleKey, "contracts.read") &&
     !INTERNAL_FINANCE_BLOCKED.includes(roleKey)
   ) {
+    // Sales intake (inquiries, quotes, vendor sourcing) is separate from
+    // active-contract management so the sidebar stays scannable.
+    sections.push("intake");
     sections.push("contracts");
   }
   if (

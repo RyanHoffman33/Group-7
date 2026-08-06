@@ -50,8 +50,8 @@ const eventsLinks = [
 ];
 
 const vendorLinks = [
-  { href: "/vendor", label: "Portal home" },
-  { href: "/vendor/rfqs", label: "RFQs & quotes" },
+  { href: "/vendor", label: "Portal Home" },
+  { href: "/vendor/rfqs", label: "RFQs & Quotes" },
   { href: "/vendor/layouts/lay-1", label: "Theater Layout" },
   { href: "/vendor/layouts/lay-2", label: "Banquet Layout" },
 ];
@@ -62,25 +62,29 @@ const customerLinks = [
   { href: "/dashboard/customer", label: "Overview" },
   { href: "/dashboard/customer/engagement", label: "Inquiry & Quotes" },
   { href: "/dashboard/customer/event", label: "Event Details" },
-  { href: "/dashboard/customer/actions", label: "Action Items & Quotes" },
+  { href: "/dashboard/customer/actions", label: "Action Items" },
+  { href: "/dashboard/customer/obligations", label: "Performance Obligations" },
   { href: "/dashboard/customer/invoices", label: "Invoices" },
   { href: "/dashboard/customer/payments", label: "Payments" },
   { href: "/dashboard/customer/documents", label: "Documents" },
 ];
 
+/** Pre-contract lifecycle: inquiries, quotes, vendor RFQs, pricing. */
+const intakeLinksAll = [
+  { href: "/engagement/approvals", label: "Inquiry Approvals" },
+  { href: "/contracts/requests", label: "Quote Requests" },
+  { href: "/engagement/sourcing", label: "Vendor Sourcing" },
+  { href: "/valuation", label: "Valuation Tool" },
+];
+
+/** Active contracts only — not sales intake or event progress. */
 const contractsLinksAll = [
-  { href: "/contracts", label: "Contracts Dashboard" },
+  { href: "/contracts", label: "Overview" },
   { href: "/contracts/list", label: "All Contracts" },
   { href: "/contracts/new", label: "Create Contract", needsWrite: true },
-  { href: "/engagement/approvals", label: "Inquiry Approvals" },
-  { href: "/engagement/sourcing", label: "Vendor Sourcing" },
-  { href: "/contracts/requests", label: "Requests for Performance" },
   { href: "/contracts/approvals", label: "Contract Approvals" },
-  { href: "/contracts/changes", label: "Contract Changes" },
-  { href: "/valuation", label: "Valuation Tool" },
-  { href: "/contracts/closeout", label: "Contract Closeout" },
-  { href: "/work", label: "Event Board (Progress)", needsWork: true },
-  { href: "/work/exceptions", label: "Ops Exception Inbox", needsWork: true },
+  { href: "/contracts/changes", label: "Change Orders" },
+  { href: "/contracts/closeout", label: "Closeout" },
 ];
 
 const workLinks = [
@@ -128,9 +132,6 @@ function navForRole(roleKey: AppRole) {
   const canAudit = roleHasPermission(roleKey, "audit.read");
   const canWriteContracts = roleHasPermission(roleKey, "contracts.write");
   const canWriteBilling = roleHasPermission(roleKey, "billing.write");
-  const canSeeWork =
-    roleHasPermission(roleKey, "events.operate") ||
-    roleHasPermission(roleKey, "ready_for_billing");
 
   return {
     users: usersLinksAll
@@ -141,10 +142,10 @@ function navForRole(roleKey: AppRole) {
       })
       .map(({ href, label }) => ({ href, label })),
     events: eventsLinks,
+    intake: intakeLinksAll,
     contracts: contractsLinksAll
       .filter((l) => {
         if ("needsWrite" in l && l.needsWrite) return canWriteContracts;
-        if ("needsWork" in l && l.needsWork) return canSeeWork;
         return true;
       })
       .map(({ href, label }) => ({ href, label })),
@@ -182,15 +183,20 @@ function isVendorRoute(pathname: string) {
   return pathname === "/vendor" || pathname.startsWith("/vendor/");
 }
 
-function isContractsRoute(pathname: string) {
+function isIntakeRoute(pathname: string) {
   return (
-    pathname === "/contracts" ||
-    pathname.startsWith("/contracts/") ||
     pathname === "/engagement" ||
     pathname.startsWith("/engagement/") ||
+    pathname === "/contracts/requests" ||
+    pathname.startsWith("/contracts/requests/") ||
     pathname === "/valuation" ||
     pathname.startsWith("/valuation/")
   );
+}
+
+function isContractsRoute(pathname: string) {
+  if (isIntakeRoute(pathname)) return false;
+  return pathname === "/contracts" || pathname.startsWith("/contracts/");
 }
 
 function isWorkRoute(pathname: string) {
@@ -251,7 +257,9 @@ function isLinkActive(pathname: string, href: string) {
     href === "/analytics" ||
     href === "/dashboard" ||
     href === "/engagement/approvals" ||
-    href === "/engagement/sourcing"
+    href === "/engagement/sourcing" ||
+    href === "/contracts/requests" ||
+    href === "/valuation"
   ) {
     return pathname === href;
   }
@@ -347,6 +355,7 @@ export function AppShell({
   const eventsActive = isEventsRoute(pathname);
   const attendeeActive = isAttendeeRoute(pathname);
   const vendorActive = isVendorRoute(pathname);
+  const intakeActive = isIntakeRoute(pathname);
   const contractsActive = isContractsRoute(pathname);
   const workActive = isWorkRoute(pathname);
   const costsActive = isCostsRoute(pathname);
@@ -365,6 +374,7 @@ export function AppShell({
   const showAttendee = navSections.includes("attendee");
   const showVendor = navSections.includes("vendor");
   const showApprovals = navSections.includes("approvals");
+  const showIntake = navSections.includes("intake");
   const showContracts = navSections.includes("contracts");
   const showWork = navSections.includes("work");
   const showCosts = navSections.includes("costs");
@@ -387,6 +397,7 @@ export function AppShell({
     !showVendor &&
     !showCustomer &&
     !showApprovals &&
+    !showIntake &&
     !showContracts &&
     !showWork &&
     !showCosts &&
@@ -404,21 +415,23 @@ export function AppShell({
         ? "events"
         : vendorActive
           ? "vendor"
-          : contractsActive || (workActive && showContracts)
-            ? "contracts"
-            : workActive
-              ? "work"
-              : billingActive
-                ? "billing"
-                : costsActive
-                  ? "costs"
-                  : analyticsCenterActive
-                    ? "analytics"
-                    : complianceActive
-                      ? "compliance"
-                      : usersActive
-                        ? "users"
-                        : null;
+          : workActive
+            ? "work"
+            : intakeActive
+              ? "intake"
+              : contractsActive
+                ? "contracts"
+                : billingActive
+                  ? "billing"
+                  : costsActive
+                    ? "costs"
+                    : analyticsCenterActive
+                      ? "analytics"
+                      : complianceActive
+                        ? "compliance"
+                        : usersActive
+                          ? "users"
+                          : null;
   const [toggled, setToggled] = useState<{
     path: string;
     section: string | null;
@@ -527,12 +540,34 @@ export function AppShell({
                 pathname={pathname}
               />
             ) : null}
+            {showWork ? (
+              <NavAccordion
+                title="Event Work"
+                open={openSection === "work"}
+                onToggle={() => toggleSection("work")}
+                active={workActive}
+                controlsId="work-nav-submenu"
+                links={workLinks}
+                pathname={pathname}
+              />
+            ) : null}
+            {showIntake ? (
+              <NavAccordion
+                title="Sales & Intake"
+                open={openSection === "intake"}
+                onToggle={() => toggleSection("intake")}
+                active={intakeActive}
+                controlsId="intake-nav-submenu"
+                links={roleNav.intake}
+                pathname={pathname}
+              />
+            ) : null}
             {showContracts ? (
               <NavAccordion
-                title="Contracts & Engagements"
+                title="Contracts"
                 open={openSection === "contracts"}
                 onToggle={() => toggleSection("contracts")}
-                active={contractsActive || (showWork && workActive)}
+                active={contractsActive}
                 controlsId="contracts-nav-submenu"
                 links={roleNav.contracts}
                 pathname={pathname}
@@ -552,20 +587,9 @@ export function AppShell({
                 </Link>
               </li>
             ) : null}
-            {showWork && !showContracts ? (
-              <NavAccordion
-                title="Progress Tracker"
-                open={openSection === "work"}
-                onToggle={() => toggleSection("work")}
-                active={workActive}
-                controlsId="work-nav-submenu"
-                links={workLinks}
-                pathname={pathname}
-              />
-            ) : null}
             {showBilling ? (
               <NavAccordion
-                title="Billing & A/R"
+                title="Billing"
                 open={openSection === "billing"}
                 onToggle={() => toggleSection("billing")}
                 active={billingActive}

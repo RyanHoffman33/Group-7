@@ -76,32 +76,19 @@ function shortcutsForRole(
 ): Shortcut[] {
   const items: Shortcut[] = [];
 
+  if (sections.includes("intake")) {
+    items.push({
+      href: "/engagement/approvals",
+      label: "Sales & Intake",
+      hint: "Inquiries, quotes & vendor sourcing",
+    });
+  }
   if (sections.includes("contracts")) {
     items.push({
       href: "/contracts",
       label: "Contracts",
-      hint: "Engagements & contract changes",
+      hint: "Active contracts & change orders",
     });
-    if (
-      roleKey === "executive" ||
-      roleKey === "project_manager" ||
-      roleKey === "accounting" ||
-      roleKey === "department_manager" ||
-      roleKey === "system_admin"
-    ) {
-      items.push({
-        href: "/valuation",
-        label: "Valuation",
-        hint: "Re-price estimates with industry ranges",
-      });
-    }
-    if (roleKey === "project_manager" || roleKey === "system_admin") {
-      items.push({
-        href: "/contracts/requests",
-        label: "Requests",
-        hint: "Intake quotes for customers",
-      });
-    }
   }
   if (sections.includes("billing")) {
     items.push({
