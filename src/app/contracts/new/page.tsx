@@ -12,7 +12,7 @@ export default async function NewContractPage() {
     <div>
       <PageHeader
         title="Create Contract"
-        description="Multi-step engagement setup. Reuses customer master records; one contract maps to one event. Project managers quote via Requests, then draft here with the valuation assistant."
+        description="Guided setup for one customer event: scope, pricing, payments, obligations, and approvals. Create a customer above if they’re not listed yet."
       />
       <div className="mb-6">
         <CreateCustomerForm />

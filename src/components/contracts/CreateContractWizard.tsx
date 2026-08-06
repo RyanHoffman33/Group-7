@@ -26,16 +26,39 @@ type Customer = { id: string; name: string };
 type DiscountType = "none" | "percent" | "fixed";
 type DepositType = "percent" | "fixed";
 
-const STORAGE_KEY = "mainevent-create-contract-draft-v2";
+const STORAGE_KEY = "mainevent-create-contract-draft-v3";
 
-const STEPS = [
-  "Customer & Event",
-  "Services & Deliverables",
-  "Financial Terms",
-  "Payment Schedule",
-  "Approvals",
-  "Cancellation",
-  "Documents & Review",
+type StepDef = { title: string; purpose: string };
+
+const STEPS: StepDef[] = [
+  {
+    title: "Customer & Event",
+    purpose: "Who is the client, and what event are you contracting for?",
+  },
+  {
+    title: "Services & Scope",
+    purpose: "List what you’re selling and what must be delivered.",
+  },
+  {
+    title: "Pricing & Deposit",
+    purpose: "Set billing method, contract value, discounts, and deposit.",
+  },
+  {
+    title: "Payment Schedule",
+    purpose: "Split the net value into payment due dates. Totals must match.",
+  },
+  {
+    title: "Performance Obligations",
+    purpose: "Define how the contract is completed and billed under ASC 606.",
+  },
+  {
+    title: "Approvals & Involvement",
+    purpose: "Who prepares this, and how the customer stays involved.",
+  },
+  {
+    title: "Terms & Review",
+    purpose: "Cancellation terms, optional documents, then confirm everything.",
+  },
 ];
 
 /** UI label → stored billing_method value (existing enum). */
@@ -69,12 +92,32 @@ function billingLabel(value: string) {
   return BILLING_METHODS.find((m) => m.value === value)?.label ?? value;
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
+function FieldLabel({
+  children,
+  required,
+}: {
+  children: ReactNode;
+  required?: boolean;
+}) {
   return (
     <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
       {children}
+      {required ? <span className="text-[var(--danger)]"> *</span> : null}
     </span>
   );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <span className="mt-1 block text-xs text-[var(--danger)]" role="alert">
+      {message}
+    </span>
+  );
+}
+
+function StepPurpose({ text }: { text: string }) {
+  return <p className="mb-4 text-sm text-[var(--muted)]">{text}</p>;
 }
 
 export function CreateContractWizard({ customers }: { customers: Customer[] }) {
@@ -82,6 +125,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
   const [step, setStep] = useState(0);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
 
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? "");
   const [eventName, setEventName] = useState("");
@@ -174,7 +218,8 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     {
       title: "Wrap-up & closeout",
       description: "",
-      completion_definition: "Customer accepts final wrap-up and closes engagement.",
+      completion_definition:
+        "Customer accepts final wrap-up and closes engagement.",
       amount: "",
     },
   ]);
@@ -246,15 +291,161 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     [milestones],
   );
 
+  const poSum = useMemo(
+    () => pos.reduce((s, p) => s + (Number(p.amount) || 0), 0),
+    [pos],
+  );
+
+  const fieldErrors = useMemo(() => {
+    const e: Record<string, string> = {};
+    if (step === 0) {
+      if (!customerId) e.customerId = "Select a customer.";
+      if (!eventName.trim()) e.eventName = "Enter an event name.";
+      if (!eventStart) e.eventStart = "Enter the event start date.";
+      if (!pm.trim()) e.pm = "Enter the project manager.";
+    }
+    if (step === 1) {
+      if (
+        !lines.some((l) => l.description.trim()) &&
+        !deliverables.some((d) => d.title.trim())
+      ) {
+        e.scope = "Add at least one service line or deliverable.";
+      }
+    }
+    if (step === 2) {
+      if (!billingMethod) e.billingMethod = "Select a billing method.";
+      if (gross <= 0) e.gross = "Gross value must be greater than zero.";
+      if (discountType === "percent") {
+        const p = Number(discountPercentInput);
+        if (Number.isNaN(p) || p < 0 || p > 100) {
+          e.discount = "Discount % must be between 0 and 100.";
+        }
+      }
+      if (discountType === "fixed") {
+        const a = Number(discountFixedInput);
+        if (Number.isNaN(a) || a < 0) {
+          e.discount = "Discount cannot be negative.";
+        } else if (a > gross + 1e-9) {
+          e.discount = "Discount cannot exceed gross value.";
+        }
+      }
+      if (gross > 0 && net <= 0) {
+        e.net = "Net value must be greater than zero after discount.";
+      }
+      if (depositRequired) {
+        if (depositType === "percent") {
+          const p = Number(depositPercentInput);
+          if (Number.isNaN(p) || p < 0 || p > 100) {
+            e.deposit = "Deposit % must be between 0 and 100.";
+          }
+        } else {
+          const a = Number(depositFixedInput);
+          if (Number.isNaN(a) || a < 0) {
+            e.deposit = "Deposit cannot be negative.";
+          } else if (a > net + 1e-9) {
+            e.deposit = "Deposit cannot exceed net value.";
+          }
+        }
+        if (!e.deposit && depositCalc.amount > net + 1e-9) {
+          e.deposit = "Deposit cannot exceed net value.";
+        }
+      }
+    }
+    if (step === 3) {
+      if (!milestones.length) e.schedule = "Add at least one payment.";
+      if (
+        depositRequired &&
+        milestones.some(
+          (m) => m.milestone_type === "deposit" && !(Number(m.amount) > 0),
+        )
+      ) {
+        e.depositRow = "Deposit payment must be greater than $0.";
+      }
+      if (milestones.length && Math.abs(scheduleSum - net) > 0.01) {
+        e.scheduleMatch = `Payments (${formatCurrency(scheduleSum)}) must equal net (${formatCurrency(net)}).`;
+      }
+      for (let i = 0; i < milestones.length; i++) {
+        if (!milestones[i].label.trim()) {
+          e[`msLabel${i}`] = "Name this payment.";
+        }
+      }
+    }
+    if (step === 4 && definePos) {
+      const filled = pos.filter((p) => p.title.trim());
+      if (!filled.length) {
+        e.pos = "Add at least one obligation, or uncheck “Define now”.";
+      }
+      for (let i = 0; i < pos.length; i++) {
+        const p = pos[i];
+        if (!p.title.trim()) continue;
+        if (!p.completion_definition.trim()) {
+          e[`poDone${i}`] = "Say what “done” means.";
+        }
+        if (!(Number(p.amount) > 0)) {
+          e[`poAmt${i}`] = "Amount must be greater than $0.";
+        }
+      }
+      if (filled.length && Math.abs(poSum - net) > 0.01) {
+        e.poMatch = `Obligation amounts (${formatCurrency(poSum)}) must equal net (${formatCurrency(net)}).`;
+      }
+    }
+    if (step === 5) {
+      if (!createdBy.trim()) e.createdBy = "Enter who prepared this.";
+      if (involvementModel === "custom" && customCheckpoints.length === 0) {
+        e.checkpoints = "Select at least one checkpoint for Custom.";
+      }
+    }
+    if (step === 6) {
+      if (!cancelPolicy.trim()) e.cancelPolicy = "Enter cancellation terms.";
+    }
+    return e;
+  }, [
+    step,
+    customerId,
+    eventName,
+    eventStart,
+    pm,
+    lines,
+    deliverables,
+    billingMethod,
+    gross,
+    net,
+    discountType,
+    discountPercentInput,
+    discountFixedInput,
+    depositRequired,
+    depositType,
+    depositPercentInput,
+    depositFixedInput,
+    depositCalc.amount,
+    milestones,
+    scheduleSum,
+    definePos,
+    pos,
+    poSum,
+    createdBy,
+    involvementModel,
+    customCheckpoints,
+    cancelPolicy,
+  ]);
+
+  const stepValid = Object.keys(fieldErrors).length === 0;
+
   useEffect(() => {
     // Restore create-contract draft from sessionStorage (external system).
     // Intentionally syncs local form state once on mount for Back/Continue + refresh.
     /* eslint-disable react-hooks/set-state-in-effect -- sessionStorage draft hydrate */
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
+      const raw =
+        sessionStorage.getItem(STORAGE_KEY) ??
+        sessionStorage.getItem("mainevent-create-contract-draft-v2");
       if (raw) {
         const d = JSON.parse(raw) as Record<string, unknown>;
-        if (typeof d.step === "number") setStep(d.step as number);
+        if (typeof d.step === "number") {
+          // Clamp: v2 had POs on step 3; map old indices if draft is v2-shaped
+          const s = d.step as number;
+          setStep(Math.min(STEPS.length - 1, Math.max(0, s)));
+        }
         if (typeof d.customerId === "string") setCustomerId(d.customerId);
         if (typeof d.eventName === "string") setEventName(d.eventName);
         if (typeof d.eventType === "string") setEventType(d.eventType);
@@ -300,6 +491,18 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         if (typeof d.docTitle === "string") setDocTitle(d.docTitle);
         if (typeof d.docUrl === "string") setDocUrl(d.docUrl);
         if (typeof d.notes === "string") setNotes(d.notes);
+        if (typeof d.definePos === "boolean") setDefinePos(d.definePos);
+        if (Array.isArray(d.pos)) setPos(d.pos as typeof pos);
+        if (
+          d.involvementModel === "collaborative" ||
+          d.involvementModel === "full_service" ||
+          d.involvementModel === "custom"
+        ) {
+          setInvolvementModel(d.involvementModel);
+        }
+        if (Array.isArray(d.customCheckpoints)) {
+          setCustomCheckpoints(d.customCheckpoints as string[]);
+        }
       }
     } catch {
       /* ignore corrupt draft */
@@ -340,6 +543,10 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       docTitle,
       docUrl,
       notes,
+      definePos,
+      pos,
+      involvementModel,
+      customCheckpoints,
     };
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -377,110 +584,43 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     docTitle,
     docUrl,
     notes,
+    definePos,
+    pos,
+    involvementModel,
+    customCheckpoints,
   ]);
 
-  function validateFinancialTerms(): string | null {
-    if (!billingMethod) return "Select a billing method.";
-    if (gross <= 0) return "Gross contract value must be greater than zero.";
-    if (discountType === "percent") {
-      const p = Number(discountPercentInput);
-      if (Number.isNaN(p) || p < 0 || p > 100) {
-        return "Percentage discount must be between 0% and 100%.";
-      }
-    }
-    if (discountType === "fixed") {
-      const a = Number(discountFixedInput);
-      if (Number.isNaN(a) || a < 0) {
-        return "Fixed discount amount cannot be negative.";
-      }
-      if (a > gross + 1e-9) {
-        return "The discount cannot exceed the gross contract value.";
-      }
-    }
-    if (net <= 0) {
-      return "Net contract value must be greater than zero.";
-    }
-    if (depositRequired) {
-      if (depositType === "percent") {
-        const p = Number(depositPercentInput);
-        if (Number.isNaN(p) || p < 0 || p > 100) {
-          return "Deposit percentage must be between 0% and 100%.";
-        }
-      } else {
-        const a = Number(depositFixedInput);
-        if (Number.isNaN(a) || a < 0) {
-          return "Fixed deposit amount cannot be negative.";
-        }
-        if (a > net + 1e-9) {
-          return "The required deposit cannot exceed the net contract value.";
-        }
-      }
-      if (depositCalc.amount > net + 1e-9) {
-        return "The required deposit cannot exceed the net contract value.";
-      }
-    }
-    return null;
-  }
-
-  function validateStep(): string | null {
-    if (step === 0) {
-      if (!customerId) return "Select a customer.";
-      if (!eventName.trim()) return "Event name is required.";
-      if (!eventStart) return "Event start is required.";
-      if (!pm.trim()) return "Project manager is required.";
-    }
-    if (step === 1) {
-      if (
-        !lines.some((l) => l.description.trim()) &&
-        !deliverables.some((d) => d.title.trim())
-      ) {
-        return "Add at least one service line or deliverable.";
-      }
-    }
-    if (step === 2) {
-      return validateFinancialTerms();
-    }
-    if (step === 3) {
-      if (!milestones.length) return "Add payment milestones.";
-      if (
-        depositRequired &&
-        milestones.some(
-          (m) =>
-            m.milestone_type === "deposit" && !(Number(m.amount) > 0),
-        )
-      ) {
-        return "Deposit payment rows must be greater than $0 when a deposit is required.";
-      }
-      if (Math.abs(scheduleSum - net) > 0.01) {
-        return `Schedule total (${formatCurrency(scheduleSum)}) must equal net contract value (${formatCurrency(net)}).`;
-      }
-    }
-    if (step === 4) {
-      if (!createdBy.trim()) return "Prepared-by name is required.";
-    }
-    if (step === 5) {
-      if (!cancelPolicy.trim()) return "Cancellation terms are required.";
-    }
-    return null;
-  }
+  useEffect(() => {
+    setShowErrors(false);
+    setError(null);
+  }, [step]);
 
   function next() {
-    const err = validateStep();
-    if (err) {
-      setError(err);
+    if (!stepValid) {
+      setShowErrors(true);
+      setError("Fix the highlighted fields to continue.");
       return;
     }
     setError(null);
+    setShowErrors(false);
     setStep((s) => Math.min(STEPS.length - 1, s + 1));
   }
 
   function back() {
     setError(null);
+    setShowErrors(false);
     setStep((s) => Math.max(0, s - 1));
   }
 
-  function setDiscountTypeSafe(next: DiscountType) {
-    setDiscountType(next);
+  function goToStep(i: number) {
+    if (i > step) return;
+    setError(null);
+    setShowErrors(false);
+    setStep(i);
+  }
+
+  function setDiscountTypeSafe(nextType: DiscountType) {
+    setDiscountType(nextType);
     setDiscountPercentInput("");
     setDiscountFixedInput("");
   }
@@ -495,9 +635,9 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
     }
   }
 
-  function setDepositTypeSafe(next: DepositType) {
-    setDepositType(next);
-    setDepositPercentInput(next === "percent" ? "30" : "");
+  function setDepositTypeSafe(nextType: DepositType) {
+    setDepositType(nextType);
+    setDepositPercentInput(nextType === "percent" ? "30" : "");
     setDepositFixedInput("");
   }
 
@@ -540,16 +680,14 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
   }
 
   function submit() {
-    const err =
-      validateStep() ||
-      (!cancelPolicy.trim() ? "Cancellation terms are required." : null);
-    if (err) {
-      setError(err);
+    if (!stepValid) {
+      setShowErrors(true);
+      setError("Fix the highlighted fields before creating.");
       return;
     }
     if (Math.abs(scheduleSum - net) > 0.01) {
       setError(
-        `Payment schedule total (${scheduleSum}) must equal net contract value (${net}).`,
+        `Payment schedule total (${formatCurrency(scheduleSum)}) must equal net (${formatCurrency(net)}).`,
       );
       return;
     }
@@ -564,15 +702,17 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
           }))
       : undefined;
     if (definePos && poPayload) {
-      const poSum = poPayload.reduce((s, p) => s + p.amount, 0);
-      if (Math.abs(poSum - net) > 0.01) {
+      const sum = poPayload.reduce((s, p) => s + p.amount, 0);
+      if (Math.abs(sum - net) > 0.01) {
         setError(
-          `Performance obligation amounts (${poSum}) must equal net contract value (${net}).`,
+          `Performance obligation amounts (${formatCurrency(sum)}) must equal net (${formatCurrency(net)}).`,
         );
         return;
       }
-      if (poPayload.some((p) => !p.completion_definition.trim() || p.amount <= 0)) {
-        setError("Each PO needs completion criteria and an amount > 0.");
+      if (
+        poPayload.some((p) => !p.completion_definition.trim() || p.amount <= 0)
+      ) {
+        setError("Each obligation needs completion criteria and an amount > 0.");
         return;
       }
     }
@@ -592,13 +732,13 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         gross_contract_value: gross,
         contract_value: net,
         deposit_required: depositRequired,
-        deposit_percent: depositRequired && depositType === "percent"
-          ? depositCalc.percent
-          : 0,
+        deposit_percent:
+          depositRequired && depositType === "percent"
+            ? depositCalc.percent
+            : 0,
         minimum_deposit_amount:
           depositRequired && depositType === "fixed" ? depositCalc.amount : null,
-        discount_amount:
-          discountType === "fixed" ? discountCalc.amount : 0,
+        discount_amount: discountType === "fixed" ? discountCalc.amount : 0,
         discount_percent:
           discountType === "percent" ? discountCalc.percent : 0,
         cancellation_policy_text: cancelPolicy,
@@ -649,6 +789,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
       }
       try {
         sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem("mainevent-create-contract-draft-v2");
       } catch {
         /* ignore */
       }
@@ -659,33 +800,65 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
 
   const field =
     "w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm";
+  const fieldBad = `${field} border-[var(--danger)]`;
+  const err = (key: string) => (showErrors ? fieldErrors[key] : undefined);
+  const customerName =
+    customers.find((c) => c.id === customerId)?.name ?? "—";
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium text-[var(--ink)]">
+          Step {step + 1} of {STEPS.length}
+          <span className="font-normal text-[var(--muted)]">
+            {" "}
+            · {STEPS[step].title}
+          </span>
+        </p>
+      </div>
+
       <ol className="flex flex-wrap gap-2">
-        {STEPS.map((label, i) => (
-          <li
-            key={label}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              i === step
-                ? "bg-[var(--accent)] text-white"
-                : i < step
-                  ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-                  : "bg-[#eef2f6] text-[var(--muted)]"
-            }`}
-          >
-            {i + 1}. {label}
-          </li>
-        ))}
+        {STEPS.map((s, i) => {
+          const done = i < step;
+          const current = i === step;
+          return (
+            <li key={s.title}>
+              <button
+                type="button"
+                disabled={i > step}
+                onClick={() => goToStep(i)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${
+                  current
+                    ? "bg-[var(--accent)] text-white"
+                    : done
+                      ? "bg-[var(--accent-soft)] text-[var(--accent)] hover:opacity-90"
+                      : "cursor-default bg-[#eef2f6] text-[var(--muted)]"
+                } disabled:cursor-default`}
+                aria-current={current ? "step" : undefined}
+              >
+                {done ? (
+                  <span aria-hidden="true" className="text-[10px]">
+                    ✓
+                  </span>
+                ) : (
+                  <span aria-hidden="true">{i + 1}</span>
+                )}
+                {s.title}
+              </button>
+            </li>
+          );
+        })}
       </ol>
 
-      <Panel title={STEPS[step]}>
+      <Panel title={STEPS[step].title}>
+        <StepPurpose text={STEPS[step].purpose} />
+
         {step === 0 && (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm sm:col-span-2">
-              <FieldLabel>Customer *</FieldLabel>
+              <FieldLabel required>Customer</FieldLabel>
               <select
-                className={field}
+                className={err("customerId") ? fieldBad : field}
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
               >
@@ -695,21 +868,20 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   </option>
                 ))}
               </select>
+              <FieldError message={err("customerId")} />
               <span className="mt-1 block text-xs text-[var(--muted)]">
-                Select an existing customer, or use Create new customer above.
+                Need a new party? Use Create new customer above.
               </span>
             </label>
             <label className="text-sm sm:col-span-2">
-              <FieldLabel>Event name *</FieldLabel>
+              <FieldLabel required>Event name</FieldLabel>
               <input
-                className={field}
+                className={err("eventName") ? fieldBad : field}
                 value={eventName}
                 onChange={(e) => setEventName(e.target.value)}
                 placeholder="e.g. Spring Product Showcase"
               />
-              <span className="mt-1 block text-xs text-[var(--muted)]">
-                One contract = one event (engagement on the contract row).
-              </span>
+              <FieldError message={err("eventName")} />
             </label>
             <label className="text-sm">
               <FieldLabel>Event type</FieldLabel>
@@ -726,7 +898,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               </select>
             </label>
             <div className="text-sm">
-              <FieldLabel>Add new event type</FieldLabel>
+              <FieldLabel>Add event type</FieldLabel>
               <div className="flex gap-2">
                 <input
                   className={field}
@@ -761,21 +933,23 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               </div>
             </div>
             <label className="text-sm">
-              <FieldLabel>Project manager *</FieldLabel>
+              <FieldLabel required>Project manager</FieldLabel>
               <input
-                className={field}
+                className={err("pm") ? fieldBad : field}
                 value={pm}
                 onChange={(e) => setPm(e.target.value)}
               />
+              <FieldError message={err("pm")} />
             </label>
             <label className="text-sm">
-              <FieldLabel>Event start *</FieldLabel>
+              <FieldLabel required>Event start</FieldLabel>
               <input
                 type="datetime-local"
-                className={field}
+                className={err("eventStart") ? fieldBad : field}
                 value={eventStart}
                 onChange={(e) => setEventStart(e.target.value)}
               />
+              <FieldError message={err("eventStart")} />
             </label>
             <label className="text-sm">
               <FieldLabel>Event end</FieldLabel>
@@ -792,6 +966,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 className={field}
                 value={venueName}
                 onChange={(e) => setVenueName(e.target.value)}
+                placeholder="Venue or location name"
               />
             </label>
             <label className="text-sm">
@@ -816,13 +991,19 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
         )}
 
         {step === 1 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
+            {err("scope") ? (
+              <p
+                className="rounded-md border border-[var(--danger)]/30 bg-[#fef2f2] px-3 py-2 text-sm text-[var(--danger)]"
+                role="alert"
+              >
+                {err("scope")}
+              </p>
+            ) : null}
             <div>
-              <p className="mb-2 text-sm font-semibold">Services & packages</p>
+              <p className="mb-1 text-sm font-semibold">Services</p>
               <p className="mb-3 text-xs text-[var(--muted)]">
-                Enter each sellable service. Line total updates from quantity ×
-                unit price. Contract-level discounts are set under Financial
-                Terms.
+                Sellable lines. Totals roll into Pricing unless you override.
               </p>
               {lines.map((l, i) => (
                 <div
@@ -830,34 +1011,34 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   className="mb-3 grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-4"
                 >
                   <label className="text-sm sm:col-span-2">
-                    <FieldLabel>Service name / description</FieldLabel>
+                    <FieldLabel>Description</FieldLabel>
                     <input
                       className={field}
                       value={l.description}
                       onChange={(e) => {
-                        const next = [...lines];
-                        next[i] = { ...l, description: e.target.value };
-                        setLines(next);
+                        const nextLines = [...lines];
+                        nextLines[i] = { ...l, description: e.target.value };
+                        setLines(nextLines);
                       }}
                       placeholder="e.g. Full-day AV package"
                     />
                   </label>
                   <label className="text-sm">
-                    <FieldLabel>Quantity</FieldLabel>
+                    <FieldLabel>Qty</FieldLabel>
                     <input
                       type="number"
                       min={0}
                       className={field}
                       value={l.quantity}
                       onChange={(e) => {
-                        const next = [...lines];
+                        const nextLines = [...lines];
                         const qty = Number(e.target.value);
-                        next[i] = {
+                        nextLines[i] = {
                           ...l,
                           quantity: qty,
                           amount: qty * l.unit_rate,
                         };
-                        setLines(next);
+                        setLines(nextLines);
                       }}
                     />
                   </label>
@@ -870,19 +1051,19 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       className={field}
                       value={l.unit_rate}
                       onChange={(e) => {
-                        const next = [...lines];
+                        const nextLines = [...lines];
                         const unit_rate = Number(e.target.value);
-                        next[i] = {
+                        nextLines[i] = {
                           ...l,
                           unit_rate,
                           amount: l.quantity * unit_rate,
                         };
-                        setLines(next);
+                        setLines(nextLines);
                       }}
                     />
                   </label>
                   <label className="text-sm sm:col-span-2">
-                    <FieldLabel>Line total (calculated)</FieldLabel>
+                    <FieldLabel>Line total</FieldLabel>
                     <input
                       type="number"
                       min={0}
@@ -890,9 +1071,12 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       className={field}
                       value={l.amount}
                       onChange={(e) => {
-                        const next = [...lines];
-                        next[i] = { ...l, amount: Number(e.target.value) };
-                        setLines(next);
+                        const nextLines = [...lines];
+                        nextLines[i] = {
+                          ...l,
+                          amount: Number(e.target.value),
+                        };
+                        setLines(nextLines);
                       }}
                     />
                   </label>
@@ -918,23 +1102,20 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               </button>
             </div>
             <div>
-              <p className="mb-2 text-sm font-semibold">
-                Contractual deliverables
-              </p>
+              <p className="mb-1 text-sm font-semibold">Deliverables</p>
               <p className="mb-3 text-xs text-[var(--muted)]">
-                What must be delivered for this engagement. Reference codes are
-                assigned automatically.
+                What must be delivered for this engagement.
               </p>
               {deliverables.map((d, i) => (
                 <div key={i} className="mb-3 grid gap-2 sm:grid-cols-3">
                   <label className="text-sm">
-                    <FieldLabel>Deliverable name</FieldLabel>
+                    <FieldLabel>Name</FieldLabel>
                     <input
                       className={field}
                       value={d.title}
                       onChange={(e) => {
-                        const next = [...deliverables];
-                        next[i] = {
+                        const nextD = [...deliverables];
+                        nextD[i] = {
                           ...d,
                           title: e.target.value,
                           code:
@@ -942,7 +1123,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                               ? d.code
                               : `DLV-${i + 1}`,
                         };
-                        setDeliverables(next);
+                        setDeliverables(nextD);
                       }}
                       placeholder="e.g. Stage setup"
                     />
@@ -953,9 +1134,9 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       className={field}
                       value={d.description}
                       onChange={(e) => {
-                        const next = [...deliverables];
-                        next[i] = { ...d, description: e.target.value };
-                        setDeliverables(next);
+                        const nextD = [...deliverables];
+                        nextD[i] = { ...d, description: e.target.value };
+                        setDeliverables(nextD);
                       }}
                       placeholder="What must be delivered"
                     />
@@ -966,9 +1147,9 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       className={field}
                       value={d.phase}
                       onChange={(e) => {
-                        const next = [...deliverables];
-                        next[i] = { ...d, phase: e.target.value };
-                        setDeliverables(next);
+                        const nextD = [...deliverables];
+                        nextD[i] = { ...d, phase: e.target.value };
+                        setDeliverables(nextD);
                       }}
                     >
                       {DELIVERABLE_PHASES.map((p) => (
@@ -978,10 +1159,6 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       ))}
                     </select>
                   </label>
-                  <p className="text-xs text-[var(--muted)] sm:col-span-3">
-                    Reference code {d.code || `DLV-${i + 1}`} is assigned
-                    automatically.
-                  </p>
                 </div>
               ))}
               <button
@@ -1021,15 +1198,14 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
               eventName={eventName}
             />
             <div className="grid gap-6 lg:grid-cols-2">
-              {/* Section 1 */}
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold text-[var(--ink)]">
-                  Contract pricing
+                  Contract value
                 </h3>
                 <label className="block text-sm">
-                  <FieldLabel>Billing method</FieldLabel>
+                  <FieldLabel required>Billing method</FieldLabel>
                   <select
-                    className={field}
+                    className={err("billingMethod") ? fieldBad : field}
                     value={billingMethod}
                     onChange={(e) => setBillingMethod(e.target.value)}
                   >
@@ -1039,14 +1215,15 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       </option>
                     ))}
                   </select>
+                  <FieldError message={err("billingMethod")} />
                 </label>
                 <label className="block text-sm">
-                  <FieldLabel>Gross contract value</FieldLabel>
+                  <FieldLabel required>Gross value</FieldLabel>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
-                    className={field}
+                    className={err("gross") ? fieldBad : field}
                     value={
                       grossOverride !== ""
                         ? grossOverride
@@ -1057,14 +1234,15 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     onChange={(e) => setGrossOverride(e.target.value)}
                     placeholder="0.00"
                   />
+                  <FieldError message={err("gross")} />
                   <span className="mt-1 block text-xs text-[var(--muted)]">
                     {linesGross > 0
-                      ? `Defaults from service lines (${formatCurrency(linesGross)}). Edit to override.`
-                      : "Enter gross value, or set amounts on Scope & Services lines."}
+                      ? `From services (${formatCurrency(linesGross)}). Edit to override.`
+                      : "Enter a value, or price services on the previous step."}
                   </span>
                 </label>
                 <label className="block text-sm">
-                  <FieldLabel>Discount type</FieldLabel>
+                  <FieldLabel>Discount</FieldLabel>
                   <select
                     className={field}
                     value={discountType}
@@ -1072,7 +1250,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                       setDiscountTypeSafe(e.target.value as DiscountType)
                     }
                   >
-                    <option value="none">No discount</option>
+                    <option value="none">None</option>
                     <option value="percent">Percentage</option>
                     <option value="fixed">Fixed amount</option>
                   </select>
@@ -1086,33 +1264,33 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                         min={0}
                         max={100}
                         step="0.01"
-                        className={`${field} pr-10`}
+                        className={`${err("discount") ? fieldBad : field} pr-10`}
                         value={discountPercentInput}
-                        onChange={(e) => setDiscountPercentInput(e.target.value)}
+                        onChange={(e) =>
+                          setDiscountPercentInput(e.target.value)
+                        }
                         placeholder="0"
-                        aria-label="Discount percent of gross contract value"
                       />
-                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-[var(--muted)]">
+                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[var(--muted)]">
                         %
                       </span>
                     </div>
-                    <span className="mt-1 block text-xs text-[var(--muted)]">
-                      Percent of gross contract value (0–100).
-                    </span>
+                    <FieldError message={err("discount")} />
                   </label>
                 ) : null}
                 {discountType === "fixed" ? (
                   <label className="block text-sm">
-                    <FieldLabel>Fixed discount amount</FieldLabel>
+                    <FieldLabel>Discount amount</FieldLabel>
                     <input
                       type="number"
                       min={0}
                       step="0.01"
-                      className={field}
+                      className={err("discount") ? fieldBad : field}
                       value={discountFixedInput}
                       onChange={(e) => setDiscountFixedInput(e.target.value)}
                       placeholder="0.00"
                     />
+                    <FieldError message={err("discount")} />
                   </label>
                 ) : null}
                 <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-2 text-sm">
@@ -1120,13 +1298,13 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   <p className="mt-0.5 font-semibold tabular-nums">
                     {formatCurrency(net)}
                   </p>
+                  <FieldError message={err("net")} />
                 </div>
               </section>
 
-              {/* Section 2 */}
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold text-[var(--ink)]">
-                  Deposit requirements
+                  Deposit
                 </h3>
                 <label className="flex items-start gap-3 rounded-md border border-[var(--line)] bg-white px-3 py-3 text-sm">
                   <input
@@ -1137,11 +1315,10 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   />
                   <span>
                     <span className="font-medium text-[var(--ink)]">
-                      Deposit required before work begins
+                      Require deposit before work starts
                     </span>
                     <span className="mt-1 block text-xs text-[var(--muted)]">
-                      Required before work begins. Held until related services
-                      are delivered.
+                      Held until related services are delivered.
                     </span>
                   </span>
                 </label>
@@ -1156,7 +1333,7 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                           setDepositTypeSafe(e.target.value as DepositType)
                         }
                       >
-                        <option value="percent">Percentage</option>
+                        <option value="percent">Percentage of net</option>
                         <option value="fixed">Fixed amount</option>
                       </select>
                     </label>
@@ -1169,20 +1346,17 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                             min={0}
                             max={100}
                             step="0.01"
-                            className={`${field} pr-10`}
+                            className={`${err("deposit") ? fieldBad : field} pr-10`}
                             value={depositPercentInput}
                             onChange={(e) =>
                               setDepositPercentInput(e.target.value)
                             }
-                            aria-label="Deposit percent of net contract value"
                           />
-                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-[var(--muted)]">
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[var(--muted)]">
                             %
                           </span>
                         </div>
-                        <span className="mt-1 block text-xs text-[var(--muted)]">
-                          Percent of net contract value after discount (0–100).
-                        </span>
+                        <FieldError message={err("deposit")} />
                       </label>
                     ) : (
                       <label className="block text-sm">
@@ -1191,16 +1365,17 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                           type="number"
                           min={0}
                           step="0.01"
-                          className={field}
+                          className={err("deposit") ? fieldBad : field}
                           value={depositFixedInput}
                           onChange={(e) => setDepositFixedInput(e.target.value)}
                           placeholder="0.00"
                         />
+                        <FieldError message={err("deposit")} />
                       </label>
                     )}
                     <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-2 text-sm">
                       <span className="text-[var(--muted)]">
-                        Calculated deposit required
+                        Deposit required
                       </span>
                       <p className="mt-0.5 font-semibold tabular-nums">
                         {formatCurrency(depositCalc.amount)}
@@ -1209,48 +1384,44 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                   </>
                 ) : (
                   <p className="text-sm text-[var(--muted)]">
-                    No deposit will be required. Work activation is not gated on
-                    a customer deposit for this engagement.
+                    No deposit required for this engagement.
                   </p>
                 )}
               </section>
             </div>
 
-            {/* Section 3 */}
             <section>
               <h3 className="mb-3 text-sm font-semibold text-[var(--ink)]">
-                Financial summary
+                Summary
               </h3>
               <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-                <dl className="space-y-3 text-sm">
+                <dl className="space-y-2 text-sm">
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--muted)]">Gross contract value</dt>
-                    <dd className="font-medium tabular-nums">
-                      {formatCurrency(gross)}
-                    </dd>
+                    <dt className="text-[var(--muted)]">Gross</dt>
+                    <dd className="tabular-nums">{formatCurrency(gross)}</dd>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--muted)]">Less: Discount</dt>
-                    <dd className="font-medium tabular-nums text-[var(--muted)]">
+                    <dt className="text-[var(--muted)]">Discount</dt>
+                    <dd className="tabular-nums text-[var(--muted)]">
                       {discountCalc.amount > 0
                         ? `(${formatCurrency(discountCalc.amount)})`
                         : formatCurrency(0)}
                     </dd>
                   </div>
-                  <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-3">
-                    <dt className="font-semibold">Net contract value</dt>
+                  <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-2">
+                    <dt className="font-semibold">Net</dt>
                     <dd className="font-semibold tabular-nums">
                       {formatCurrency(net)}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--muted)]">Required deposit</dt>
-                    <dd className="font-medium tabular-nums">
+                    <dt className="text-[var(--muted)]">Deposit</dt>
+                    <dd className="tabular-nums">
                       {formatCurrency(depositCalc.amount)}
                     </dd>
                   </div>
-                  <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-3">
-                    <dt className="font-semibold">Remaining contract balance</dt>
+                  <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-2">
+                    <dt className="font-semibold">Remaining balance</dt>
                     <dd className="font-semibold tabular-nums">
                       {formatCurrency(remainingBalance)}
                     </dd>
@@ -1265,15 +1436,16 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-[var(--muted)]">
-                Scheduled total: <strong>{formatCurrency(scheduleSum)}</strong>{" "}
-                · Net contract value: <strong>{formatCurrency(net)}</strong>
+                Scheduled: <strong>{formatCurrency(scheduleSum)}</strong>
+                {" · "}
+                Net: <strong>{formatCurrency(net)}</strong>
               </p>
               <button
                 type="button"
                 className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
                 onClick={splitMilestonesFromValue}
               >
-                Split deposit + final from value
+                Auto-split deposit + final
               </button>
             </div>
             {Math.abs(scheduleSum - net) > 0.01 ? (
@@ -1281,29 +1453,29 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 className="rounded-md border border-[#f59e0b]/40 bg-[#fffbeb] px-3 py-2 text-sm text-[#92400e]"
                 role="status"
               >
-                Schedule does not match net contract value (
-                {formatCurrency(Math.abs(scheduleSum - net))} difference). Adjust
-                amounts or use “Split deposit + final from value.”
+                {err("scheduleMatch") ||
+                  `Off by ${formatCurrency(Math.abs(scheduleSum - net))}. Adjust amounts or auto-split.`}
               </p>
             ) : (
               <p className="text-xs text-[var(--ok)]">
-                Schedule totals match the net contract value.
+                Schedule matches net contract value.
               </p>
             )}
+            <FieldError message={err("schedule") || err("depositRow")} />
             {milestones.map((m, i) => (
               <div
                 key={i}
                 className="mb-1 grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-4"
               >
                 <label className="text-sm sm:col-span-2">
-                  <FieldLabel>Milestone name</FieldLabel>
+                  <FieldLabel required>Payment name</FieldLabel>
                   <input
-                    className={field}
+                    className={err(`msLabel${i}`) ? fieldBad : field}
                     value={m.label}
                     onChange={(e) => {
-                      const next = [...milestones];
+                      const nextM = [...milestones];
                       const label = e.target.value;
-                      next[i] = {
+                      nextM[i] = {
                         ...m,
                         label,
                         milestone_key: (() => {
@@ -1318,10 +1490,11 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                           return slug || `ms-${i + 1}`;
                         })(),
                       };
-                      setMilestones(next);
+                      setMilestones(nextM);
                     }}
                     placeholder="e.g. Deposit on signing"
                   />
+                  <FieldError message={err(`msLabel${i}`)} />
                 </label>
                 <label className="text-sm">
                   <FieldLabel>Amount</FieldLabel>
@@ -1332,18 +1505,11 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     className={field}
                     value={m.amount}
                     onChange={(e) => {
-                      const next = [...milestones];
-                      next[i] = { ...m, amount: e.target.value };
-                      setMilestones(next);
+                      const nextM = [...milestones];
+                      nextM[i] = { ...m, amount: e.target.value };
+                      setMilestones(nextM);
                     }}
                   />
-                  {m.milestone_type === "deposit" &&
-                  Number(m.amount) === 0 &&
-                  depositRequired ? (
-                    <span className="mt-1 block text-xs text-[var(--danger)]">
-                      Deposit rows should not be $0 when a deposit is required.
-                    </span>
-                  ) : null}
                 </label>
                 <label className="text-sm">
                   <FieldLabel>Due date</FieldLabel>
@@ -1352,21 +1518,21 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     className={field}
                     value={m.due_date}
                     onChange={(e) => {
-                      const next = [...milestones];
-                      next[i] = { ...m, due_date: e.target.value };
-                      setMilestones(next);
+                      const nextM = [...milestones];
+                      nextM[i] = { ...m, due_date: e.target.value };
+                      setMilestones(nextM);
                     }}
                   />
                 </label>
                 <label className="text-sm sm:col-span-2">
-                  <FieldLabel>Billing trigger</FieldLabel>
+                  <FieldLabel>Type</FieldLabel>
                   <select
                     className={field}
                     value={m.milestone_type}
                     onChange={(e) => {
-                      const next = [...milestones];
-                      next[i] = { ...m, milestone_type: e.target.value };
-                      setMilestones(next);
+                      const nextM = [...milestones];
+                      nextM[i] = { ...m, milestone_type: e.target.value };
+                      setMilestones(nextM);
                     }}
                   >
                     {MILESTONE_TYPES.map((t) => (
@@ -1397,100 +1563,146 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
             >
               + Add payment
             </button>
+          </div>
+        )}
 
-            <div className="mt-6 border-t border-[var(--line)] pt-4">
-              <label className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                <input
-                  type="checkbox"
-                  checked={definePos}
-                  onChange={(e) => setDefinePos(e.target.checked)}
-                />
-                Define ASC 606 performance obligations now
-              </label>
-              <p className="mb-3 text-xs text-[var(--muted)]">
-                Allocated amounts must equal net contract value. Approving a
-                non-final PO later requires paying the next PO’s installment.
+        {step === 4 && (
+          <div className="space-y-4">
+            <label className="flex items-start gap-3 rounded-md border border-[var(--line)] px-3 py-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={definePos}
+                onChange={(e) => setDefinePos(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Define performance obligations now</span>
+                <span className="mt-1 block text-xs text-[var(--muted)]">
+                  Each obligation needs a title, what “done” means, and an amount.
+                  Amounts must sum to net ({formatCurrency(net)}). You can also
+                  add them later on the contract detail page.
+                </span>
+              </span>
+            </label>
+
+            {!definePos ? (
+              <p className="rounded-md border border-[var(--line)] bg-[#f8fafb] px-3 py-3 text-sm text-[var(--muted)]">
+                Skipping for now. After create, open the contract and use
+                Performance Obligations to allocate the net value.
               </p>
-              {definePos ? (
-                <div className="space-y-3">
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-[var(--muted)]">
+                    Allocated: <strong>{formatCurrency(poSum)}</strong>
+                    {" · "}
+                    Net: <strong>{formatCurrency(net)}</strong>
+                  </p>
                   <button
                     type="button"
                     className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
                     onClick={splitPosFromValue}
                   >
-                    Split 30% / 50% / 20% from net value
+                    Split 30% / 50% / 20%
                   </button>
-                  {pos.map((p, i) => (
-                    <div
-                      key={i}
-                      className="grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-2"
-                    >
-                      <label className="text-sm sm:col-span-2">
-                        <FieldLabel>PO {i + 1} title</FieldLabel>
-                        <input
-                          className={field}
-                          value={p.title}
-                          onChange={(e) => {
-                            const next = [...pos];
-                            next[i] = { ...p, title: e.target.value };
-                            setPos(next);
-                          }}
-                        />
-                      </label>
-                      <label className="text-sm sm:col-span-2">
-                        <FieldLabel>Completion criteria</FieldLabel>
-                        <input
-                          className={field}
-                          value={p.completion_definition}
-                          onChange={(e) => {
-                            const next = [...pos];
-                            next[i] = {
-                              ...p,
-                              completion_definition: e.target.value,
-                            };
-                            setPos(next);
-                          }}
-                        />
-                      </label>
-                      <label className="text-sm">
-                        <FieldLabel>Allocated amount</FieldLabel>
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className={field}
-                          value={p.amount}
-                          onChange={(e) => {
-                            const next = [...pos];
-                            next[i] = { ...p, amount: e.target.value };
-                            setPos(next);
-                          }}
-                        />
-                      </label>
-                    </div>
-                  ))}
-                  <p className="text-xs text-[var(--muted)]">
-                    PO sum:{" "}
-                    {formatCurrency(
-                      pos.reduce((s, p) => s + (Number(p.amount) || 0), 0),
-                    )}{" "}
-                    · Net: {formatCurrency(net)}
-                  </p>
                 </div>
-              ) : null}
-            </div>
+                {err("pos") || err("poMatch") ? (
+                  <p
+                    className="rounded-md border border-[var(--danger)]/30 bg-[#fef2f2] px-3 py-2 text-sm text-[var(--danger)]"
+                    role="alert"
+                  >
+                    {err("pos") || err("poMatch")}
+                  </p>
+                ) : Math.abs(poSum - net) <= 0.01 && poSum > 0 ? (
+                  <p className="text-xs text-[var(--ok)]">
+                    Obligation amounts match net contract value.
+                  </p>
+                ) : null}
+                {pos.map((p, i) => (
+                  <div
+                    key={i}
+                    className="grid gap-2 rounded-md border border-[var(--line)] p-3 sm:grid-cols-2"
+                  >
+                    <label className="text-sm sm:col-span-2">
+                      <FieldLabel>Obligation {i + 1} title</FieldLabel>
+                      <input
+                        className={field}
+                        value={p.title}
+                        onChange={(e) => {
+                          const nextP = [...pos];
+                          nextP[i] = { ...p, title: e.target.value };
+                          setPos(nextP);
+                        }}
+                        placeholder="e.g. Planning & design"
+                      />
+                    </label>
+                    <label className="text-sm sm:col-span-2">
+                      <FieldLabel>When is this complete?</FieldLabel>
+                      <input
+                        className={err(`poDone${i}`) ? fieldBad : field}
+                        value={p.completion_definition}
+                        onChange={(e) => {
+                          const nextP = [...pos];
+                          nextP[i] = {
+                            ...p,
+                            completion_definition: e.target.value,
+                          };
+                          setPos(nextP);
+                        }}
+                        placeholder="Customer approves…"
+                      />
+                      <FieldError message={err(`poDone${i}`)} />
+                    </label>
+                    <label className="text-sm">
+                      <FieldLabel>Allocated amount</FieldLabel>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className={err(`poAmt${i}`) ? fieldBad : field}
+                        value={p.amount}
+                        onChange={(e) => {
+                          const nextP = [...pos];
+                          nextP[i] = { ...p, amount: e.target.value };
+                          setPos(nextP);
+                        }}
+                      />
+                      <FieldError message={err(`poAmt${i}`)} />
+                    </label>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="text-sm font-medium text-[var(--accent)]"
+                  onClick={() =>
+                    setPos([
+                      ...pos,
+                      {
+                        title: "",
+                        description: "",
+                        completion_definition: "",
+                        amount: "",
+                      },
+                    ])
+                  }
+                >
+                  + Add obligation
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {step === 4 && (
-          <div className="grid gap-3 sm:grid-cols-2">
+        {step === 5 && (
+          <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm">
-              <FieldLabel>Prepared by *</FieldLabel>
+              <FieldLabel required>Prepared by</FieldLabel>
               <input
-                className={field}
+                className={err("createdBy") ? fieldBad : field}
                 value={createdBy}
                 onChange={(e) => setCreatedBy(e.target.value)}
               />
+              <FieldError message={err("createdBy")} />
             </label>
             <label className="flex items-center gap-2 text-sm sm:col-span-2">
               <input
@@ -1498,15 +1710,24 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 checked={submitNow}
                 onChange={(e) => setSubmitNow(e.target.checked)}
               />
-              Submit for project manager approval immediately
+              Submit for PM approval right after create
             </label>
+
             <fieldset className="sm:col-span-2">
-              <legend className="mb-2 text-xs font-medium text-[var(--muted)]">
-                Customer involvement model
+              <legend className="mb-2 text-sm font-semibold text-[var(--ink)]">
+                Customer involvement
               </legend>
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                Controls which planning items the customer must approve in their
+                portal. Internal contract approval does not recognize revenue.
+              </p>
               <div className="space-y-2">
                 {(
-                  ["collaborative", "full_service", "custom"] as InvolvementModel[]
+                  [
+                    "collaborative",
+                    "full_service",
+                    "custom",
+                  ] as InvolvementModel[]
                 ).map((m) => (
                   <label
                     key={m}
@@ -1531,10 +1752,11 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                 ))}
               </div>
             </fieldset>
+
             {involvementModel === "custom" ? (
               <div className="sm:col-span-2">
                 <p className="mb-2 text-xs font-medium text-[var(--muted)]">
-                  Custom required checkpoints
+                  Required checkpoints
                 </p>
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   {CHECKPOINT_TYPES.map((t) => (
@@ -1554,103 +1776,163 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
                     </label>
                   ))}
                 </div>
+                <FieldError message={err("checkpoints")} />
               </div>
             ) : null}
-            <p className="text-xs text-[var(--muted)] sm:col-span-2">
-              Internal contract approval does not recognize revenue. Customer
-              involvement controls which planning checkpoints the client must
-              approve in their portal.
-            </p>
-          </div>
-        )}
-
-        {step === 5 && (
-          <div className="grid gap-3">
-            <label className="text-sm">
-              <FieldLabel>Cancellation policy *</FieldLabel>
-              <textarea
-                className={field}
-                rows={4}
-                value={cancelPolicy}
-                onChange={(e) => setCancelPolicy(e.target.value)}
-              />
-            </label>
-            <label className="text-sm">
-              <FieldLabel>Default cancellation fee %</FieldLabel>
-              <div className="relative max-w-xs">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  className={`${field} pr-10`}
-                  value={cancelFee}
-                  onChange={(e) => setCancelFee(e.target.value)}
-                  aria-label="Cancellation fee percent"
-                />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-[var(--muted)]">
-                  %
-                </span>
-              </div>
-              <span className="mt-1 block text-xs text-[var(--muted)]">
-                Default fee as a percent of contract value if canceled (0–100).
-              </span>
-            </label>
           </div>
         )}
 
         {step === 6 && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
-              <FieldLabel>Document title</FieldLabel>
-              <input
-                className={field}
-                value={docTitle}
-                onChange={(e) => setDocTitle(e.target.value)}
-              />
-            </label>
-            <label className="text-sm">
-              <FieldLabel>Document URL</FieldLabel>
-              <input
-                className={field}
-                value={docUrl}
-                onChange={(e) => setDocUrl(e.target.value)}
-                placeholder="https://..."
-              />
-            </label>
-            <label className="text-sm sm:col-span-2">
-              <FieldLabel>Internal notes</FieldLabel>
-              <textarea
-                className={field}
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </label>
-            <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] p-4 text-sm sm:col-span-2">
-              <p className="font-semibold">Review</p>
-              <ul className="mt-2 space-y-1 text-[var(--muted)]">
-                <li>
-                  Customer:{" "}
-                  {customers.find((c) => c.id === customerId)?.name ?? "—"}
-                </li>
-                <li>Event: {eventName || "—"}</li>
-                <li>PM: {pm}</li>
-                <li>Method: {billingLabel(billingMethod)}</li>
-                <li>
-                  Gross {formatCurrency(gross)} · Discount{" "}
-                  {formatCurrency(discountCalc.amount)} · Net{" "}
-                  {formatCurrency(net)}
-                </li>
-                <li>
-                  Deposit:{" "}
-                  {depositRequired
-                    ? formatCurrency(depositCalc.amount)
-                    : "None"}
-                </li>
-                <li>
-                  Submit: {submitNow ? "Yes — pending approval" : "Save as draft"}
-                </li>
-              </ul>
+          <div className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm sm:col-span-2">
+                <FieldLabel required>Cancellation policy</FieldLabel>
+                <textarea
+                  className={err("cancelPolicy") ? fieldBad : field}
+                  rows={3}
+                  value={cancelPolicy}
+                  onChange={(e) => setCancelPolicy(e.target.value)}
+                />
+                <FieldError message={err("cancelPolicy")} />
+              </label>
+              <label className="text-sm">
+                <FieldLabel>Default cancellation fee %</FieldLabel>
+                <div className="relative max-w-xs">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className={`${field} pr-10`}
+                    value={cancelFee}
+                    onChange={(e) => setCancelFee(e.target.value)}
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[var(--muted)]">
+                    %
+                  </span>
+                </div>
+              </label>
+              <label className="text-sm">
+                <FieldLabel>Document title</FieldLabel>
+                <input
+                  className={field}
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                />
+              </label>
+              <label className="text-sm">
+                <FieldLabel>Document URL</FieldLabel>
+                <input
+                  className={field}
+                  value={docUrl}
+                  onChange={(e) => setDocUrl(e.target.value)}
+                  placeholder="https://…"
+                />
+              </label>
+              <label className="text-sm sm:col-span-2">
+                <FieldLabel>Internal notes</FieldLabel>
+                <textarea
+                  className={field}
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="rounded-md border border-[var(--line)] bg-[#f8fafb] p-4 text-sm">
+              <p className="font-semibold text-[var(--ink)]">Review before create</p>
+              <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Customer</dt>
+                  <dd>{customerName}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Event</dt>
+                  <dd>{eventName || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">When</dt>
+                  <dd>
+                    {eventStart
+                      ? new Date(eventStart).toLocaleString()
+                      : "—"}
+                    {eventEnd
+                      ? ` → ${new Date(eventEnd).toLocaleString()}`
+                      : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Venue</dt>
+                  <dd>
+                    {[venueName, venueCity].filter(Boolean).join(", ") || "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">PM</dt>
+                  <dd>{pm || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Billing</dt>
+                  <dd>{billingLabel(billingMethod)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Value</dt>
+                  <dd>
+                    Gross {formatCurrency(gross)} · Net {formatCurrency(net)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Deposit</dt>
+                  <dd>
+                    {depositRequired
+                      ? formatCurrency(depositCalc.amount)
+                      : "None"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Payments</dt>
+                  <dd>
+                    {milestones.length} milestone
+                    {milestones.length === 1 ? "" : "s"} ·{" "}
+                    {formatCurrency(scheduleSum)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">
+                    Performance obligations
+                  </dt>
+                  <dd>
+                    {definePos
+                      ? `${pos.filter((p) => p.title.trim()).length} defined · ${formatCurrency(poSum)}`
+                      : "Define later on contract"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">Involvement</dt>
+                  <dd>{INVOLVEMENT_MODEL_LABELS[involvementModel]}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--muted)]">After create</dt>
+                  <dd>
+                    {submitNow ? "Submit for PM approval" : "Save as draft"}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-[var(--muted)]">Services</dt>
+                  <dd>
+                    {lines.filter((l) => l.description.trim()).length} line
+                    {lines.filter((l) => l.description.trim()).length === 1
+                      ? ""
+                      : "s"}
+                    {" · "}
+                    {deliverables.filter((d) => d.title.trim()).length}{" "}
+                    deliverable
+                    {deliverables.filter((d) => d.title.trim()).length === 1
+                      ? ""
+                      : "s"}
+                  </dd>
+                </div>
+              </dl>
             </div>
           </div>
         )}
@@ -1661,7 +1943,13 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
           </p>
         ) : null}
 
-        <div className="mt-6 flex flex-wrap justify-between gap-2">
+        {!stepValid && showErrors ? (
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            Complete the required fields above to continue.
+          </p>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
             disabled={step === 0 || pending}
@@ -1670,28 +1958,36 @@ export function CreateContractWizard({ customers }: { customers: Customer[] }) {
           >
             Back
           </button>
-          {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              onClick={next}
-              className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
-            >
-              Continue
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={submit}
-              className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {pending
-                ? "Saving…"
-                : submitNow
-                  ? "Create & submit"
-                  : "Create draft"}
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {!stepValid ? (
+              <span className="hidden text-xs text-[var(--muted)] sm:inline">
+                Required fields incomplete
+              </span>
+            ) : null}
+            {step < STEPS.length - 1 ? (
+              <button
+                type="button"
+                onClick={next}
+                disabled={!stepValid}
+                className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={pending || !stepValid}
+                onClick={submit}
+                className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {pending
+                  ? "Saving…"
+                  : submitNow
+                    ? "Create & submit"
+                    : "Create draft"}
+              </button>
+            )}
+          </div>
         </div>
       </Panel>
     </div>
