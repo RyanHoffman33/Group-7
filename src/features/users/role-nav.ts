@@ -240,7 +240,7 @@ export function allowedRoutePrefixes(roleKey: AppRole): string[] {
   const prefixes = [...common];
 
   if (roleKey === "customer") {
-    prefixes.push("/dashboard/customer");
+    prefixes.push("/dashboard/customer", "/request");
     return prefixes;
   }
 

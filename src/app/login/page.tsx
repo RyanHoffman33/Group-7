@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import {
   loginAction,
@@ -37,6 +38,7 @@ export default function LoginPage() {
                 name="email"
                 type="email"
                 required
+                autoComplete="email"
                 placeholder="manager@gmail.com"
                 className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2.5 outline-none ring-[var(--accent)] focus:ring-2"
               />
@@ -47,6 +49,7 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 required
+                autoComplete="current-password"
                 defaultValue={DEMO_PASSWORD}
                 className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2.5 outline-none ring-[var(--accent)] focus:ring-2"
               />
@@ -64,6 +67,16 @@ export default function LoginPage() {
               {pending ? "Signing in…" : "Sign in"}
             </button>
           </form>
+
+          <div className="mt-6 border-t border-[var(--line)] pt-6">
+            <p className="text-sm text-[var(--muted)]">New client?</p>
+            <Link
+              href="/register"
+              className="mt-2 inline-flex w-full items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:bg-[var(--bg)]"
+            >
+              Create New Account
+            </Link>
+          </div>
         </section>
 
         <section className="rounded-xl border border-[var(--line)] bg-[var(--ink)] p-8 text-white">

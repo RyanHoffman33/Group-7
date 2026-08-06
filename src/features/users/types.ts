@@ -34,14 +34,21 @@ export interface RoleDefinition {
 export interface AppUser {
   id: string;
   fullName: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
-  /** Demo only — never use real passwords in seed data. */
+  phone?: string;
+  /** Demo seed passwords only — never log or display. Prefer passwordHash for new accounts. */
   demoPassword: string;
+  /** SHA-256 hash for self-registered accounts (demo auth; not production-grade). */
+  passwordHash?: string;
   roleKey: AppRole;
   status: UserStatus;
   organization: string;
   lastLoginAt: string | null;
   createdAt: string;
+  /** After self-registration, send user through intake request form first. */
+  needsIntake?: boolean;
 }
 
 export interface RoleAssignment {
@@ -82,4 +89,6 @@ export interface SessionUser {
   roleKey: AppRole;
   roleName: string;
   organization: string;
+  /** Mirrored into the cookie so Edge middleware can enforce intake. */
+  needsIntake?: boolean;
 }

@@ -6,7 +6,7 @@ import {
   homePathForRole,
   notificationsPathForRole,
 } from "@/features/users/role-nav";
-import { findUserByEmail } from "@/features/users/session";
+import { findUserByEmail } from "@/features/users/directory";
 import type { AppRole } from "@/features/users/types";
 
 const SESSION_COOKIE = "mainevent_demo_session";
@@ -14,12 +14,14 @@ const SESSION_COOKIE = "mainevent_demo_session";
 function parseSession(raw: string | undefined): {
   email?: string;
   roleKey?: AppRole;
+  needsIntake?: boolean;
 } | null {
   if (!raw) return null;
   try {
     return JSON.parse(decodeURIComponent(raw)) as {
       email?: string;
       roleKey?: AppRole;
+      needsIntake?: boolean;
     };
   } catch {
     return null;
@@ -27,7 +29,10 @@ function parseSession(raw: string | undefined): {
 }
 
 /**
- * Resolve role from seeded account email — never trust cookie roleKey alone.
+ * Resolve role from seeded account email — never trust cookie roleKey alone
+ * for privileged roles. Self-registered customers may exist only in the Node
+ * process memory, so Edge middleware accepts cookie roleKey === "customer"
+ * when the email is not yet visible in this isolate.
  */
 function roleFromSession(parsed: {
   email?: string;
@@ -35,8 +40,14 @@ function roleFromSession(parsed: {
 }): AppRole | null {
   if (!parsed.email) return null;
   const user = findUserByEmail(parsed.email);
-  if (!user || user.status === "disabled") return null;
-  return user.roleKey;
+  if (user) {
+    if (user.status === "disabled") return null;
+    return user.roleKey;
+  }
+  if (parsed.roleKey === "customer") {
+    return "customer";
+  }
+  return null;
 }
 
 /**
@@ -56,6 +67,8 @@ export function middleware(request: NextRequest) {
     pathname === "/favicon.ico";
 
   const isLogin = pathname === "/login";
+  const isRegister = pathname === "/register";
+  const isPublicAuth = isLogin || isRegister;
   const isAccessDenied = pathname === "/access-denied";
 
   const isApi = pathname.startsWith("/api");
@@ -64,11 +77,18 @@ export function middleware(request: NextRequest) {
 
   if (pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = roleKey ? homePathForRole(roleKey) : "/login";
+    if (roleKey) {
+      url.pathname =
+        parsed?.needsIntake && roleKey === "customer"
+          ? "/request"
+          : homePathForRole(roleKey);
+    } else {
+      url.pathname = "/login";
+    }
     return NextResponse.redirect(url);
   }
 
-  if (!parsed?.email && !isLogin) {
+  if (!parsed?.email && !isPublicAuth) {
     if (isApi) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -78,7 +98,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Cookie present but email not in directory / disabled
-  if (parsed?.email && !roleKey && !isLogin) {
+  if (parsed?.email && !roleKey && !isPublicAuth) {
     if (isApi) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -87,13 +107,28 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (parsed?.email && roleKey && isLogin) {
+  if (parsed?.email && roleKey && isPublicAuth) {
     const url = request.nextUrl.clone();
-    url.pathname = homePathForRole(roleKey);
+    url.pathname =
+      parsed.needsIntake && roleKey === "customer"
+        ? "/request"
+        : homePathForRole(roleKey);
     return NextResponse.redirect(url);
   }
 
-  if (roleKey && !isLogin && !isAccessDenied) {
+  // New self-registered customers finish intake before the customer dashboard.
+  if (
+    roleKey === "customer" &&
+    parsed?.needsIntake &&
+    !pathname.startsWith("/request") &&
+    !isAccessDenied
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/request";
+    return NextResponse.redirect(url);
+  }
+
+  if (roleKey && !isPublicAuth && !isAccessDenied) {
     const isDashboard =
       pathname === "/dashboard" || pathname.startsWith("/dashboard/");
     if (isDashboard) {
