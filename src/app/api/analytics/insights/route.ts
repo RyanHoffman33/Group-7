@@ -2,15 +2,18 @@ import {
   buildFallbackInsights,
   getAnalyticsBundle,
 } from "@/features/analytics/queries";
+import { rankingsFromSlices } from "@/features/analytics/rankings";
 import { getSessionUser } from "@/features/users/session";
 import { roleHasPermission } from "@/features/access/matrix";
 
 export const runtime = "nodejs";
 
-const INSIGHTS_SYSTEM = `You are a financial analytics advisor for MainEvent, an event services company.
-Given a compact JSON snapshot of historical KPIs and a short-horizon forecast, produce 4–6 DISTINCT actionable insights for executives.
-Each bullet must cover a DIFFERENT angle — do not restate the same revenue total in multiple bullets.
-Prefer: (1) trend direction vs prior period, (2) projected vs recent actual variance, (3) margin/cost pressure months, (4) A/R or cash-conversion risk, (5) what to watch next quarter.
+const INSIGHTS_SYSTEM = `You are a business-planning advisor for MainEvent, an event services company.
+Given a compact JSON snapshot of what the user is viewing on the Analytics Center overview
+(KPIs, top profitable segments by gross margin $, recent history), produce 4–6 DISTINCT
+actionable business-plan ideas — not generic finance commentary.
+Each bullet must cover a DIFFERENT angle: growth bet, margin defense, customer mix,
+venue/vendor leverage, capacity, or risk.
 Be concrete with numbers from the JSON. Do not invent accounts. Return ONLY a JSON array of strings.`;
 
 function parseInsightList(text: string): string[] | null {
@@ -49,7 +52,7 @@ async function callGeminiInsights(
           role: "user",
           parts: [
             {
-              text: `Analyze this analytics snapshot and return a JSON array of insight strings:\n${payload}`,
+              text: `Advise on business-plan ideas from this overview snapshot and return a JSON array of insight strings:\n${payload}`,
             },
           ],
         },
@@ -79,42 +82,78 @@ async function callGeminiInsights(
   return insights;
 }
 
-function compactSnapshot(bundle: Awaited<ReturnType<typeof getAnalyticsBundle>>) {
-  const hist = bundle.history.slice(-12).map((m) => ({
+type ClientContext = {
+  filterLabel?: string;
+  rankings?: {
+    vendors: { label: string; margin: number; count: number }[];
+    eventGroups: { label: string; margin: number; count: number }[];
+    customers: { label: string; margin: number; count: number }[];
+    venues: { label: string; margin: number; count: number }[];
+  };
+  history?: {
+    month: string;
+    revenue: number;
+    cogs: number;
+    margin: number;
+    events: number;
+  }[];
+  kpis?: {
+    yoyRevenueGrowthPct: number | null;
+    avgMarginPct: number;
+    topCustomerSharePct: number | null;
+    topCustomerName: string | null;
+  };
+};
+
+function compactSnapshot(
+  bundle: Awaited<ReturnType<typeof getAnalyticsBundle>>,
+  ctx?: ClientContext,
+) {
+  const rankings =
+    ctx?.rankings ??
+    rankingsFromSlices(bundle.eventSlices, {
+      year: "all",
+      quarter: "all",
+      month: "all",
+    });
+
+  const histSource = ctx?.history?.length
+    ? ctx.history
+    : bundle.history.slice(-12);
+
+  const hist = histSource.slice(-12).map((m) => ({
     month: m.month.slice(0, 7),
     revenue: Math.round(m.revenue),
-    cogs: Math.round(m.cogs),
+    cogs: Math.round("cogs" in m ? (m.cogs as number) : 0),
     margin: Math.round(m.margin),
     events: m.events,
-    ar: Math.round(m.arOutstanding),
   }));
-  const forecast = bundle.forecast.points.map((p) => ({
-    month: p.month.slice(0, 7),
-    revenue: p.revenue,
-    low: p.revenueLow,
-    high: p.revenueHigh,
-    events: p.events,
-  }));
+
   return {
     source: bundle.source,
-    method: bundle.forecast.method,
-    revenueSlope: Math.round(bundle.forecast.revenueSlope),
+    filter: ctx?.filterLabel ?? "all periods",
+    purpose: "business_plan_ideas",
+    overviewKpis: ctx?.kpis ?? null,
     kpis: {
       trailingRevenue: Math.round(bundle.kpis.trailingRevenue),
       trailingMarginPct: Number(bundle.kpis.trailingMarginPct.toFixed(4)),
       avgEvents: Number(bundle.kpis.avgEvents.toFixed(2)),
-      arOutstanding: Math.round(bundle.kpis.arOutstanding),
       revenueGrowthPct:
         bundle.kpis.revenueGrowthPct == null
           ? null
           : Number(bundle.kpis.revenueGrowthPct.toFixed(4)),
     },
+    topByGrossMarginDollars: {
+      vendors: rankings.vendors.slice(0, 5),
+      eventGroups: rankings.eventGroups.slice(0, 5),
+      customers: rankings.customers.slice(0, 5),
+      venues: rankings.venues.slice(0, 5),
+    },
     history: hist,
-    forecast,
   };
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const session = await getSessionUser();
     if (!session) {
@@ -127,8 +166,41 @@ export async function POST() {
       );
     }
 
+    let ctx: ClientContext | undefined;
+    try {
+      const body = (await req.json()) as { context?: ClientContext };
+      ctx = body.context;
+    } catch {
+      ctx = undefined;
+    }
+
     const bundle = await getAnalyticsBundle();
-    const fallback = buildFallbackInsights(bundle);
+    const rankings =
+      ctx?.rankings ??
+      rankingsFromSlices(bundle.eventSlices, {
+        year: "all",
+        quarter: "all",
+        month: "all",
+      });
+
+    const fallback = buildFallbackInsights({
+      history: ctx?.history?.length
+        ? ctx.history.map((m) => ({
+            month: m.month,
+            revenue: m.revenue,
+            cogs: m.cogs ?? 0,
+            margin: m.margin,
+            events: m.events,
+            arOutstanding: 0,
+          }))
+        : bundle.history,
+      forecast: bundle.forecast,
+      source: bundle.source,
+      kpis: bundle.kpis,
+      rankings,
+      filterLabel: ctx?.filterLabel ?? "all periods",
+    });
+
     const geminiKey = process.env.GEMINI_API_KEY;
 
     if (!geminiKey) {
@@ -136,7 +208,7 @@ export async function POST() {
     }
 
     try {
-      const payload = JSON.stringify(compactSnapshot(bundle));
+      const payload = JSON.stringify(compactSnapshot(bundle, ctx));
       const insights = await callGeminiInsights(geminiKey, payload);
       return Response.json({ insights, source: "gemini" as const });
     } catch {

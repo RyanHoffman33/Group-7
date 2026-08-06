@@ -1,12 +1,17 @@
 import { listMonthlyProfits, listEventProfits } from "@/features/profitability/queries";
 import { getDashboardMetrics } from "@/features/billing/queries";
+import { createClient } from "@/lib/supabase/server";
 import { ANALYTICS_SEED_MONTHS, type AnalyticsMonth } from "./seed";
 import { forecastSeries, type ForecastResult } from "./forecast";
+import type { AnalyticsEventSlice } from "./rankings";
+import { rankingsFromSlices } from "./rankings";
 
 export type AnalyticsBundle = {
   history: AnalyticsMonth[];
   forecast: ForecastResult;
   source: "live" | "seed";
+  /** Event-level slices for overview quadrants (filterable client-side). */
+  eventSlices: AnalyticsEventSlice[];
   kpis: {
     trailingRevenue: number;
     trailingMargin: number;
@@ -42,18 +47,165 @@ function fromProfitMonths(
   }));
 }
 
-async function loadLiveHistory(): Promise<AnalyticsMonth[]> {
-  const [months, events, metrics] = await Promise.all([
+async function loadVenuesByContract(
+  contractIds: string[],
+): Promise<Map<string, string | null>> {
+  const map = new Map<string, string | null>();
+  if (!contractIds.length) return map;
+  const supabase = createClient();
+  const chunkSize = 80;
+  for (let i = 0; i < contractIds.length; i += chunkSize) {
+    const chunk = contractIds.slice(i, i + chunkSize);
+    const { data, error } = await supabase
+      .from("contracts")
+      .select("id, venue_name")
+      .in("id", chunk);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      map.set(String(row.id), (row.venue_name as string | null) ?? null);
+    }
+  }
+  return map;
+}
+
+async function loadVendorsByContract(
+  contractIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (!contractIds.length) return map;
+  const supabase = createClient();
+  // Chunk .in() to stay under PostgREST URL limits.
+  const chunkSize = 80;
+  for (let i = 0; i < contractIds.length; i += chunkSize) {
+    const chunk = contractIds.slice(i, i + chunkSize);
+    const { data, error } = await supabase
+      .from("cost_entries")
+      .select("contract_id, vendor_name, vendor_id, vendors(name), is_void")
+      .in("contract_id", chunk);
+    if (error) throw error;
+
+    for (const row of data ?? []) {
+      if (row.is_void === true) continue;
+      const cid = String(row.contract_id);
+      const joined = row.vendors as
+        | { name?: string }
+        | { name?: string }[]
+        | null;
+      const vendorFromJoin = Array.isArray(joined)
+        ? joined[0]?.name
+        : joined?.name;
+      const name =
+        (row.vendor_name as string | null)?.trim() ||
+        vendorFromJoin?.trim() ||
+        null;
+      if (!name) continue;
+      const list = map.get(cid) ?? [];
+      if (!list.includes(name)) list.push(name);
+      map.set(cid, list);
+    }
+  }
+  return map;
+}
+
+function eventMonthKey(iso: string | null): string | null {
+  if (!iso) return null;
+  return `${iso.slice(0, 7)}-01`;
+}
+
+async function loadEventSlices(): Promise<AnalyticsEventSlice[]> {
+  const events = await listEventProfits();
+  if (!events.length) return [];
+
+  const ids = events.map((e) => e.contract_id);
+  const [venues, vendors] = await Promise.all([
+    loadVenuesByContract(ids),
+    loadVendorsByContract(ids),
+  ]);
+
+  return events.map((e) => ({
+    contractId: e.contract_id,
+    customerName: e.customer_name,
+    eventType: e.event_type,
+    venueName: venues.get(e.contract_id) ?? null,
+    eventMonth: eventMonthKey(e.event_start ?? e.event_end),
+    grossMargin: e.gross_margin,
+    recognizedRevenue: e.recognized_revenue,
+    vendors: vendors.get(e.contract_id) ?? [],
+  }));
+}
+
+/** Deterministic seed slices when live data is unavailable — enough for demo quadrants. */
+function seedEventSlices(): AnalyticsEventSlice[] {
+  const customers = [
+    "Harborview Hospitals",
+    "Northstar Financial Group",
+    "Prairie Arts Collective",
+    "Cedar & Pine Weddings",
+    "Lakeside University",
+  ];
+  const groups = [
+    "corporate_conference",
+    "trade_show",
+    "gala",
+    "corporate_event",
+    "product_launch",
+  ];
+  const venues = [
+    "MainEvent Venue 1",
+    "MainEvent Venue 2",
+    "MainEvent Venue 4",
+    "MainEvent Venue 5",
+    "MainEvent Venue 6",
+  ];
+  const vendorPool = [
+    "Premier Catering Co",
+    "StageRight AV",
+    "BrightLight Rentals",
+    "PrintWorks",
+    "Fleet Travel Partners",
+  ];
+
+  const slices: AnalyticsEventSlice[] = [];
+  let i = 0;
+  for (const m of ANALYTICS_SEED_MONTHS) {
+    const eventsInMonth = Math.max(1, m.events);
+    const marginEach = m.margin / eventsInMonth;
+    const revEach = m.revenue / eventsInMonth;
+    for (let e = 0; e < eventsInMonth; e++) {
+      slices.push({
+        contractId: `seed-${i}`,
+        customerName: customers[i % customers.length],
+        eventType: groups[i % groups.length],
+        venueName: venues[i % venues.length],
+        eventMonth: m.month,
+        grossMargin: Math.round(marginEach * (0.85 + (i % 5) * 0.06)),
+        recognizedRevenue: Math.round(revEach),
+        vendors: [
+          vendorPool[i % vendorPool.length],
+          vendorPool[(i + 2) % vendorPool.length],
+        ],
+      });
+      i += 1;
+    }
+  }
+  return slices;
+}
+
+async function loadLiveHistory(): Promise<{
+  history: AnalyticsMonth[];
+  slices: AnalyticsEventSlice[];
+}> {
+  const [months, events, metrics, slices] = await Promise.all([
     listMonthlyProfits(),
     listEventProfits(),
     getDashboardMetrics().catch(() => null),
+    loadEventSlices(),
   ]);
 
   const arOut = metrics?.totalOutstanding ?? 0;
 
   let history = fromProfitMonths(months, arOut);
 
-  // Approximate event counts per month from event start dates when available.
   if (events.length) {
     const counts = new Map<string, number>();
     for (const e of events) {
@@ -71,18 +223,25 @@ async function loadLiveHistory(): Promise<AnalyticsMonth[]> {
   if (history.length < 3) {
     throw new Error("insufficient live history");
   }
-  return history.sort((a, b) => a.month.localeCompare(b.month));
+  return {
+    history: history.sort((a, b) => a.month.localeCompare(b.month)),
+    slices,
+  };
 }
 
 export async function getAnalyticsBundle(): Promise<AnalyticsBundle> {
   let history: AnalyticsMonth[];
+  let eventSlices: AnalyticsEventSlice[];
   let source: "live" | "seed" = "seed";
 
   try {
-    history = await withTimeout(loadLiveHistory(), 3500);
+    const live = await withTimeout(loadLiveHistory(), 4500);
+    history = live.history;
+    eventSlices = live.slices;
     source = "live";
   } catch {
     history = ANALYTICS_SEED_MONTHS;
+    eventSlices = seedEventSlices();
     source = "seed";
   }
 
@@ -108,6 +267,7 @@ export async function getAnalyticsBundle(): Promise<AnalyticsBundle> {
     history,
     forecast,
     source,
+    eventSlices,
     kpis: {
       trailingRevenue,
       trailingMargin,
@@ -119,42 +279,72 @@ export async function getAnalyticsBundle(): Promise<AnalyticsBundle> {
   };
 }
 
-/** Deterministic offline insights when Gemini is unavailable. */
-export function buildFallbackInsights(bundle: AnalyticsBundle): string[] {
+export type InsightContext = {
+  history: AnalyticsMonth[];
+  forecast: ForecastResult;
+  source: "live" | "seed";
+  kpis: AnalyticsBundle["kpis"];
+  rankings?: ReturnType<typeof rankingsFromSlices>;
+  filterLabel?: string;
+};
+
+/** Deterministic offline insights — business-plan ideas from the viewed snapshot. */
+export function buildFallbackInsights(
+  bundle: AnalyticsBundle | InsightContext,
+): string[] {
   const { forecast, kpis, history } = bundle;
+  const rankings =
+    "rankings" in bundle && bundle.rankings
+      ? bundle.rankings
+      : "eventSlices" in bundle && bundle.eventSlices
+        ? rankingsFromSlices(bundle.eventSlices, {
+            year: "all",
+            quarter: "all",
+            month: "all",
+          })
+        : null;
+  const filterLabel =
+    "filterLabel" in bundle && bundle.filterLabel
+      ? bundle.filterLabel
+      : "all periods";
+
   const last = history[history.length - 1];
   const prev = history[history.length - 2];
   const slope = forecast.revenueSlope;
   const direction =
     slope > 2000 ? "upward" : slope < -2000 ? "downward" : "flat";
 
-  const next3 = forecast.points.slice(0, 3);
-  const nextRev = next3.reduce((s, p) => s + p.revenue, 0);
-  const nextMargin = next3.reduce((s, p) => s + p.margin, 0);
-  const last3 = history.slice(-3);
-  const last3Rev = last3.reduce((s, m) => s + m.revenue, 0);
-  const variancePct =
-    last3Rev > 0 ? ((nextRev - last3Rev) / last3Rev) * 100 : null;
-
-  const thinMarginMonths = history
-    .filter((m) => m.revenue > 0 && m.margin / m.revenue < 0.12)
-    .slice(-3);
-  const costCreep =
-    prev && last && last.revenue > 0 && prev.revenue > 0
-      ? last.cogs / last.revenue - prev.cogs / prev.revenue
-      : null;
-
   const tips: string[] = [];
 
   tips.push(
-    `Trend is ${direction} (≈$${Math.round(Math.abs(slope)).toLocaleString()}/mo slope). Next quarter revenue outlook ~$${Math.round(nextRev).toLocaleString()} with ~$${Math.round(nextMargin).toLocaleString()} projected margin.`,
+    `Business-plan lens (${filterLabel}): revenue trend is ${direction}. Lean the next planning cycle toward segments already showing the strongest gross margin $, not just top-line bookings.`,
   );
 
-  if (variancePct != null) {
+  if (rankings?.customers[0]) {
+    const top = rankings.customers[0];
+    const share =
+      rankings.customers.reduce((s, c) => s + c.margin, 0) > 0
+        ? (top.margin /
+            rankings.customers.reduce((s, c) => s + c.margin, 0)) *
+          100
+        : 0;
     tips.push(
-      variancePct >= 0
-        ? `Projected next 3 months are ${variancePct.toFixed(1)}% above the last 3 months of actual revenue — check capacity and staffing before locking spend.`
-        : `Projected next 3 months are ${Math.abs(variancePct).toFixed(1)}% below the last 3 months of actuals — review pipeline and change-order backlog.`,
+      share >= 35
+        ? `Customer concentration risk: ${top.label} drives ~${share.toFixed(0)}% of viewed gross margin $. Diversify with lookalike accounts in adjacent industries before locking a multi-year plan.`
+        : `Anchor growth on ${top.label} (top customer by gross margin $) while packaging a repeatable offer for the next 2–3 similar accounts.`,
+    );
+  }
+
+  if (rankings?.eventGroups[0]) {
+    const g = rankings.eventGroups[0];
+    tips.push(
+      `Event mix opportunity: "${g.label}" leads by gross margin $. Staff capacity, vendor retainers, and marketing should prioritize this event group in the next business plan.`,
+    );
+  }
+
+  if (rankings?.venues[0] && rankings?.vendors[0]) {
+    tips.push(
+      `Operations play: double down on ${rankings.venues[0].label} and preferred partner ${rankings.vendors[0].label} — both rank highest by associated gross margin $ in the current view.`,
     );
   }
 
@@ -162,40 +352,29 @@ export function buildFallbackInsights(bundle: AnalyticsBundle): string[] {
     const g = kpis.revenueGrowthPct * 100;
     tips.push(
       g >= 0
-        ? `Trailing half outpaced the prior half by ${g.toFixed(1)}% ($${Math.round(kpis.trailingRevenue).toLocaleString()} recognized).`
-        : `Trailing half lagged the prior half by ${Math.abs(g).toFixed(1)}% — investigate canceled or delayed events.`,
+        ? `Trailing half revenue is up ${g.toFixed(1)}% vs the prior half — fund a measured capacity increase (crew + AV) rather than across-the-board hiring.`
+        : `Trailing half revenue is down ${Math.abs(g).toFixed(1)}% — freeze discretionary overhead and protect margin on the highest-performing event groups before expanding.`,
     );
   }
 
-  if (thinMarginMonths.length) {
+  if (kpis.trailingMarginPct < 0.15) {
     tips.push(
-      `Margin pressure in ${thinMarginMonths.map((m) => m.month.slice(0, 7)).join(", ")} (under 12% on recognized revenue). Treat those months as at-risk for cost overruns.`,
+      `Blended trailing margin is only ${(kpis.trailingMarginPct * 100).toFixed(1)}% — write a cost-discipline initiative (commitment gates + vendor rate cards) into the plan before chasing volume.`,
     );
-  } else if (kpis.trailingMarginPct < 0.15) {
-    tips.push(
-      `Blended trailing margin is only ${(kpis.trailingMarginPct * 100).toFixed(1)}% — below a healthy 15% floor for event production.`,
-    );
+  } else if (prev && last && last.revenue > 0 && prev.revenue > 0) {
+    const creep = last.cogs / last.revenue - prev.cogs / prev.revenue;
+    if (creep > 0.02) {
+      tips.push(
+        `COGS ratio rose ${(creep * 100).toFixed(1)} pts month-over-month — include a vendor renegotiation sprint in the near-term plan.`,
+      );
+    }
   }
 
-  if (costCreep != null && costCreep > 0.02) {
+  if (tips.length < 4 && forecast.points.length >= 2) {
+    const next3 = forecast.points.slice(0, 3);
+    const nextRev = next3.reduce((s, p) => s + p.revenue, 0);
     tips.push(
-      `COGS ratio rose ${(costCreep * 100).toFixed(1)} pts month-over-month — projected costs may outrun revenue unless commitments are tightened.`,
-    );
-  }
-
-  if (last && last.arOutstanding > kpis.trailingRevenue * 0.45 && kpis.trailingRevenue > 0) {
-    tips.push(
-      `A/R ($${Math.round(last.arOutstanding).toLocaleString()}) is high vs trailing revenue — collections risk can erase projected margin even if bookings look strong.`,
-    );
-  }
-
-  if (forecast.points.length >= 2) {
-    const first = forecast.points[0];
-    const lastF = forecast.points[forecast.points.length - 1];
-    const bandWidth = lastF.revenueHigh - lastF.revenueLow;
-    const conf = forecast.confidence;
-    tips.push(
-      `Forecast confidence is ${conf.label} (${conf.score}%); the ${Math.round(conf.intervalLevel * 100)}% band widens to ±$${Math.round(bandWidth / 2).toLocaleString()} by ${lastF.month.slice(0, 7)} — near-term ${first.month.slice(0, 7)} is the more actionable planning month.`,
+      `Near-term outlook: ~$${Math.round(nextRev).toLocaleString()} projected revenue over the next quarter — size inventory and cash reserves to that band, not peak historical months.`,
     );
   }
 

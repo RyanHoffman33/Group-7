@@ -1,11 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { AnalyticsMonth } from "@/features/analytics/seed";
+import type { AnalyticsRankings } from "@/features/analytics/rankings";
+
+export type InsightRequestContext = {
+  filterLabel: string;
+  rankings: AnalyticsRankings;
+  history: AnalyticsMonth[];
+  kpis: {
+    yoyRevenueGrowthPct: number | null;
+    avgMarginPct: number;
+    topCustomerSharePct: number | null;
+    topCustomerName: string | null;
+  };
+};
 
 export function InsightCards({
   initialInsights,
+  context,
 }: {
   initialInsights: string[];
+  /** Optional overview context sent to the insights API for filter-aware advice. */
+  context?: InsightRequestContext;
 }) {
   const [insights, setInsights] = useState(initialInsights);
   const [loading, setLoading] = useState(false);
@@ -18,7 +35,11 @@ export function InsightCards({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/analytics/insights", { method: "POST" });
+      const res = await fetch("/api/analytics/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(context ? { context } : {}),
+      });
       const data = (await res.json()) as {
         insights?: string[];
         source?: "fallback" | "gemini";
@@ -37,7 +58,7 @@ export function InsightCards({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [context]);
 
   useEffect(() => {
     setInsights(initialInsights);
@@ -48,7 +69,7 @@ export function InsightCards({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-[var(--muted)]">
           {source === "gemini"
-            ? "Generated with Gemini from live analytics snapshot"
+            ? "Generated with Gemini from the analytics view you are looking at"
             : "Rule-based briefing (Gemini unavailable or not yet refreshed)"}
         </p>
         <button
@@ -57,7 +78,7 @@ export function InsightCards({
           disabled={loading}
           className="rounded-md border border-[var(--line)] px-3 py-1.5 text-xs font-semibold hover:bg-[#f7f9fb] disabled:opacity-60"
         >
-          {loading ? "Refreshing…" : "Refresh AI insights"}
+          {loading ? "Refreshing…" : "Refresh AI summary"}
         </button>
       </div>
       {error ? (

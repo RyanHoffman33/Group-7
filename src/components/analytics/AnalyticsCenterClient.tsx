@@ -2,23 +2,62 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { formatCurrency, formatPercent } from "@/features/billing/aging";
+import { formatPercent } from "@/features/billing/aging";
 import type { AnalyticsBundle } from "@/features/analytics/queries";
 import { buildFallbackInsights } from "@/features/analytics/queries";
-import { forecastSeries } from "@/features/analytics/forecast";
 import {
   defaultAnalyticsFilter,
   filterAnalyticsHistory,
-  kpisFromHistory,
   yearsFromHistory,
   type AnalyticsPeriodFilter,
 } from "@/features/analytics/filter";
+import {
+  overviewKpisFromData,
+  rankingsFromSlices,
+} from "@/features/analytics/rankings";
 import { PageHeader, Panel, StatCard } from "@/components/billing/ui";
 import { AnalyticsFilters } from "@/components/analytics/AnalyticsFilters";
 import { ChartLegend } from "@/components/analytics/ChartLegend";
 import { HistoryCharts } from "@/components/analytics/HistoryCharts";
-import { ProjectionChart } from "@/components/analytics/ProjectionChart";
 import { InsightCards } from "@/components/analytics/InsightCards";
+import { TopNBarChart } from "@/components/analytics/TopNBarChart";
+
+function filterLabel(f: AnalyticsPeriodFilter): string {
+  const parts: string[] = [];
+  if (f.year !== "all") parts.push(`Year ${f.year}`);
+  if (f.quarter !== "all") parts.push(`Q${f.quarter}`);
+  if (f.month !== "all") {
+    const names = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    parts.push(names[Number(f.month) - 1] ?? `M${f.month}`);
+  }
+  return parts.length ? parts.join(" · ") : "all periods";
+}
+
+function formatSignedPct(pct: number | null): string {
+  if (pct == null) return "—";
+  const v = pct * 100;
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(1)}%`;
+}
+
+function formatPts(pts: number | null): string {
+  if (pts == null) return "—";
+  const sign = pts > 0 ? "+" : "";
+  return `${sign}${pts.toFixed(1)} pts`;
+}
 
 export function AnalyticsCenterClient({
   bundle,
@@ -37,34 +76,31 @@ export function AnalyticsCenterClient({
     [bundle.history, filter],
   );
 
-  const forecast = useMemo(
-    // Always project from full history — year/quarter filters must not
-    // starve the model down to lag-zero months (which forecast as $0).
-    () => forecastSeries(bundle.history, 6),
-    [bundle.history],
+  const chartHistory =
+    filteredHistory.length > 0 ? filteredHistory : bundle.history;
+
+  const rankings = useMemo(
+    () => rankingsFromSlices(bundle.eventSlices, filter),
+    [bundle.eventSlices, filter],
   );
 
-  const kpis = useMemo(
-    () =>
-      kpisFromHistory(
-        filteredHistory.length ? filteredHistory : bundle.history,
-      ),
-    [filteredHistory, bundle.history],
+  const overviewKpis = useMemo(
+    () => overviewKpisFromData(bundle.history, rankings, filter),
+    [bundle.history, rankings, filter],
   );
 
   const insights = useMemo(
     () =>
       buildFallbackInsights({
-        history: filteredHistory.length ? filteredHistory : bundle.history,
-        forecast,
+        history: chartHistory,
+        forecast: bundle.forecast,
         source: bundle.source,
-        kpis,
+        kpis: bundle.kpis,
+        rankings,
+        filterLabel: filterLabel(filter),
       }),
-    [filteredHistory, forecast, bundle.source, kpis],
+    [chartHistory, bundle.forecast, bundle.source, bundle.kpis, rankings, filter],
   );
-
-  const chartHistory =
-    filteredHistory.length > 0 ? filteredHistory : bundle.history;
 
   return (
     <div>
@@ -110,58 +146,114 @@ export function AnalyticsCenterClient({
       </div>
 
       <div className="mb-3">
-        <ChartLegend variant="full" />
+        <ChartLegend variant="history" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Trailing 6-mo revenue"
-          value={formatCurrency(kpis.trailingRevenue)}
-          hint="Within filtered series (last 6 pts)"
+          label="Year-over-year revenue growth"
+          value={formatSignedPct(overviewKpis.yoyRevenueGrowthPct)}
+          hint={overviewKpis.yoyRevenueHint}
           tone="accent"
         />
         <StatCard
-          label="Trailing margin"
-          value={formatPercent(kpis.trailingMarginPct)}
-          hint={formatCurrency(kpis.trailingMargin)}
+          label="Year-over-year margin change"
+          value={formatPts(overviewKpis.yoyMarginChangePts)}
+          hint={overviewKpis.yoyMarginHint}
         />
         <StatCard
-          label="Avg events / month"
-          value={kpis.avgEvents.toFixed(1)}
-          hint={`${chartHistory.length} months in view`}
-        />
-        <StatCard
-          label="A/R outstanding"
-          value={formatCurrency(kpis.arOutstanding)}
-          hint={
-            kpis.revenueGrowthPct == null
-              ? "Latest in filter"
-              : `Rev Δ ${(kpis.revenueGrowthPct * 100).toFixed(1)}% vs prior 6`
+          label="Top customer share"
+          value={
+            overviewKpis.topCustomerSharePct == null
+              ? "—"
+              : formatPercent(overviewKpis.topCustomerSharePct)
           }
-          tone={kpis.arOutstanding > 140000 ? "warn" : "default"}
+          hint={
+            overviewKpis.topCustomerName
+              ? `Of top-5 margin · ${overviewKpis.topCustomerName}`
+              : "Of ranked customers in view"
+          }
+        />
+        <StatCard
+          label="Average margin"
+          value={formatPercent(overviewKpis.avgMarginPct)}
+          hint={
+            overviewKpis.eventCountGrowthPct == null
+              ? overviewKpis.avgMarginHint
+              : `Events YoY ${formatSignedPct(overviewKpis.eventCountGrowthPct)}`
+          }
         />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Panel title="Recent history">
+      <div className="mt-4">
+        <Panel title="Recent history — revenues vs costs">
           <HistoryCharts months={chartHistory} showLegend={false} />
-        </Panel>
-        <Panel title="Projection preview (line)">
-          <ProjectionChart
-            history={bundle.history.slice(-12)}
-            forecast={forecast.points}
-            showLegend={false}
-            confidence={forecast.confidence}
-          />
-          <p className="mt-3 text-xs text-[var(--muted)]">
-            Model: {forecast.method} (full history; filters apply to charts/KPIs)
-          </p>
         </Panel>
       </div>
 
       <div className="mt-4">
-        <Panel title="AI insights">
-          <InsightCards initialInsights={insights} />
+        <Panel title="Most profitable segments">
+          <p className="mb-4 text-xs text-[var(--muted)]">
+            Ranked by gross margin $ · top 5 · respects Year / Quarter / Month
+            filters
+          </p>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Vendors used
+              </p>
+              <p className="mb-3 text-[11px] text-[var(--muted)]">
+                By allocated event gross margin $
+              </p>
+              <TopNBarChart items={rankings.vendors} />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Event by group
+              </p>
+              <p className="mb-3 text-[11px] text-[var(--muted)]">
+                By gross margin $ (event type)
+              </p>
+              <TopNBarChart items={rankings.eventGroups} />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Customers
+              </p>
+              <p className="mb-3 text-[11px] text-[var(--muted)]">
+                By gross margin $
+              </p>
+              <TopNBarChart items={rankings.customers} />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Venues
+              </p>
+              <p className="mb-3 text-[11px] text-[var(--muted)]">
+                By gross margin $
+              </p>
+              <TopNBarChart items={rankings.venues} />
+            </div>
+          </div>
+        </Panel>
+      </div>
+
+      <div className="mt-4">
+        <Panel title="AI summary — business plan ideas">
+          <InsightCards
+            initialInsights={insights}
+            context={{
+              filterLabel: filterLabel(filter),
+              rankings,
+              history: chartHistory,
+              kpis: {
+                yoyRevenueGrowthPct: overviewKpis.yoyRevenueGrowthPct,
+                avgMarginPct: overviewKpis.avgMarginPct,
+                topCustomerSharePct: overviewKpis.topCustomerSharePct,
+                topCustomerName: overviewKpis.topCustomerName,
+              },
+            }}
+          />
         </Panel>
       </div>
     </div>
