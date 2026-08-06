@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { AssistantChat } from "@/components/assistant/AssistantChat";
 import { logoutAction } from "@/features/users/actions";
 import type { AppRole } from "@/features/users/types";
@@ -378,64 +378,42 @@ export function AppShell({
     !showCosts &&
     !showAnalyticsCenter;
 
-  const [billingOpen, setBillingOpen] = useState(billingActive);
-  const [complianceOpen, setComplianceOpen] = useState(complianceActive);
-  const [usersOpen, setUsersOpen] = useState(usersActive);
-  const [eventsOpen, setEventsOpen] = useState(eventsActive);
-  const [attendeeOpen, setAttendeeOpen] = useState(attendeeActive);
-  const [vendorOpen, setVendorOpen] = useState(vendorActive);
-  const [customerOpen, setCustomerOpen] = useState(showCustomer && myDashboardActive);
-  const [contractsOpen, setContractsOpen] = useState(
-    contractsActive || workActive,
-  );
-  const [workOpen, setWorkOpen] = useState(workActive);
-  const [costsOpen, setCostsOpen] = useState(costsActive);
-  const [analyticsOpen, setAnalyticsOpen] = useState(analyticsCenterActive);
+  // Accordions are mutually exclusive: exactly one section (or none) is open.
+  // The section owning the active route is derived from pathname; a manual
+  // toggle overrides it only while the pathname is unchanged, so navigation
+  // always re-opens the section that owns the new route and closes the rest.
+  const routeSection: string | null = showCustomer && myDashboardActive
+    ? "customer"
+    : attendeeActive
+      ? "attendee"
+      : eventsActive
+        ? "events"
+        : vendorActive
+          ? "vendor"
+          : contractsActive || (workActive && showContracts)
+            ? "contracts"
+            : workActive
+              ? "work"
+              : billingActive
+                ? "billing"
+                : costsActive
+                  ? "costs"
+                  : analyticsCenterActive
+                    ? "analytics"
+                    : complianceActive
+                      ? "compliance"
+                      : usersActive
+                        ? "users"
+                        : null;
+  const [toggled, setToggled] = useState<{
+    path: string;
+    section: string | null;
+  } | null>(null);
+  const openSection =
+    toggled && toggled.path === pathname ? toggled.section : routeSection;
+  const toggleSection = (id: string) =>
+    setToggled({ path: pathname, section: openSection === id ? null : id });
   const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (billingActive) setBillingOpen(true);
-  }, [billingActive]);
-
-  useEffect(() => {
-    if (complianceActive) setComplianceOpen(true);
-  }, [complianceActive]);
-
-  useEffect(() => {
-    if (usersActive) setUsersOpen(true);
-  }, [usersActive]);
-
-  useEffect(() => {
-    if (eventsActive) setEventsOpen(true);
-  }, [eventsActive]);
-
-  useEffect(() => {
-    if (attendeeActive) setAttendeeOpen(true);
-  }, [attendeeActive]);
-
-  useEffect(() => {
-    if (vendorActive) setVendorOpen(true);
-  }, [vendorActive]);
-
-  useEffect(() => {
-    if (contractsActive || workActive) setContractsOpen(true);
-  }, [contractsActive, workActive]);
-
-  useEffect(() => {
-    if (workActive) setWorkOpen(true);
-  }, [workActive]);
-
-  useEffect(() => {
-    if (costsActive) setCostsOpen(true);
-  }, [costsActive]);
-
-  useEffect(() => {
-    if (analyticsCenterActive) setAnalyticsOpen(true);
-  }, [analyticsCenterActive]);
-
-  useEffect(() => {
-    if (myDashboardActive && showCustomer) setCustomerOpen(true);
-  }, [myDashboardActive, showCustomer]);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -494,8 +472,8 @@ export function AppShell({
             {showCustomer ? (
               <NavAccordion
                 title="My Portal"
-                open={customerOpen}
-                onToggle={() => setCustomerOpen((o) => !o)}
+                open={openSection === "customer"}
+                onToggle={() => toggleSection("customer")}
                 active={myDashboardActive}
                 controlsId="customer-nav-submenu"
                 links={customerLinks}
@@ -505,8 +483,8 @@ export function AppShell({
             {showAttendee ? (
               <NavAccordion
                 title="My Event"
-                open={attendeeOpen}
-                onToggle={() => setAttendeeOpen((o) => !o)}
+                open={openSection === "attendee"}
+                onToggle={() => toggleSection("attendee")}
                 active={attendeeActive}
                 controlsId="attendee-nav-submenu"
                 links={attendeeLinks}
@@ -516,8 +494,8 @@ export function AppShell({
             {showEvents ? (
               <NavAccordion
                 title="Event Operations"
-                open={eventsOpen}
-                onToggle={() => setEventsOpen((o) => !o)}
+                open={openSection === "events"}
+                onToggle={() => toggleSection("events")}
                 active={eventsActive}
                 controlsId="events-nav-submenu"
                 links={roleNav.events}
@@ -527,8 +505,8 @@ export function AppShell({
             {showVendor ? (
               <NavAccordion
                 title="Layouts"
-                open={vendorOpen}
-                onToggle={() => setVendorOpen((o) => !o)}
+                open={openSection === "vendor"}
+                onToggle={() => toggleSection("vendor")}
                 active={vendorActive}
                 controlsId="vendor-nav-submenu"
                 links={vendorLinks}
@@ -538,8 +516,8 @@ export function AppShell({
             {showContracts ? (
               <NavAccordion
                 title="Contracts & Engagements"
-                open={contractsOpen}
-                onToggle={() => setContractsOpen((o) => !o)}
+                open={openSection === "contracts"}
+                onToggle={() => toggleSection("contracts")}
                 active={contractsActive || (showWork && workActive)}
                 controlsId="contracts-nav-submenu"
                 links={roleNav.contracts}
@@ -563,8 +541,8 @@ export function AppShell({
             {showWork && !showContracts ? (
               <NavAccordion
                 title="Progress Tracker"
-                open={workOpen}
-                onToggle={() => setWorkOpen((o) => !o)}
+                open={openSection === "work"}
+                onToggle={() => toggleSection("work")}
                 active={workActive}
                 controlsId="work-nav-submenu"
                 links={workLinks}
@@ -574,8 +552,8 @@ export function AppShell({
             {showBilling ? (
               <NavAccordion
                 title="Billing & A/R"
-                open={billingOpen}
-                onToggle={() => setBillingOpen((o) => !o)}
+                open={openSection === "billing"}
+                onToggle={() => toggleSection("billing")}
                 active={billingActive}
                 controlsId="billing-nav-submenu"
                 links={roleNav.billing}
@@ -586,8 +564,8 @@ export function AppShell({
             {showCosts ? (
               <NavAccordion
                 title="Costs & Resources"
-                open={costsOpen}
-                onToggle={() => setCostsOpen((o) => !o)}
+                open={openSection === "costs"}
+                onToggle={() => toggleSection("costs")}
                 active={costsActive}
                 controlsId="costs-nav-submenu"
                 links={roleNav.costs}
@@ -597,8 +575,8 @@ export function AppShell({
             {showAnalyticsCenter ? (
               <NavAccordion
                 title="Analytics Center"
-                open={analyticsOpen}
-                onToggle={() => setAnalyticsOpen((o) => !o)}
+                open={openSection === "analytics"}
+                onToggle={() => toggleSection("analytics")}
                 active={analyticsCenterActive}
                 controlsId="analytics-nav-submenu"
                 links={analyticsCenterLinks}
@@ -608,8 +586,8 @@ export function AppShell({
             {showCompliance ? (
               <NavAccordion
                 title="GAAP Compliance"
-                open={complianceOpen}
-                onToggle={() => setComplianceOpen((o) => !o)}
+                open={openSection === "compliance"}
+                onToggle={() => toggleSection("compliance")}
                 active={complianceActive}
                 controlsId="compliance-nav-submenu"
                 links={complianceLinks}
@@ -619,8 +597,8 @@ export function AppShell({
             {showUsers ? (
               <NavAccordion
                 title="Users & Roles"
-                open={usersOpen}
-                onToggle={() => setUsersOpen((o) => !o)}
+                open={openSection === "users"}
+                onToggle={() => toggleSection("users")}
                 active={usersActive}
                 controlsId="users-nav-submenu"
                 links={roleNav.users}
