@@ -4,6 +4,7 @@ import {
   allowedRoutePrefixes,
   canAccessDashboardPath,
   homePathForRole,
+  notificationsPathForRole,
 } from "@/features/users/role-nav";
 import { findUserByEmail } from "@/features/users/session";
 import type { AppRole } from "@/features/users/types";
@@ -97,6 +98,20 @@ export function middleware(request: NextRequest) {
       pathname === "/dashboard" || pathname.startsWith("/dashboard/");
     if (isDashboard) {
       if (!canAccessDashboardPath(roleKey, pathname)) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/access-denied";
+        url.searchParams.set("from", pathname);
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.next();
+    }
+
+    const notif = notificationsPathForRole(roleKey);
+    if (
+      pathname === "/notifications" ||
+      pathname.startsWith("/notifications/")
+    ) {
+      if (notif !== "/notifications") {
         const url = request.nextUrl.clone();
         url.pathname = "/access-denied";
         url.searchParams.set("from", pathname);

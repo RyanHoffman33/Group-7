@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { DEMO_PASSWORD, roles, users } from "@/features/users/seed";
 import type { AppUser, SessionUser } from "@/features/users/types";
 
-export { homePathForRole, navSectionsForRole } from "@/features/users/role-nav";
+export { homePathForRole, navSectionsForRole, notificationsPathForRole } from "@/features/users/role-nav";
 export type { NavSection } from "@/features/users/role-nav";
 
 export const SESSION_COOKIE = "mainevent_demo_session";

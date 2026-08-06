@@ -131,7 +131,7 @@ export default async function AccountingDashboardPage() {
     return (
       <div className="rounded-md border border-[var(--danger)]/30 bg-[#fdf2f2] p-4">
         <h2 className="font-[family-name:var(--font-display)] text-xl text-[var(--ink)]">
-          Accounting Dashboard
+          Notifications Center
         </h2>
         <p className="mt-2 text-sm text-[var(--danger)]">
           Could not load accounting data: {message}
@@ -154,7 +154,7 @@ export default async function AccountingDashboardPage() {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <PageHeader
           compact
-          title="Accounting Dashboard"
+          title="Notifications Center"
           description={greeting}
         />
         <div className="flex items-center gap-3 pt-1">

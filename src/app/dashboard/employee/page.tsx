@@ -135,7 +135,7 @@ export default async function EmployeeDashboardPage() {
     <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col gap-2">
       <PageHeader
         compact
-        title="Employee Dashboard"
+        title="Notifications Center"
         description={greeting}
         actions={
           <div className="flex flex-wrap items-center gap-2">

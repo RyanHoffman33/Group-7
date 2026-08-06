@@ -7,7 +7,11 @@ import { AssistantChat } from "@/components/assistant/AssistantChat";
 import { logoutAction } from "@/features/users/actions";
 import type { AppRole } from "@/features/users/types";
 import { roleHasPermission } from "@/features/access/matrix";
-import { homePathForRole, type NavSection } from "@/features/users/role-nav";
+import {
+  homePathForRole,
+  notificationsPathForRole,
+  type NavSection,
+} from "@/features/users/role-nav";
 import { DemoRoleSwitcher } from "@/components/layout/DemoRoleSwitcher";
 
 const billingLinksAll = [
@@ -184,8 +188,17 @@ function isAnalyticsRoute(pathname: string) {
 
 function isMyDashboardActive(pathname: string, roleKey: AppRole) {
   const home = homePathForRole(roleKey);
-  if (home === "/dashboard") return pathname === "/dashboard";
+  if (home === "/home") return pathname === "/home";
   return pathname === home || pathname.startsWith(`${home}/`);
+}
+
+function isNotificationsActive(pathname: string, roleKey: AppRole) {
+  const href = notificationsPathForRole(roleKey);
+  if (!href) return false;
+  if (href === "/notifications") {
+    return pathname === "/notifications" || pathname === "/dashboard";
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function isLinkActive(pathname: string, href: string) {
@@ -207,6 +220,7 @@ function isLinkActive(pathname: string, href: string) {
     href === "/attendee" ||
     href === "/vendor" ||
     href === "/home" ||
+    href === "/notifications" ||
     href === "/contracts" ||
     href === "/work" ||
     href === "/costs" ||
@@ -316,6 +330,9 @@ export function AppShell({
   const analyticsCenterActive = analyticsRouteActive || profitabilityActive;
   const myDashboardHref = homePathForRole(session.roleKey);
   const myDashboardActive = isMyDashboardActive(pathname, session.roleKey);
+  const notificationsHref = notificationsPathForRole(session.roleKey);
+  const notificationsActive = isNotificationsActive(pathname, session.roleKey);
+  const showNotifications = navSections.includes("notifications");
   const showUsers = navSections.includes("users");
   const showBilling = navSections.includes("billing");
   const showCompliance = navSections.includes("compliance");
@@ -447,6 +464,20 @@ export function AppShell({
                 My Dashboard
               </Link>
             </li>
+            {showNotifications && notificationsHref ? (
+              <li>
+                <Link
+                  href={notificationsHref}
+                  className={`block rounded-md px-3 py-2.5 text-sm font-medium transition ${
+                    notificationsActive
+                      ? "bg-white/12 text-white"
+                      : "text-white/70 hover:bg-white/8 hover:text-white"
+                  }`}
+                >
+                  Notifications Center
+                </Link>
+              </li>
+            ) : null}
             {showCustomer ? (
               <NavAccordion
                 title="My Portal"

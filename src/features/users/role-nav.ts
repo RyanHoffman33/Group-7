@@ -16,6 +16,7 @@ export type NavSection =
   | "vendor"
   | "customer"
   | "approvals"
+  | "notifications"
   | "home_only";
 
 /** Roles that must not open internal finance suites (except their own portal). */
@@ -32,6 +33,10 @@ export function navSectionsForRole(roleKey: AppRole): NavSection[] {
   if (roleKey === "customer") {
     sections.push("customer");
     return sections;
+  }
+
+  if (notificationsPathForRole(roleKey)) {
+    sections.push("notifications");
   }
 
   if (roleHasPermission(roleKey, "users.read") || roleHasPermission(roleKey, "users.manage")) {
@@ -113,7 +118,8 @@ export function navSectionsForRole(roleKey: AppRole): NavSection[] {
 }
 
 /**
- * Role-specific "My Dashboard" destination.
+ * Role-specific "My Dashboard" (primary home) destination.
+ * Internal staff land on the calm /home overview; portals keep their own homes.
  */
 export function homePathForRole(roleKey: AppRole): string {
   switch (roleKey) {
@@ -124,6 +130,27 @@ export function homePathForRole(roleKey: AppRole): string {
     case "customer":
       return "/dashboard/customer";
     case "accounting":
+    case "event_coordinator":
+    case "project_manager":
+    case "department_manager":
+    case "executive":
+    case "system_admin":
+    default:
+      return "/home";
+  }
+}
+
+/**
+ * Former "My Dashboard" boards — now Notifications Center.
+ * Null for portal-only roles (customer / vendor / attendee).
+ */
+export function notificationsPathForRole(roleKey: AppRole): string | null {
+  switch (roleKey) {
+    case "attendee":
+    case "vendor":
+    case "customer":
+      return null;
+    case "accounting":
       return "/dashboard/accounting";
     case "event_coordinator":
       return "/dashboard/employee";
@@ -132,7 +159,7 @@ export function homePathForRole(roleKey: AppRole): string {
     case "executive":
     case "system_admin":
     default:
-      return "/dashboard";
+      return "/notifications";
   }
 }
 
@@ -144,12 +171,22 @@ export function canAccessDashboardPath(
   if (pathname !== "/dashboard" && !pathname.startsWith("/dashboard/")) {
     return false;
   }
-  const home = homePathForRole(roleKey);
-  if (home === "/attendee" || home === "/vendor") return false;
-  if (home === "/dashboard") {
-    return pathname === "/dashboard";
+
+  // Legacy /dashboard entry — redirect page sends users to Notifications Center.
+  if (pathname === "/dashboard") {
+    return notificationsPathForRole(roleKey) != null || roleKey === "customer";
   }
-  return pathname === home || pathname.startsWith(`${home}/`);
+
+  if (roleKey === "customer") {
+    return (
+      pathname === "/dashboard/customer" ||
+      pathname.startsWith("/dashboard/customer/")
+    );
+  }
+
+  const notif = notificationsPathForRole(roleKey);
+  if (!notif || !notif.startsWith("/dashboard")) return false;
+  return pathname === notif || pathname.startsWith(`${notif}/`);
 }
 
 /** Safe in-app destinations for shared manager-board deep links. */
@@ -261,9 +298,13 @@ export function allowedRoutePrefixes(roleKey: AppRole): string[] {
     prefixes.push("/analytics");
   }
 
-  const dashboardHome = homePathForRole(roleKey);
-  if (dashboardHome.startsWith("/dashboard")) {
-    prefixes.push(dashboardHome);
+  const notif = notificationsPathForRole(roleKey);
+  if (notif) {
+    prefixes.push(notif);
+    // Legacy /dashboard redirect target for roles whose board moved to /notifications.
+    if (notif === "/notifications") {
+      prefixes.push("/dashboard");
+    }
   }
 
   if (roleKey === "attendee") {
