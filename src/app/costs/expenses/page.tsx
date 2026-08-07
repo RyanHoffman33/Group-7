@@ -14,7 +14,7 @@ export default async function ExpenseEntryPage() {
   return (
     <div>
       <PageHeader
-        title="Vendor & expense entry"
+        title="Vendor Expense Entry"
         description="Log contractor/subcontractor, materials, equipment, vendor charges, advertising, travel, reimbursable, payroll-related, replacement parts, allocated, and other direct costs — each tied to a contract/event."
       />
       <div className="mx-auto max-w-xl">

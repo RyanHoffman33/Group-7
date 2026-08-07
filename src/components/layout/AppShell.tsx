@@ -96,7 +96,7 @@ const workLinks = [
 const costsLinksFull = [
   { href: "/costs", label: "Cost Dashboard" },
   { href: "/costs/time", label: "Time Entry" },
-  { href: "/costs/expenses", label: "Vendor & Expenses" },
+  { href: "/costs/expenses", label: "Vendor Expense Entry" },
   { href: "/costs/commitments", label: "Commitments" },
   { href: "/costs/approvals", label: "Expense approvals" },
   { href: "/costs/flags", label: "Flags & Exceptions" },
