@@ -48,17 +48,11 @@ export function LoginSplash() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/brand/mainevent-logo.png"
+          src="/brand/mainevent-mark.png?v=5"
           alt=""
-          width={280}
-          height={160}
-          className="h-28 w-auto max-w-[min(80vw,320px)] object-contain sm:h-36"
-          onError={(e) => {
-            const el = e.currentTarget;
-            if (!el.src.includes("mainevent-mark")) {
-              el.src = "/brand/mainevent-mark.png?v=5";
-            }
-          }}
+          width={200}
+          height={140}
+          className="h-28 w-auto max-w-[min(80vw,280px)] object-contain sm:h-36"
         />
         <div>
           <p className="font-[family-name:var(--font-display)] text-4xl tracking-[-0.03em] text-white sm:text-5xl">
