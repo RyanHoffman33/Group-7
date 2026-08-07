@@ -35,6 +35,13 @@ export default async function ProfitabilityPage() {
   ]);
   const totals = await getPortfolioTotals(events, exceptions);
   const historyMonths = toHistoryMonths(months);
+  const currentYear = new Date().getFullYear();
+  const currentYearRecognizedRevenue = months
+    .filter((m) => {
+      const key = m.month.length >= 7 ? m.month.slice(0, 7) : m.month;
+      return key.startsWith(String(currentYear));
+    })
+    .reduce((s, m) => s + m.recognized_revenue, 0);
 
   return (
     <div>
@@ -61,8 +68,8 @@ export default async function ProfitabilityPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Recognized revenue"
-          value={formatCurrency(totals.recognizedRevenue)}
-          hint="All events, billed-recognized"
+          value={formatCurrency(currentYearRecognizedRevenue)}
+          hint={`${currentYear} only · billed-recognized`}
           tone="accent"
         />
         <StatCard
