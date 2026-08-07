@@ -350,6 +350,7 @@ export function AppShell({
   navSections: NavSection[];
 }) {
   const pathname = usePathname();
+  const isMyDashboardHome = pathname === "/home";
   const billingActive = isBillingRoute(pathname);
   const complianceActive = isComplianceRoute(pathname);
   const usersActive = isUsersRoute(pathname);
@@ -672,8 +673,27 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="min-w-0">
-        <header className="border-b border-[var(--line)] bg-[var(--surface)] px-6 py-4">
+      <div className={`relative min-w-0 ${isMyDashboardHome ? "min-h-screen" : ""}`}>
+        {isMyDashboardHome ? (
+          <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{ backgroundImage: "url(/brand/my-dashboard-bg.png)" }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--bg)]/75 via-[var(--bg)]/70 to-[var(--bg)]/82"
+            />
+          </>
+        ) : null}
+        <header
+          className={`relative z-10 border-b px-6 py-4 ${
+            isMyDashboardHome
+              ? "border-white/40 bg-white/70 backdrop-blur-md"
+              : "border-[var(--line)] bg-[var(--surface)]"
+          }`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
@@ -686,7 +706,9 @@ export function AppShell({
           </div>
         </header>
         <main
-          className="px-6 py-8"
+          className={`relative z-10 px-6 py-8 ${
+            isMyDashboardHome ? "min-h-[calc(100vh-5.5rem)]" : ""
+          }`}
           style={{
             paddingBottom:
               "max(2rem, var(--ask-mainevent-pad, 2rem))",
