@@ -387,6 +387,8 @@ export function AppShell({
     ...(showProfitability ? profitabilitySubLinks : []),
   ];
   const showCustomer = navSections.includes("customer");
+  const showMyDashboard =
+    session.roleKey !== "customer" && session.roleKey !== "vendor";
   const roleNav = navForRole(session.roleKey);
   const homeOnly =
     navSections.includes("home_only") &&
@@ -471,18 +473,20 @@ export function AppShell({
 
         <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-4" aria-label="Primary">
           <ul className="space-y-1">
-            <li>
-              <Link
-                href={myDashboardHref}
-                className={`block rounded-md px-3 py-2.5 text-sm font-medium transition ${
-                  myDashboardActive
-                    ? "bg-white/12 text-white"
-                    : "text-white/70 hover:bg-white/8 hover:text-white"
-                }`}
-              >
-                My Dashboard
-              </Link>
-            </li>
+            {showMyDashboard ? (
+              <li>
+                <Link
+                  href={myDashboardHref}
+                  className={`block rounded-md px-3 py-2.5 text-sm font-medium transition ${
+                    myDashboardActive
+                      ? "bg-white/12 text-white"
+                      : "text-white/70 hover:bg-white/8 hover:text-white"
+                  }`}
+                >
+                  My Dashboard
+                </Link>
+              </li>
+            ) : null}
             {showNotifications && notificationsHref ? (
               <li>
                 <Link
