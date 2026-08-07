@@ -75,7 +75,7 @@ export default async function EventOverviewPage({
         <Panel>
           <FunnelChart
             stages={[
-              { title: "Invitations", count: f.invitationsSent, color: "#5b21b6", subMetrics: ["Unopened ~11%"] },
+              { title: "Invitations", count: f.invitationsSent, color: "#5b21b6" },
               { title: "Opened", count: f.invitationsOpened, pctLabel: "89% of sent", color: "#1e3a8a" },
               { title: "Website", count: f.websiteVisitors, pctLabel: "45% of opened", color: "#0369a1" },
               { title: "Reg visitors", count: f.registrationVisitors, pctLabel: "37% of visits", color: "#0f766e" },
