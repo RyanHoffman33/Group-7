@@ -195,13 +195,13 @@ export function AnalyticsCenterClient({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Year-over-year revenue growth"
+          label="YoY revenue (same period)"
           value={formatSignedPct(overviewKpis.yoyRevenueGrowthPct)}
           hint={overviewKpis.yoyRevenueHint}
           tone="accent"
         />
         <StatCard
-          label="Year-over-year margin change"
+          label="YoY margin (same period)"
           value={formatPts(overviewKpis.yoyMarginChangePts)}
           hint={overviewKpis.yoyMarginHint}
         />
@@ -224,7 +224,7 @@ export function AnalyticsCenterClient({
           hint={
             overviewKpis.eventCountGrowthPct == null
               ? overviewKpis.avgMarginHint
-              : `Events YoY ${formatSignedPct(overviewKpis.eventCountGrowthPct)}`
+              : `Events YoY ${formatSignedPct(overviewKpis.eventCountGrowthPct)} · same period`
           }
         />
       </div>

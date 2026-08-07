@@ -116,10 +116,10 @@ export function rankingsFromSlices(
 }
 
 export type OverviewKpis = {
-  /** YoY revenue growth (selected year vs prior, or trailing 12 vs prior 12). */
+  /** YoY revenue growth using same calendar months in prior year (period-matched). */
   yoyRevenueGrowthPct: number | null;
   yoyRevenueHint: string;
-  /** YoY change in margin % points. */
+  /** YoY change in margin % points (same months). */
   yoyMarginChangePts: number | null;
   yoyMarginHint: string;
   /** Share of gross margin from the single largest customer. */
@@ -128,18 +128,87 @@ export type OverviewKpis = {
   /** Blended average margin % in view. */
   avgMarginPct: number;
   avgMarginHint: string;
-  /** YoY event count growth. */
+  /** YoY event count growth (same months). */
   eventCountGrowthPct: number | null;
   eventCountHint: string;
 };
 
-function yearTotals(
-  history: { month: string; revenue: number; margin: number; events: number }[],
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+type MonthHistoryRow = {
+  month: string;
+  revenue: number;
+  margin: number;
+  events: number;
+};
+
+function parseMonth(month: string): { year: number; monthNum: number } {
+  const d = new Date(`${month.slice(0, 10)}T00:00:00Z`);
+  return { year: d.getUTCFullYear(), monthNum: d.getUTCMonth() + 1 };
+}
+
+function matchesSubPeriod(
+  monthNum: number,
+  filter: { quarter: string; month: string },
+): boolean {
+  const q = Math.ceil(monthNum / 3);
+  if (filter.quarter !== "all" && q !== Number(filter.quarter)) return false;
+  if (filter.month !== "all" && monthNum !== Number(filter.month)) return false;
+  return true;
+}
+
+/** Month-of-year numbers present in `year` that also match quarter/month filters. */
+function monthsPresentInYear(
+  history: MonthHistoryRow[],
   year: number,
-) {
-  const rows = history.filter(
-    (m) => new Date(`${m.month}T00:00:00Z`).getUTCFullYear() === year,
+  filter: { quarter: string; month: string },
+): number[] {
+  const set = new Set<number>();
+  for (const row of history) {
+    const { year: y, monthNum } = parseMonth(row.month);
+    if (y !== year) continue;
+    if (!matchesSubPeriod(monthNum, filter)) continue;
+    set.add(monthNum);
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+function formatMonthSpan(months: number[]): string {
+  if (months.length === 0) return "";
+  if (months.length === 1) return MONTH_SHORT[months[0] - 1];
+  const contiguous = months.every(
+    (m, i) => i === 0 || m === months[i - 1] + 1,
   );
+  if (contiguous) {
+    return `${MONTH_SHORT[months[0] - 1]}–${MONTH_SHORT[months[months.length - 1] - 1]}`;
+  }
+  return months.map((m) => MONTH_SHORT[m - 1]).join(", ");
+}
+
+/** Sum revenue/margin/events for a year restricted to specific calendar months. */
+function periodTotals(
+  history: MonthHistoryRow[],
+  year: number,
+  monthNums: number[],
+) {
+  const monthSet = new Set(monthNums);
+  const rows = history.filter((m) => {
+    const { year: y, monthNum } = parseMonth(m.month);
+    return y === year && monthSet.has(monthNum);
+  });
   const revenue = rows.reduce((s, m) => s + m.revenue, 0);
   const margin = rows.reduce((s, m) => s + m.margin, 0);
   const events = rows.reduce((s, m) => s + m.events, 0);
@@ -152,16 +221,30 @@ function yearTotals(
   };
 }
 
+/**
+ * Same-period prior-year comparison: if the focus year only has Jan–Jul,
+ * compare Jan–Jul focus vs Jan–Jul prior (not full prior calendar year).
+ * When a month is missing on either side, it is dropped from both.
+ */
+function periodMatchedMonthNums(
+  history: MonthHistoryRow[],
+  focusYear: number,
+  priorYear: number,
+  filter: { quarter: string; month: string },
+): number[] {
+  const focusMonths = monthsPresentInYear(history, focusYear, filter);
+  const priorMonths = new Set(monthsPresentInYear(history, priorYear, filter));
+  return focusMonths.filter((m) => priorMonths.has(m));
+}
+
 /** Demo-friendly overview KPIs with soft labels computed from monthly history + rankings. */
 export function overviewKpisFromData(
-  history: { month: string; revenue: number; margin: number; events: number }[],
+  history: MonthHistoryRow[],
   rankings: AnalyticsRankings,
   filter: { year: string; quarter: string; month: string },
 ): OverviewKpis {
   const years = [
-    ...new Set(
-      history.map((m) => new Date(`${m.month}T00:00:00Z`).getUTCFullYear()),
-    ),
+    ...new Set(history.map((m) => parseMonth(m.month).year)),
   ].sort((a, b) => a - b);
 
   let focusYear: number | null = null;
@@ -183,19 +266,33 @@ export function overviewKpisFromData(
   let eventCountHint = "Need two years of history";
 
   if (focusYear != null && priorYear != null) {
-    const cur = yearTotals(history, focusYear);
-    const prev = yearTotals(history, priorYear);
+    const matchedMonths = periodMatchedMonthNums(
+      history,
+      focusYear,
+      priorYear,
+      filter,
+    );
+    const cur = periodTotals(history, focusYear, matchedMonths);
+    const prev = periodTotals(history, priorYear, matchedMonths);
+    const span = formatMonthSpan(matchedMonths);
+    const isPartialYear = matchedMonths.length > 0 && matchedMonths.length < 12;
+    const periodLabel = isPartialYear
+      ? `YTD vs prior YTD · ${span}`
+      : `Same period · ${span || "full year"}`;
+
     if (prev.revenue > 0 && cur.months > 0 && prev.months > 0) {
       yoyRevenueGrowthPct = (cur.revenue - prev.revenue) / prev.revenue;
-      yoyRevenueHint = `${focusYear} vs ${priorYear}`;
+      yoyRevenueHint = `${periodLabel} · ${focusYear} vs ${priorYear}`;
     }
     if (prev.months > 0 && cur.months > 0) {
       yoyMarginChangePts = (cur.marginPct - prev.marginPct) * 100;
-      yoyMarginHint = `Margin % ${focusYear} vs ${priorYear}`;
+      yoyMarginHint = `Margin % · ${periodLabel}`;
     }
     if (prev.events > 0 && cur.months > 0 && prev.months > 0) {
       eventCountGrowthPct = (cur.events - prev.events) / prev.events;
-      eventCountHint = `${cur.events} events in ${focusYear} vs ${prev.events} in ${priorYear}`;
+      eventCountHint = `${cur.events} vs ${prev.events} events · ${periodLabel}`;
+    } else if (cur.months > 0 && prev.months > 0 && matchedMonths.length > 0) {
+      eventCountHint = `${cur.events} vs ${prev.events} events · ${periodLabel}`;
     }
   }
 
