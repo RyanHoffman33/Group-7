@@ -178,7 +178,20 @@ export default async function MyDashboardHomePage() {
   const deadlines = (data?.deadlines ?? []).slice(0, 4);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="relative -mx-6 -mt-8 min-h-[calc(100vh-7.5rem)] overflow-hidden">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url(/brand/my-dashboard-bg.png)",
+        }}
+      />
+      {/* Scrim so cards and type stay readable over the photo */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--bg)]/88 via-[var(--bg)]/78 to-[var(--bg)]/90"
+      />
+      <div className="relative z-10 mx-auto max-w-5xl space-y-6 px-6 py-8">
       <PageHeader
         title="My Dashboard"
         description={`Welcome back, ${firstName}.`}
@@ -346,6 +359,7 @@ export default async function MyDashboardHomePage() {
             </p>
           ) : null}
         </Panel>
+      </div>
       </div>
     </div>
   );
