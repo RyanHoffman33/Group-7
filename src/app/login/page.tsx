@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { LoginSplash } from "@/components/auth/LoginSplash";
 import {
   loginAction,
   loginAsEmailFormAction,
@@ -17,6 +18,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg)] px-4 py-10">
+      <LoginSplash />
       <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-8 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
