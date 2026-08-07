@@ -23,6 +23,7 @@ import {
   listPoApprovals,
 } from "@/features/performance-obligations";
 import { ContractDetailClient } from "@/components/contracts/ContractDetailClient";
+import { ContractControlsPanel } from "@/components/controls/ContractControlsPanel";
 import { PageHeader } from "@/components/billing/ui";
 import Link from "next/link";
 
@@ -111,6 +112,7 @@ export default async function ContractDetailPage({
         poSummary={poSummary}
         poApprovals={poApprovals}
       />
+      <ContractControlsPanel contractId={contractId} />
     </div>
   );
 }
