@@ -36,6 +36,10 @@ export type AgingRow = OutstandingRow & {
 
 export async function listInvoices(filters?: {
   contractId?: string;
+  customerId?: string;
+  status?: string;
+  recognitionStatus?: string;
+  q?: string;
 }): Promise<(Invoice & { customer_name?: string; event_name?: string })[]> {
   const supabase = createClient();
   let q = supabase
@@ -44,6 +48,18 @@ export async function listInvoices(filters?: {
     .order("issue_date", { ascending: false });
   if (filters?.contractId) {
     q = q.eq("contract_id", filters.contractId);
+  }
+  if (filters?.customerId) {
+    q = q.eq("customer_id", filters.customerId);
+  }
+  if (filters?.status) {
+    q = q.eq("status", filters.status);
+  }
+  if (filters?.recognitionStatus) {
+    q = q.eq("recognition_status", filters.recognitionStatus);
+  }
+  if (filters?.q?.trim()) {
+    q = q.ilike("invoice_number", `%${filters.q.trim()}%`);
   }
   const { data, error } = await q;
   if (error) throw error;

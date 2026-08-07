@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { listCustomers, listContracts, getContract } from "@/features/billing/adapters/upstream";
 import { listInvoices } from "@/features/billing/queries";
 import { formatDate, formatLabel } from "@/features/billing/aging";
 import { CreateInvoiceForm } from "@/components/billing/CreateInvoiceForm";
+import { InvoiceFilters } from "@/components/billing/InvoiceFilters";
 import { Money, PageHeader, Panel, StatusPill } from "@/components/billing/ui";
 
 export const dynamic = "force-dynamic";
@@ -23,60 +25,98 @@ function recogTone(status: string) {
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ contract_id?: string; contractId?: string }>;
+  searchParams: Promise<{
+    contract_id?: string;
+    contractId?: string;
+    customer_id?: string;
+    status?: string;
+    recognition?: string;
+    q?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const contractFilter = sp.contract_id || sp.contractId || undefined;
+  const customerFilter = sp.customer_id || undefined;
+  const statusFilter =
+    sp.status && sp.status !== "all" ? sp.status : undefined;
+  const recognitionFilter =
+    sp.recognition && sp.recognition !== "all" ? sp.recognition : undefined;
+  const qFilter = sp.q?.trim() || undefined;
 
   const [invoices, customers, contracts, scopedContract] = await Promise.all([
-    listInvoices(contractFilter ? { contractId: contractFilter } : undefined),
+    listInvoices({
+      contractId: contractFilter,
+      customerId: customerFilter,
+      status: statusFilter,
+      recognitionStatus: recognitionFilter,
+      q: qFilter,
+    }),
     listCustomers(),
     listContracts(),
     contractFilter ? getContract(contractFilter) : Promise.resolve(null),
   ]);
 
-  const panelTitle = scopedContract
-    ? `Invoices for ${scopedContract.contract_number ?? scopedContract.event_name}`
-    : contractFilter
-      ? "Invoices for contract"
+  const filterBits = [
+    scopedContract
+      ? scopedContract.contract_number ?? scopedContract.event_name
+      : contractFilter
+        ? "contract"
+        : null,
+    customerFilter
+      ? customers.find((c) => c.id === customerFilter)?.name ?? "customer"
+      : null,
+    statusFilter ? formatLabel(statusFilter) : null,
+    recognitionFilter ? formatLabel(recognitionFilter) : null,
+    qFilter ? `“${qFilter}”` : null,
+  ].filter(Boolean);
+
+  const panelTitle =
+    filterBits.length > 0
+      ? `Invoices · ${filterBits.join(" · ")}`
       : "All invoices";
+
+  const customerOptions = customers
+    .map((c) => ({ id: c.id, label: c.name }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const contractOptions = contracts
+    .map((c) => ({
+      id: c.id,
+      label: `${c.contract_number ? `${c.contract_number} · ` : ""}${c.event_name}`,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   return (
     <div>
       <PageHeader
         title="Invoices"
-        description={
-          scopedContract
-            ? `Filtered to ${scopedContract.event_name}. Clear the filter to see all invoices.`
-            : "Create and manage customer invoices. Use Determine charges for method-based billing. Track unpaid, partial, paid, disputed, canceled, and void."
-        }
+        description="Create and manage customer invoices. Filter by status, customer, contract, or recognition — or search by invoice number."
         actions={
-          contractFilter ? (
-            <div className="flex flex-wrap items-center gap-3">
-              {scopedContract ? (
-                <Link
-                  href={`/contracts/${scopedContract.id}`}
-                  className="text-sm font-medium text-[var(--accent)]"
-                >
-                  ← Contract workspace
-                </Link>
-              ) : null}
-              <Link
-                href="/billing/invoices"
-                className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm font-semibold"
-              >
-                Clear contract filter
-              </Link>
-            </div>
+          scopedContract ? (
+            <Link
+              href={`/contracts/${scopedContract.id}`}
+              className="text-sm font-medium text-[var(--accent)]"
+            >
+              ← Contract workspace
+            </Link>
           ) : undefined
         }
       />
 
+      <Suspense fallback={null}>
+        <InvoiceFilters
+          customers={customerOptions}
+          contracts={contractOptions}
+        />
+      </Suspense>
+
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Panel title={panelTitle}>
+          <p className="mb-3 text-xs text-[var(--muted)]">
+            Showing {invoices.length} invoice{invoices.length === 1 ? "" : "s"}
+          </p>
           {invoices.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
-              No invoices{contractFilter ? " for this contract" : ""}.
+              No invoices match these filters.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -147,8 +187,10 @@ export default async function InvoicesPage({
               label: `${c.contract_number ? `${c.contract_number} · ` : ""}${c.event_name}`,
               customer_id: c.customer_id,
             }))}
-            defaultCustomerId={scopedContract?.customer_id}
-            defaultContractId={scopedContract?.id}
+            defaultCustomerId={
+              scopedContract?.customer_id ?? customerFilter ?? undefined
+            }
+            defaultContractId={scopedContract?.id ?? contractFilter}
           />
         </Panel>
       </div>
